@@ -3,11 +3,16 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "npx vercel dev"
+    "dev": "npx vercel dev",
+    "collect-prices": "node scripts/collect-prices.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.0",
     "busboy": "^1.6.0",
     "csv-parse": "^5.6.0"
+  },
+  "devDependencies": {
+    "@sparticuz/chromium": "^131.0.0",
+    "puppeteer-core": "^23.11.1"
   }
 }

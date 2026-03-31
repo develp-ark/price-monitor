@@ -32,12 +32,28 @@ table.data td.num{text-align:right;font-variant-numeric:tabular-nums}
 .err{background:#fce8e6;color:#c5221f;padding:12px 16px;border-radius:10px;margin-bottom:12px;font-size:13px}
 .empty{padding:28px;text-align:center;color:#9aa0a6}
 .badge{font-size:10px;padding:2px 8px;border-radius:6px;font-weight:600;background:#e8f0fe;color:#1a73e8}
-.action-bar{background:#fff;border-radius:12px;padding:12px 18px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid #e8eaed}
-.btn-upload{padding:10px 22px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:#1a73e8;color:#fff;box-shadow:0 1px 3px rgba(26,115,232,.3);transition:all .2s}
-.btn-upload:hover:not(:disabled){background:#1557b0;transform:translateY(-1px)}
-.btn-upload:disabled{opacity:.55;cursor:not-allowed}
-.upload-hint{font-size:12px;color:#5f6368}
-.upload-msg{background:#e6f4ea;border:1px solid #ceead6;color:#137333;padding:12px 16px;border-radius:10px;margin-bottom:14px;font-size:13px;display:none}
+.upload-collapsible{background:#fff;border-radius:12px;border:1px solid #e8eaed;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:16px;overflow:hidden}
+.upload-collapse-hdr{width:100%;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border:none;background:#fafbfc;font-size:14px;font-weight:700;color:#202124;cursor:pointer;text-align:left;transition:background .15s;border-bottom:1px solid transparent}
+.upload-collapse-hdr:hover{background:#f1f3f4}
+.upload-collapse-hdr[aria-expanded="true"]{border-bottom-color:#e8eaed}
+.upload-collapse-hdr .chev{font-size:11px;color:#5f6368;transition:transform .2s}
+.upload-collapse-hdr[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.upload-collapse-body{padding:16px}
+.drop-zone{border:2px dashed #c4c7cc;border-radius:12px;padding:32px 20px;text-align:center;cursor:pointer;transition:background .15s,border-color .15s;outline:none}
+.drop-zone:hover{border-color:#8ab4f8;background:#f8faff}
+.drop-zone:focus-visible{box-shadow:0 0 0 2px rgba(26,115,232,.35)}
+.drop-zone.dragover{background:#EBF3FE;border:2px solid #1a73e8;border-style:solid}
+.drop-zone.uploading{cursor:wait;pointer-events:none;opacity:.92}
+.drop-zone-inner{max-width:420px;margin:0 auto}
+.drop-icon{display:block;margin:0 auto 10px;color:#5f6368}
+.drop-icon svg{width:36px;height:36px;display:block;margin:0 auto}
+.drop-text{font-size:14px;color:#5f6368;line-height:1.45}
+.drop-zone.dragover .drop-text{color:#1a73e8;font-weight:600}
+.upload-progress-wrap{margin-top:16px;height:4px;background:#e8eaed;border-radius:2px;overflow:hidden}
+.upload-progress-bar{height:100%;width:30%;background:#1a73e8;border-radius:2px;animation:upload-indet 1s ease-in-out infinite}
+@keyframes upload-indet{0%{transform:translateX(-100%)}100%{transform:translateX(400%)}}
+.upload-hint-foot{font-size:11px;color:#9aa0a6;margin-top:12px}
+.upload-msg{background:#e6f4ea;border:1px solid #ceead6;color:#137333;padding:12px 16px;border-radius:10px;margin-top:14px;font-size:14px;display:none}
 .upload-msg.err-msg{background:#fce8e6;border-color:#f5c6c0;color:#c5221f}
 .filter-row{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding:12px 14px;border-bottom:1px solid #f1f3f4;background:#fafbfc}
 .tabs-brand{display:flex;flex-wrap:wrap;gap:6px}
@@ -70,14 +86,31 @@ table.data td.num{text-align:right;font-variant-numeric:tabular-nums}
   <span class="sub" id="refreshed"></span>
 </header>
 <div class="wrap">
-  <div class="action-bar">
-    <input type="file" id="csvFile" accept=".csv,text/csv" hidden />
-    <button type="button" class="btn-upload" id="btnCsv">SKU CSV 업로드</button>
-    <span class="upload-hint" id="uploadHint">브랜드, SKU ID, SKU 명, … 형식 (sales-monitor와 동일)</span>
-  </div>
-  <div id="uploadResult" class="upload-msg" role="status"></div>
   <div id="errBox" class="err" style="display:none"></div>
   <div class="summary-row" id="summary"></div>
+
+  <div class="upload-collapsible">
+    <button type="button" class="upload-collapse-hdr" id="uploadCollapseToggle" aria-expanded="false" aria-controls="uploadCollapseBody">
+      <span>📁 SKU CSV 업로드</span>
+      <span class="chev" aria-hidden="true">▼</span>
+    </button>
+    <div class="upload-collapse-body" id="uploadCollapseBody" hidden>
+      <input type="file" id="csvFile" accept=".csv,text/csv" hidden />
+      <div class="drop-zone" id="dropZone" tabindex="0" role="button" aria-label="CSV 파일 선택 또는 끌어다 놓기">
+        <div class="drop-zone-inner">
+          <span class="drop-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          </span>
+          <p class="drop-text" id="dropText">CSV 파일을 여기에 끌어다 놓으세요</p>
+          <div class="upload-progress-wrap" id="uploadProgress" style="display:none" aria-hidden="true">
+            <div class="upload-progress-bar indeterminate"></div>
+          </div>
+          <p class="upload-hint-foot">클릭하여 선택 · 브랜드, SKU ID, SKU 명 형식 (sales-monitor와 동일)</p>
+        </div>
+      </div>
+      <div id="uploadResult" class="upload-msg" role="status"></div>
+    </div>
+  </div>
 
   <h2 class="stitle">브랜드별 수집 현황</h2>
   <div class="panel">
@@ -452,6 +485,13 @@ async function load() {
     '갱신: ' + new Date().toLocaleString('ko-KR');
 }
 
+let uploadSuccessTimer = null;
+let uploadBusy = false;
+let dragDepth = 0;
+
+const DROP_IDLE = 'CSV 파일을 여기에 끌어다 놓으세요';
+const DROP_HOVER = '여기에 놓으세요';
+
 function showUploadMsg(text, isErr) {
   const el = document.getElementById('uploadResult');
   el.style.display = 'block';
@@ -466,21 +506,40 @@ function hideUploadMsg() {
   el.classList.remove('err-msg');
 }
 
-document.getElementById('btnCsv').addEventListener('click', () => {
-  document.getElementById('csvFile').click();
-});
+function setDropText(text) {
+  document.getElementById('dropText').textContent = text;
+}
 
-document.getElementById('csvFile').addEventListener('change', async (ev) => {
-  const file = ev.target.files && ev.target.files[0];
-  ev.target.value = '';
-  if (!file) return;
+function setUploading(on) {
+  const dz = document.getElementById('dropZone');
+  const bar = document.getElementById('uploadProgress');
+  if (on) {
+    dz.classList.add('uploading');
+    bar.style.display = 'block';
+    bar.setAttribute('aria-hidden', 'false');
+    setDropText('업로드 중…');
+  } else {
+    dz.classList.remove('uploading');
+    bar.style.display = 'none';
+    bar.setAttribute('aria-hidden', 'true');
+    setDropText(DROP_IDLE);
+  }
+}
 
-  const btn = document.getElementById('btnCsv');
-  const hint = document.getElementById('uploadHint');
+function clearUploadSuccessTimer() {
+  if (uploadSuccessTimer) {
+    clearTimeout(uploadSuccessTimer);
+    uploadSuccessTimer = null;
+  }
+}
+
+async function performUpload(file) {
+  if (!file || uploadBusy) return;
+  uploadBusy = true;
+  clearUploadSuccessTimer();
   hideUploadMsg();
   hideErr();
-  btn.disabled = true;
-  hint.textContent = '업로드 중…';
+  setUploading(true);
 
   try {
     const fd = new FormData();
@@ -490,17 +549,97 @@ document.getElementById('csvFile').addEventListener('change', async (ev) => {
     if (!r.ok || j.ok === false) {
       throw new Error(j.error || r.statusText || '업로드 실패');
     }
-    showUploadMsg(
-      `완료: 신규 ${j.inserted}건, 갱신 ${j.updated}건 (총 ${j.total}건)`
-    );
-    await load();
+    setUploading(false);
+    const total = j.total ?? 0;
+    const ins = j.inserted ?? 0;
+    const upd = j.updated ?? 0;
+    showUploadMsg(`✅ ${total}건 등록 (신규 ${ins}, 업데이트 ${upd})`, false);
+    uploadSuccessTimer = setTimeout(async () => {
+      uploadSuccessTimer = null;
+      hideUploadMsg();
+      try {
+        await load();
+      } catch (e) {
+        showErr(e.message || String(e));
+      }
+    }, 3000);
   } catch (e) {
+    setUploading(false);
     showUploadMsg(e.message || String(e), true);
   } finally {
-    btn.disabled = false;
-    hint.textContent = '브랜드, SKU ID, SKU 명, … 형식 (sales-monitor와 동일)';
+    uploadBusy = false;
   }
-});
+}
+
+(function initUploadUi() {
+  const uploadToggle = document.getElementById('uploadCollapseToggle');
+  const uploadBody = document.getElementById('uploadCollapseBody');
+  uploadToggle.addEventListener('click', () => {
+    const open = uploadToggle.getAttribute('aria-expanded') === 'true';
+    const next = !open;
+    uploadToggle.setAttribute('aria-expanded', String(next));
+    if (next) uploadBody.removeAttribute('hidden');
+    else uploadBody.setAttribute('hidden', '');
+  });
+
+  const dropZone = document.getElementById('dropZone');
+  const csvFile = document.getElementById('csvFile');
+
+  dropZone.addEventListener('click', () => {
+    if (uploadBusy) return;
+    csvFile.click();
+  });
+
+  dropZone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (!uploadBusy) csvFile.click();
+    }
+  });
+
+  dropZone.addEventListener('dragenter', (e) => {
+    if (uploadBusy) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepth++;
+    dropZone.classList.add('dragover');
+    setDropText(DROP_HOVER);
+  });
+
+  dropZone.addEventListener('dragleave', (e) => {
+    if (uploadBusy) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepth--;
+    if (dragDepth <= 0) {
+      dragDepth = 0;
+      dropZone.classList.remove('dragover');
+      setDropText(DROP_IDLE);
+    }
+  });
+
+  dropZone.addEventListener('dragover', (e) => {
+    if (uploadBusy) return;
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepth = 0;
+    dropZone.classList.remove('dragover');
+    if (!uploadBusy) setDropText(DROP_IDLE);
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) performUpload(f);
+  });
+
+  csvFile.addEventListener('change', (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (file) performUpload(file);
+  });
+})();
 
 load().catch((e) => showErr(e.message || String(e)));
 setInterval(() => load().catch((e) => showErr(e.message)), 120000);
