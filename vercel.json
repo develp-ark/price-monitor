@@ -1,7 +1,9 @@
 {
   "rewrites": [{ "source": "/", "destination": "/index.html" }],
   "functions": {
-    "api/sku-upload.js": { "maxDuration": 60 }
+    "api/sku-upload.js": { "maxDuration": 60 },
+    "api/sku-detail.js": { "maxDuration": 60 },
+    "api/sku-batch-toggle.js": { "maxDuration": 30 }
   },
   "headers": [
     {

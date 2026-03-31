@@ -7,6 +7,9 @@ const COL_BRAND = '브랜드';
 const COL_SKU_ID = 'SKU ID';
 const COL_SKU_NAME = 'SKU 명';
 const COL_URL = 'url';
+const COL_REGISTERED = '등록가';
+const COL_FLAG = '플래그';
+const COL_MEMO = '메모';
 
 function defaultProductUrl(skuId) {
   return `https://www.coupang.com/vp/products/${skuId}`;
@@ -83,7 +86,20 @@ function rowToPayload(rec) {
   let product_url = String(rec[COL_URL] ?? '').trim();
   if (!product_url) product_url = defaultProductUrl(sku_id);
 
-  return { sku_id, brand, sku_name, product_url };
+  const regRaw = String(rec[COL_REGISTERED] ?? '').replace(/,/g, '').trim();
+  let registered_price = null;
+  if (regRaw !== '') {
+    const n = parseInt(regRaw, 10);
+    if (!Number.isNaN(n)) registered_price = n;
+  }
+
+  const flagRaw = String(rec[COL_FLAG] ?? '').trim();
+  const flag = flagRaw === '' ? null : flagRaw;
+
+  const memoRaw = String(rec[COL_MEMO] ?? '').trim();
+  const memo = memoRaw === '' ? null : memoRaw;
+
+  return { sku_id, brand, sku_name, product_url, registered_price, flag, memo };
 }
 
 function dedupeBySkuId(rows) {
@@ -142,7 +158,12 @@ module.exports = async (req, res) => {
 
   for (const p of bySku.values()) {
     if (existing.has(p.sku_id)) toUpdate.push(p);
-    else toInsert.push({ ...p, is_active: true, collect_cycle: 7 });
+    else
+      toInsert.push({
+        ...p,
+        is_active: true,
+        collect_cycle: 7,
+      });
   }
 
   let inserted = 0;
@@ -165,6 +186,9 @@ module.exports = async (req, res) => {
             brand: p.brand,
             sku_name: p.sku_name,
             product_url: p.product_url,
+            registered_price: p.registered_price,
+            flag: p.flag,
+            memo: p.memo,
           })
           .eq('sku_id', p.sku_id)
       )

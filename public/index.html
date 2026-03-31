@@ -10,7 +10,7 @@ body{font-family:'Segoe UI','Apple SD Gothic Neo',sans-serif;background:#f5f6fa;
 .header{background:linear-gradient(135deg,#1a73e8 0%,#4285f4 100%);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(26,115,232,.3)}
 .header h1{font-size:18px;color:#fff;font-weight:700;letter-spacing:-0.3px}
 .header .sub{font-size:12px;color:rgba(255,255,255,.85)}
-.wrap{max-width:1280px;margin:0 auto;padding:16px}
+.wrap{max-width:1320px;margin:0 auto;padding:16px}
 .summary-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:18px}
 .scard{background:linear-gradient(135deg,#f8f9ff 0%,#fff 100%);border-radius:12px;padding:14px;text-align:center;border:1px solid #e8eaed;box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .scard .sl{font-size:11px;color:#5f6368;margin-bottom:4px;font-weight:500}
@@ -39,6 +39,26 @@ table.data td.num{text-align:right;font-variant-numeric:tabular-nums}
 .upload-hint{font-size:12px;color:#5f6368}
 .upload-msg{background:#e6f4ea;border:1px solid #ceead6;color:#137333;padding:12px 16px;border-radius:10px;margin-bottom:14px;font-size:13px;display:none}
 .upload-msg.err-msg{background:#fce8e6;border-color:#f5c6c0;color:#c5221f}
+.filter-row{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding:12px 14px;border-bottom:1px solid #f1f3f4;background:#fafbfc}
+.tabs-brand{display:flex;flex-wrap:wrap;gap:6px}
+.tab-brand{padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;border:1.5px solid #dadce0;background:#fff;color:#5f6368;cursor:pointer;transition:all .15s}
+.tab-brand:hover{border-color:#1a73e8;color:#1a73e8}
+.tab-brand.on{background:#1a73e8;color:#fff;border-color:#1a73e8}
+.filter-row select,.filter-row input[type=search]{padding:7px 10px;border:1px solid #dadce0;border-radius:8px;font-size:12px;min-width:140px}
+.filter-row input[type=search]{min-width:200px;flex:1;max-width:320px}
+.sched-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;padding:16px}
+.sched-card{background:linear-gradient(135deg,#fff 0%,#f8f9ff 100%);border:1px solid #e8eaed;border-radius:16px;padding:16px 18px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.sched-card h3{font-size:14px;font-weight:700;margin-bottom:12px;color:#202124;line-height:1.35}
+.sched-meta{font-size:12px;color:#5f6368;margin-bottom:6px;display:flex;justify-content:space-between;gap:8px}
+.sched-meta b{color:#202124;font-weight:600}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid #f1f3f4}
+.toggle-label{font-size:12px;font-weight:600;color:#5f6368}
+.btn-toggle{padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;border:none;cursor:pointer;transition:all .15s}
+.btn-toggle.on{background:#34a853;color:#fff}
+.btn-toggle.off{background:#dadce0;color:#5f6368}
+.btn-toggle:disabled{opacity:.5;cursor:wait}
+.link-sku{color:#1a73e8;text-decoration:none}
+.link-sku:hover{text-decoration:underline}
 </style>
 </head>
 <body>
@@ -79,18 +99,54 @@ table.data td.num{text-align:right;font-variant-numeric:tabular-nums}
     </div>
   </div>
 
-  <h2 class="stitle">수집 예정 스케줄 (7일)</h2>
+  <h2 class="stitle">SKU 목록</h2>
   <div class="panel">
+    <div class="filter-row">
+      <div class="tabs-brand" id="brandTabs"></div>
+      <label class="muted" style="display:flex;align-items:center;gap:6px">
+        플래그
+        <select id="flagFilter"></select>
+      </label>
+      <label class="muted" style="display:flex;align-items:center;gap:6px">
+        정렬
+        <select id="sortSku">
+          <option value="brand">브랜드 → SKU</option>
+          <option value="name">상품명</option>
+          <option value="chg_desc">변동률 높은순</option>
+          <option value="chg_asc">변동률 낮은순</option>
+        </select>
+      </label>
+      <input type="search" id="skuSearch" placeholder="상품명 검색" autocomplete="off" />
+    </div>
     <div class="twrap">
-      <table class="data" id="schedTable">
-        <thead><tr><th>예정일</th><th>브랜드</th><th>상품명</th><th class="num">주기(일)</th><th>상태</th></tr></thead>
+      <table class="data" id="skuTable">
+        <thead>
+          <tr>
+            <th>브랜드</th>
+            <th>SKU ID</th>
+            <th>상품명</th>
+            <th class="num">등록가</th>
+            <th class="num">현재가</th>
+            <th class="num">변동</th>
+            <th>메모</th>
+          </tr>
+        </thead>
         <tbody></tbody>
       </table>
     </div>
   </div>
+
+  <h2 class="stitle">수집 스케줄 관리</h2>
+  <div class="panel">
+    <div class="sched-grid" id="schedCards"></div>
+  </div>
 </div>
 <script>
 const API = '';
+const BRAND_TABS = ['전체', '아리코', '윰', '건우코리아'];
+
+let cacheDetail = null;
+let savedBrandTab = '전체';
 
 function ymd(d) {
   return d.toISOString().slice(0, 10);
@@ -105,17 +161,20 @@ function isDue(lastCollected, cycle, todayStr) {
   const due = addDays(String(lastCollected).slice(0, 10), Number(cycle) || 7);
   return due <= todayStr;
 }
-function nextDueYmd(lastCollected, cycle) {
-  const c = Number(cycle) || 7;
-  if (!lastCollected) return ymd(new Date());
-  return addDays(String(lastCollected).slice(0, 10), c);
-}
 
-async function fetchJson(path) {
-  const r = await fetch(API + path);
+async function fetchJson(path, opts) {
+  const r = await fetch(API + path, opts);
   const j = await r.json().catch(() => ({}));
   if (!r.ok || j.ok === false) throw new Error(j.error || r.statusText || '요청 실패');
   return j;
+}
+
+async function postJson(path, body) {
+  return fetchJson(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 
 function showErr(msg) {
@@ -127,9 +186,14 @@ function hideErr() {
   document.getElementById('errBox').style.display = 'none';
 }
 
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 function renderSummary(total, todayDone, pending, alertCount) {
   document.getElementById('summary').innerHTML = `
-    <div class="scard"><div class="sl">등록 SKU</div><div class="sv blue">${total}</div></div>
+    <div class="scard"><div class="sl">등록 SKU (활성)</div><div class="sv blue">${total}</div></div>
     <div class="scard"><div class="sl">금일 수집 완료</div><div class="sv green">${todayDone}</div></div>
     <div class="scard"><div class="sl">수집 대기</div><div class="sv">${pending}</div></div>
     <div class="scard"><div class="sl">가격 변동 (7일)</div><div class="sv red">${alertCount}</div></div>`;
@@ -148,11 +212,6 @@ function renderBrandTable(byBrand, todayStr) {
     const done = g.rows.filter((r) => r.last_collected && String(r.last_collected).slice(0, 10) === todayStr).length;
     return `<tr><td>${escapeHtml(b)}</td><td class="num">${g.rows.length}</td><td class="num">${done}</td><td class="num">${pend}</td></tr>`;
   }).join('');
-}
-
-function escapeHtml(s) {
-  if (s == null) return '';
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function renderAlerts(alerts) {
@@ -177,41 +236,193 @@ function renderAlerts(alerts) {
   }).join('');
 }
 
-function renderSchedule(rows, todayStr, horizonEnd) {
-  const tb = document.querySelector('#schedTable tbody');
+function fmtVariation(row) {
+  const reg = row.registered_price;
+  const cur = row.current_price;
+  const pct = row.change_pct;
+  if (cur == null || reg == null || Number(reg) <= 0) return '—';
+  if (pct == null) return '—';
+  if (Math.abs(Number(pct)) < 0.005) return '—';
+  if (pct > 0) return `<span class="chg-up">▲ ${pct}%</span>`;
+  if (pct < 0) return `<span class="chg-down">▼ ${Math.abs(pct)}%</span>`;
+  return '—';
+}
+
+function getSelectedBrandTab() {
+  return savedBrandTab;
+}
+
+function uniqueFlagsFromDetail(detail) {
+  const s = new Set();
+  for (const r of detail.data || []) {
+    if (r.flag) s.add(r.flag);
+  }
+  for (const g of detail.schedule_groups || []) {
+    if (g.flag) s.add(g.flag);
+  }
+  return [...s].sort();
+}
+
+function renderBrandTabs() {
+  const el = document.getElementById('brandTabs');
+  const cur = savedBrandTab;
+  el.innerHTML = BRAND_TABS.map((b) =>
+    `<button type="button" class="tab-brand${cur === b ? ' on' : ''}" data-brand="${escapeHtml(b)}">${escapeHtml(b)}</button>`
+  ).join('');
+  el.querySelectorAll('.tab-brand').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      savedBrandTab = btn.dataset.brand;
+      el.querySelectorAll('.tab-brand').forEach((x) => x.classList.remove('on'));
+      btn.classList.add('on');
+      renderSkuTable();
+    });
+  });
+}
+
+function populateFlagSelect(detail) {
+  const sel = document.getElementById('flagFilter');
+  const prev = sel.value;
+  const flags = uniqueFlagsFromDetail(detail);
+  sel.innerHTML = '<option value="__ALL__">전체</option>' +
+    flags.map((f) => `<option value="${encodeURIComponent(f)}">${escapeHtml(f)}</option>`).join('');
+  if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
+}
+
+function filterSkuRows(rows) {
+  const brand = getSelectedBrandTab();
+  const flagSel = document.getElementById('flagFilter').value;
+  const q = (document.getElementById('skuSearch').value || '').trim().toLowerCase();
+  return rows.filter((r) => {
+    if (brand !== '전체' && r.brand !== brand) return false;
+    if (flagSel !== '__ALL__') {
+      const rf = r.flag || '';
+      const want = decodeURIComponent(flagSel);
+      if (rf !== want) return false;
+    }
+    if (q) {
+      const name = (r.sku_name || '').toLowerCase();
+      if (!name.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function sortSkuRows(rows, mode) {
+  const copy = [...rows];
+  if (mode === 'name') {
+    copy.sort((a, b) => (a.sku_name || '').localeCompare(b.sku_name || '', 'ko') || a.sku_id.localeCompare(b.sku_id));
+  } else if (mode === 'chg_desc') {
+    copy.sort((a, b) => (Number(b.change_pct) || -9999) - (Number(a.change_pct) || -9999));
+  } else if (mode === 'chg_asc') {
+    copy.sort((a, b) => (Number(a.change_pct) || 9999) - (Number(b.change_pct) || 9999));
+  } else {
+    copy.sort((a, b) => (a.brand || '').localeCompare(b.brand || '', 'ko') || a.sku_id.localeCompare(b.sku_id));
+  }
+  return copy;
+}
+
+function renderSkuTable() {
+  if (!cacheDetail) return;
+  const tb = document.querySelector('#skuTable tbody');
+  const mode = document.getElementById('sortSku').value;
+  let rows = filterSkuRows(cacheDetail.data || []);
+  rows = sortSkuRows(rows, mode);
   if (!rows.length) {
-    tb.innerHTML = '<tr><td colspan="5" class="empty">예정 일정 없음</td></tr>';
+    tb.innerHTML = '<tr><td colspan="7" class="empty">조건에 맞는 SKU가 없습니다</td></tr>';
     return;
   }
-  rows.sort((a, b) => a.due.localeCompare(b.due) || a.brand.localeCompare(b.brand));
   tb.innerHTML = rows.map((r) => {
-    let status = '<span class="badge">예정</span>';
-    if (r.due < todayStr) status = '<span class="badge" style="background:#fce8e6;color:#c5221f">지연</span>';
-    else if (r.due === todayStr) status = '<span class="badge" style="background:#e6f4ea;color:#137333">오늘</span>';
+    const url = r.product_url || `https://www.coupang.com/vp/products/${r.sku_id}`;
+    const reg = r.registered_price != null ? Number(r.registered_price).toLocaleString() : '—';
+    const cur = r.current_price != null ? Number(r.current_price).toLocaleString() : '—';
     return `<tr>
-      <td>${r.due}</td>
       <td>${escapeHtml(r.brand)}</td>
-      <td>${escapeHtml(r.sku_name || r.sku_id)}</td>
-      <td class="num">${r.collect_cycle}</td>
-      <td>${status}</td>
+      <td><a class="link-sku" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(r.sku_id)}</a></td>
+      <td>${escapeHtml(r.sku_name || '—')}</td>
+      <td class="num">${reg}</td>
+      <td class="num">${cur}</td>
+      <td class="num">${fmtVariation(r)}</td>
+      <td class="muted">${escapeHtml(r.memo || '—')}</td>
     </tr>`;
   }).join('');
+}
+
+async function onScheduleToggle(brand, flag, makeActive, btn) {
+  btn.disabled = true;
+  try {
+    await postJson('/api/sku-batch-toggle', { brand, flag, active: makeActive });
+    await load();
+  } catch (e) {
+    showErr(e.message || String(e));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderScheduleCards(groups) {
+  const el = document.getElementById('schedCards');
+  if (!groups || !groups.length) {
+    el.innerHTML = '<div class="empty" style="grid-column:1/-1">그룹 데이터 없음</div>';
+    return;
+  }
+  const sorted = [...groups].sort((a, b) =>
+    (a.brand || '').localeCompare(b.brand || '', 'ko') ||
+    (a.flag || '').localeCompare(b.flag || '', 'ko')
+  );
+  el.innerHTML = sorted.map((g) => {
+    const flagLabel = g.flag ? escapeHtml(g.flag) : '(플래그 없음)';
+    const title = `${escapeHtml(g.brand == null || g.brand === '' ? '미지정' : g.brand)} · ${flagLabel}`;
+    const last = g.last_collected || '—';
+    const next = g.next_collect_due || '—';
+    const on = g.all_active;
+    const btnClass = on ? 'on' : 'off';
+    const btnText = on ? '수집 ON' : '수집 OFF';
+    const encBrand = encodeURIComponent(g.brand == null ? '' : g.brand);
+    const encFlag = encodeURIComponent(g.flag || '');
+    return `<div class="sched-card" data-benc="${encBrand}" data-fenc="${encFlag}">
+      <h3>${title}</h3>
+      <div class="sched-meta"><span>SKU 수</span><b>${g.sku_count}</b></div>
+      <div class="sched-meta"><span>활성</span><b>${g.active_count} / ${g.sku_count}</b></div>
+      <div class="sched-meta"><span>마지막 수집일</span><b>${last}</b></div>
+      <div class="sched-meta"><span>다음 수집 예정</span><b>${next}</b></div>
+      <div class="toggle-row">
+        <span class="toggle-label">일괄 수집</span>
+        <button type="button" class="btn-toggle ${btnClass}" data-active="${on}">${btnText}</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('.sched-card').forEach((card) => {
+    const btn = card.querySelector('.btn-toggle');
+    const brand = decodeURIComponent(card.dataset.benc || '');
+    const flag = decodeURIComponent(card.dataset.fenc || '');
+    btn.addEventListener('click', () => {
+      const currentlyOn = btn.dataset.active === 'true';
+      onScheduleToggle(brand, flag, !currentlyOn, btn);
+    });
+  });
+}
+
+function bindSkuFiltersOnce() {
+  if (bindSkuFiltersOnce.done) return;
+  bindSkuFiltersOnce.done = true;
+  document.getElementById('flagFilter').addEventListener('change', () => renderSkuTable());
+  document.getElementById('sortSku').addEventListener('change', () => renderSkuTable());
+  document.getElementById('skuSearch').addEventListener('input', () => renderSkuTable());
 }
 
 async function load() {
   hideErr();
   const todayStr = ymd(new Date());
-  const end = new Date();
-  end.setUTCDate(end.getUTCDate() + 7);
-  const horizonEnd = ymd(end);
 
-  const [skuRes, dueRes, alertRes] = await Promise.all([
-    fetchJson('/api/sku-list'),
+  const [detailRes, dueRes, alertRes] = await Promise.all([
+    fetchJson('/api/sku-detail'),
     fetchJson('/api/sku-list?due=1'),
     fetchJson('/api/price-alert?days=7'),
   ]);
 
-  const list = skuRes.data || [];
+  cacheDetail = detailRes;
+  const list = detailRes.data || [];
   const pending = dueRes.count ?? (dueRes.data || []).length;
   const todayDone = list.filter(
     (r) => r.last_collected && String(r.last_collected).slice(0, 10) === todayStr
@@ -223,25 +434,19 @@ async function load() {
   for (const r of list) {
     const b = r.brand || '(미지정)';
     if (!byBrand[b]) byBrand[b] = { rows: [] };
-    byBrand[b].rows.push(r);
+    byBrand[b].rows.push({
+      last_collected: r.last_collected,
+      collect_cycle: r.collect_cycle,
+    });
   }
   renderBrandTable(byBrand, todayStr);
   renderAlerts(alertRes.alerts || []);
 
-  const sched = [];
-  for (const r of list) {
-    const due = nextDueYmd(r.last_collected, r.collect_cycle);
-    if (due <= horizonEnd) {
-      sched.push({
-        due,
-        brand: r.brand,
-        sku_name: r.sku_name,
-        sku_id: r.sku_id,
-        collect_cycle: r.collect_cycle,
-      });
-    }
-  }
-  renderSchedule(sched, todayStr, horizonEnd);
+  bindSkuFiltersOnce();
+  renderBrandTabs();
+  populateFlagSelect(detailRes);
+  renderSkuTable();
+  renderScheduleCards(detailRes.schedule_groups || []);
 
   document.getElementById('refreshed').textContent =
     '갱신: ' + new Date().toLocaleString('ko-KR');
