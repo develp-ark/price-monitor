@@ -256,6 +256,21 @@ async function main() {
         await gotoWithRetry(page, url);
         await waitForPriceDom(page);
 
+        // 디버깅: 첫 번째 SKU만 페이지 HTML 일부 출력
+        if (i === 0) {
+          const html = await page.content();
+          // 가격 관련 부분만 추출
+          const priceArea = html.match(/.{0,500}(price|Price|가격).{0,500}/g);
+          console.log('[DEBUG] price-related HTML:', JSON.stringify(priceArea?.slice(0, 3)));
+
+          // 현재 URL 확인 (리다이렉트 여부)
+          console.log('[DEBUG] current URL:', page.url());
+
+          // 페이지 제목
+          const title = await page.title();
+          console.log('[DEBUG] page title:', title);
+        }
+
         const info = await extractPriceInfo(page);
 
         if (info.oos) {
