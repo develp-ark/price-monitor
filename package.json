@@ -1,0 +1,11 @@
+{
+  "name": "price-monitor",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npx vercel dev"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.101.0"
+  }
+}

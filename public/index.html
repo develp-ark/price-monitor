@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Price Monitor</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI','Apple SD Gothic Neo',sans-serif;background:#f5f6fa;color:#333;font-size:14px;line-height:1.6}
+.header{background:linear-gradient(135deg,#1a73e8 0%,#4285f4 100%);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(26,115,232,.3)}
+.header h1{font-size:18px;color:#fff;font-weight:700;letter-spacing:-0.3px}
+.header .sub{font-size:12px;color:rgba(255,255,255,.85)}
+.wrap{max-width:1280px;margin:0 auto;padding:16px}
+.summary-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:18px}
+.scard{background:linear-gradient(135deg,#f8f9ff 0%,#fff 100%);border-radius:12px;padding:14px;text-align:center;border:1px solid #e8eaed;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.scard .sl{font-size:11px;color:#5f6368;margin-bottom:4px;font-weight:500}
+.scard .sv{font-size:22px;font-weight:700;color:#202124;font-variant-numeric:tabular-nums}
+.scard .sv.blue{color:#1a73e8}
+.scard .sv.red{color:#ea4335}
+.scard .sv.green{color:#34a853}
+.stitle{font-size:15px;font-weight:700;color:#202124;margin:24px 0 10px;padding-left:12px;border-left:4px solid #1a73e8}
+.panel{background:#fff;border-radius:12px;border:1px solid #e8eaed;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden;margin-bottom:16px}
+.twrap{overflow-x:auto}
+table.data{width:100%;border-collapse:collapse;font-size:13px}
+table.data th,table.data td{padding:10px 12px;text-align:left;border-bottom:1px solid #f1f3f4}
+table.data th{background:#f8f9fa;color:#5f6368;font-weight:600;font-size:11px;white-space:nowrap}
+table.data tr:hover{background:#f8faff}
+table.data td.num{text-align:right;font-variant-numeric:tabular-nums}
+.chg-up{color:#ea4335;font-weight:600}
+.chg-down{color:#1a73e8;font-weight:600}
+.muted{color:#9aa0a6;font-size:12px}
+.err{background:#fce8e6;color:#c5221f;padding:12px 16px;border-radius:10px;margin-bottom:12px;font-size:13px}
+.empty{padding:28px;text-align:center;color:#9aa0a6}
+.badge{font-size:10px;padding:2px 8px;border-radius:6px;font-weight:600;background:#e8f0fe;color:#1a73e8}
+</style>
+</head>
+<body>
+<header class="header">
+  <div>
+    <h1>Price Monitor</h1>
+    <div class="sub">쿠팡 SKU 가격 수집 현황</div>
+  </div>
+  <span class="sub" id="refreshed"></span>
+</header>
+<div class="wrap">
+  <div id="errBox" class="err" style="display:none"></div>
+  <div class="summary-row" id="summary"></div>
+
+  <h2 class="stitle">브랜드별 수집 현황</h2>
+  <div class="panel">
+    <div class="twrap">
+      <table class="data" id="brandTable">
+        <thead><tr><th>브랜드</th><th class="num">등록 SKU</th><th class="num">금일 수집</th><th class="num">수집 대기</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2 class="stitle">최근 가격 변동</h2>
+  <div class="panel">
+    <div class="twrap">
+      <table class="data" id="alertTable">
+        <thead><tr><th>시각</th><th>브랜드</th><th>상품</th><th class="num">이전</th><th class="num">변경</th><th class="num">변동률</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2 class="stitle">수집 예정 스케줄 (7일)</h2>
+  <div class="panel">
+    <div class="twrap">
+      <table class="data" id="schedTable">
+        <thead><tr><th>예정일</th><th>브랜드</th><th>상품명</th><th class="num">주기(일)</th><th>상태</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<script>
+const API = '';
+
+function ymd(d) {
+  return d.toISOString().slice(0, 10);
+}
+function addDays(iso, n) {
+  const x = new Date(iso.slice(0, 10) + 'T12:00:00.000Z');
+  x.setUTCDate(x.getUTCDate() + n);
+  return ymd(x);
+}
+function isDue(lastCollected, cycle, todayStr) {
+  if (!lastCollected) return true;
+  const due = addDays(String(lastCollected).slice(0, 10), Number(cycle) || 7);
+  return due <= todayStr;
+}
+function nextDueYmd(lastCollected, cycle) {
+  const c = Number(cycle) || 7;
+  if (!lastCollected) return ymd(new Date());
+  return addDays(String(lastCollected).slice(0, 10), c);
+}
+
+async function fetchJson(path) {
+  const r = await fetch(API + path);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.ok === false) throw new Error(j.error || r.statusText || '요청 실패');
+  return j;
+}
+
+function showErr(msg) {
+  const el = document.getElementById('errBox');
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+function hideErr() {
+  document.getElementById('errBox').style.display = 'none';
+}
+
+function renderSummary(total, todayDone, pending, alertCount) {
+  document.getElementById('summary').innerHTML = `
+    <div class="scard"><div class="sl">등록 SKU</div><div class="sv blue">${total}</div></div>
+    <div class="scard"><div class="sl">금일 수집 완료</div><div class="sv green">${todayDone}</div></div>
+    <div class="scard"><div class="sl">수집 대기</div><div class="sv">${pending}</div></div>
+    <div class="scard"><div class="sl">가격 변동 (7일)</div><div class="sv red">${alertCount}</div></div>`;
+}
+
+function renderBrandTable(byBrand, todayStr) {
+  const tb = document.querySelector('#brandTable tbody');
+  const brands = Object.keys(byBrand).sort();
+  if (!brands.length) {
+    tb.innerHTML = '<tr><td colspan="4" class="empty">데이터 없음</td></tr>';
+    return;
+  }
+  tb.innerHTML = brands.map((b) => {
+    const g = byBrand[b];
+    const pend = g.rows.filter((r) => isDue(r.last_collected, r.collect_cycle, todayStr)).length;
+    const done = g.rows.filter((r) => r.last_collected && String(r.last_collected).slice(0, 10) === todayStr).length;
+    return `<tr><td>${escapeHtml(b)}</td><td class="num">${g.rows.length}</td><td class="num">${done}</td><td class="num">${pend}</td></tr>`;
+  }).join('');
+}
+
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderAlerts(alerts) {
+  const tb = document.querySelector('#alertTable tbody');
+  if (!alerts.length) {
+    tb.innerHTML = '<tr><td colspan="6" class="empty">최근 변동 없음</td></tr>';
+    return;
+  }
+  tb.innerHTML = alerts.map((a) => {
+    const pct = a.change_pct;
+    const cls = pct > 0 ? 'chg-up' : pct < 0 ? 'chg-down' : '';
+    const sign = pct > 0 ? '+' : '';
+    const dt = a.detected_at ? new Date(a.detected_at).toLocaleString('ko-KR') : '—';
+    return `<tr>
+      <td class="muted">${escapeHtml(dt)}</td>
+      <td>${escapeHtml(a.brand)}</td>
+      <td>${escapeHtml(a.sku_name || a.sku_id)}</td>
+      <td class="num">${a.prev_price != null ? Number(a.prev_price).toLocaleString() : '—'}</td>
+      <td class="num">${Number(a.new_price).toLocaleString()}</td>
+      <td class="num ${cls}">${sign}${pct}%</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderSchedule(rows, todayStr, horizonEnd) {
+  const tb = document.querySelector('#schedTable tbody');
+  if (!rows.length) {
+    tb.innerHTML = '<tr><td colspan="5" class="empty">예정 일정 없음</td></tr>';
+    return;
+  }
+  rows.sort((a, b) => a.due.localeCompare(b.due) || a.brand.localeCompare(b.brand));
+  tb.innerHTML = rows.map((r) => {
+    let status = '<span class="badge">예정</span>';
+    if (r.due < todayStr) status = '<span class="badge" style="background:#fce8e6;color:#c5221f">지연</span>';
+    else if (r.due === todayStr) status = '<span class="badge" style="background:#e6f4ea;color:#137333">오늘</span>';
+    return `<tr>
+      <td>${r.due}</td>
+      <td>${escapeHtml(r.brand)}</td>
+      <td>${escapeHtml(r.sku_name || r.sku_id)}</td>
+      <td class="num">${r.collect_cycle}</td>
+      <td>${status}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function load() {
+  hideErr();
+  const todayStr = ymd(new Date());
+  const end = new Date();
+  end.setUTCDate(end.getUTCDate() + 7);
+  const horizonEnd = ymd(end);
+
+  const [skuRes, dueRes, alertRes] = await Promise.all([
+    fetchJson('/api/sku-list'),
+    fetchJson('/api/sku-list?due=1'),
+    fetchJson('/api/price-alert?days=7'),
+  ]);
+
+  const list = skuRes.data || [];
+  const pending = dueRes.count ?? (dueRes.data || []).length;
+  const todayDone = list.filter(
+    (r) => r.last_collected && String(r.last_collected).slice(0, 10) === todayStr
+  ).length;
+
+  renderSummary(list.length, todayDone, pending, (alertRes.alerts || []).length);
+
+  const byBrand = {};
+  for (const r of list) {
+    const b = r.brand || '(미지정)';
+    if (!byBrand[b]) byBrand[b] = { rows: [] };
+    byBrand[b].rows.push(r);
+  }
+  renderBrandTable(byBrand, todayStr);
+  renderAlerts(alertRes.alerts || []);
+
+  const sched = [];
+  for (const r of list) {
+    const due = nextDueYmd(r.last_collected, r.collect_cycle);
+    if (due <= horizonEnd) {
+      sched.push({
+        due,
+        brand: r.brand,
+        sku_name: r.sku_name,
+        sku_id: r.sku_id,
+        collect_cycle: r.collect_cycle,
+      });
+    }
+  }
+  renderSchedule(sched, todayStr, horizonEnd);
+
+  document.getElementById('refreshed').textContent =
+    '갱신: ' + new Date().toLocaleString('ko-KR');
+}
+
+load().catch((e) => showErr(e.message || String(e)));
+setInterval(() => load().catch((e) => showErr(e.message)), 120000);
+</script>
+</body>
+</html>
