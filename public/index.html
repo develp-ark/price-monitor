@@ -32,6 +32,13 @@ table.data td.num{text-align:right;font-variant-numeric:tabular-nums}
 .err{background:#fce8e6;color:#c5221f;padding:12px 16px;border-radius:10px;margin-bottom:12px;font-size:13px}
 .empty{padding:28px;text-align:center;color:#9aa0a6}
 .badge{font-size:10px;padding:2px 8px;border-radius:6px;font-weight:600;background:#e8f0fe;color:#1a73e8}
+.action-bar{background:#fff;border-radius:12px;padding:12px 18px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid #e8eaed}
+.btn-upload{padding:10px 22px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:#1a73e8;color:#fff;box-shadow:0 1px 3px rgba(26,115,232,.3);transition:all .2s}
+.btn-upload:hover:not(:disabled){background:#1557b0;transform:translateY(-1px)}
+.btn-upload:disabled{opacity:.55;cursor:not-allowed}
+.upload-hint{font-size:12px;color:#5f6368}
+.upload-msg{background:#e6f4ea;border:1px solid #ceead6;color:#137333;padding:12px 16px;border-radius:10px;margin-bottom:14px;font-size:13px;display:none}
+.upload-msg.err-msg{background:#fce8e6;border-color:#f5c6c0;color:#c5221f}
 </style>
 </head>
 <body>
@@ -43,6 +50,12 @@ table.data td.num{text-align:right;font-variant-numeric:tabular-nums}
   <span class="sub" id="refreshed"></span>
 </header>
 <div class="wrap">
+  <div class="action-bar">
+    <input type="file" id="csvFile" accept=".csv,text/csv" hidden />
+    <button type="button" class="btn-upload" id="btnCsv">SKU CSV 업로드</button>
+    <span class="upload-hint" id="uploadHint">브랜드, SKU ID, SKU 명, … 형식 (sales-monitor와 동일)</span>
+  </div>
+  <div id="uploadResult" class="upload-msg" role="status"></div>
   <div id="errBox" class="err" style="display:none"></div>
   <div class="summary-row" id="summary"></div>
 
@@ -233,6 +246,56 @@ async function load() {
   document.getElementById('refreshed').textContent =
     '갱신: ' + new Date().toLocaleString('ko-KR');
 }
+
+function showUploadMsg(text, isErr) {
+  const el = document.getElementById('uploadResult');
+  el.style.display = 'block';
+  el.textContent = text;
+  el.classList.toggle('err-msg', !!isErr);
+}
+
+function hideUploadMsg() {
+  const el = document.getElementById('uploadResult');
+  el.style.display = 'none';
+  el.textContent = '';
+  el.classList.remove('err-msg');
+}
+
+document.getElementById('btnCsv').addEventListener('click', () => {
+  document.getElementById('csvFile').click();
+});
+
+document.getElementById('csvFile').addEventListener('change', async (ev) => {
+  const file = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if (!file) return;
+
+  const btn = document.getElementById('btnCsv');
+  const hint = document.getElementById('uploadHint');
+  hideUploadMsg();
+  hideErr();
+  btn.disabled = true;
+  hint.textContent = '업로드 중…';
+
+  try {
+    const fd = new FormData();
+    fd.append('file', file, file.name);
+    const r = await fetch(API + '/api/sku-upload', { method: 'POST', body: fd });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) {
+      throw new Error(j.error || r.statusText || '업로드 실패');
+    }
+    showUploadMsg(
+      `완료: 신규 ${j.inserted}건, 갱신 ${j.updated}건 (총 ${j.total}건)`
+    );
+    await load();
+  } catch (e) {
+    showUploadMsg(e.message || String(e), true);
+  } finally {
+    btn.disabled = false;
+    hint.textContent = '브랜드, SKU ID, SKU 명, … 형식 (sales-monitor와 동일)';
+  }
+});
 
 load().catch((e) => showErr(e.message || String(e)));
 setInterval(() => load().catch((e) => showErr(e.message)), 120000);

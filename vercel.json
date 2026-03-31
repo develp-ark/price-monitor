@@ -1,5 +1,8 @@
 {
   "rewrites": [{ "source": "/", "destination": "/index.html" }],
+  "functions": {
+    "api/sku-upload.js": { "maxDuration": 60 }
+  },
   "headers": [
     {
       "source": "/api/(.*)",
