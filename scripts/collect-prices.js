@@ -1,16 +1,37 @@
 #!/usr/bin/env node
 /**
  * Coupang price collector → price-monitor API.
- * GitHub Actions: puppeteer-core + @sparticuz/chromium
- * Local: set PUPPETEER_EXECUTABLE_PATH to Chrome/Chromium binary.
+ * 로컬: 실제 Chrome 창(headless: false), 기본 경로 또는 PUPPETEER_EXECUTABLE_PATH.
+ * GitHub Actions: headless + @sparticuz/chromium (디스플레이 없음).
  */
+
+const { addExtra } = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const puppeteerCore = require('puppeteer-core');
+
+const puppeteer = addExtra(puppeteerCore);
+puppeteer.use(StealthPlugin());
 
 const DEFAULT_API = 'https://price-monitor-mocha.vercel.app';
 const MAX_SKUS = 50;
-const GOTO_TIMEOUT_MS = 15_000;
+/** networkidle2는 쿠팡처럼 요청이 많은 페이지에서 시간이 걸릴 수 있음 */
+const GOTO_TIMEOUT_MS = 90_000;
 const POST_WAIT_MS = 3_000;
+const POST_NETWORKIDLE_EXTRA_MS = 3_000;
+const DEFAULT_WIN_CHROME =
+  'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const UA =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+
+const EXTRA_ARGS = [
+  '--no-sandbox',
+  '--disable-setuid-sandbox',
+  '--disable-dev-shm-usage',
+  '--disable-blink-features=AutomationControlled',
+  '--window-size=1920,1080',
+];
+
+const VIEWPORT = { width: 1920, height: 1080 };
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -43,42 +64,96 @@ async function fetchJson(url, options = {}) {
   return { res, data };
 }
 
-async function getLaunchOptions() {
-  const puppeteer = require('puppeteer-core');
+async function getLaunchConfig() {
   if (process.env.GITHUB_ACTIONS === 'true') {
     const chromium = require('@sparticuz/chromium');
     return {
-      puppeteer,
-      options: {
-        args: chromium.args,
-        defaultViewport: chromium.defaultViewport,
+      launchOpts: {
+        headless: 'new',
         executablePath: await chromium.executablePath(),
-        headless: true,
+        args: [...new Set([...chromium.args, ...EXTRA_ARGS])],
+        defaultViewport: VIEWPORT,
       },
+      useFixedViewport: true,
     };
   }
+
   const exe =
-    process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH || '';
+    process.env.PUPPETEER_EXECUTABLE_PATH ||
+    process.env.CHROME_PATH ||
+    (process.platform === 'win32' ? DEFAULT_WIN_CHROME : '');
+
   if (!exe) {
     console.error(
-      '로컬 실행: Chrome/Chromium 경로를 환경변수로 지정하세요.\n' +
-        '  PUPPETEER_EXECUTABLE_PATH (예: Windows "C:\\\\Program Files\\\\Google\\\\Chrome\\\\Application\\\\chrome.exe")'
+      'Chrome 실행 파일을 찾을 수 없습니다.\n' +
+        '  PUPPETEER_EXECUTABLE_PATH 또는 CHROME_PATH 를 설정하세요.\n' +
+        '  (Windows 기본값: ' +
+        DEFAULT_WIN_CHROME +
+        ')'
     );
     process.exit(1);
   }
+
   return {
-    puppeteer,
-    options: {
+    launchOpts: {
+      headless: false,
       executablePath: exe,
-      headless: true,
       args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
+        '--disable-blink-features=AutomationControlled',
+        '--window-size=1920,1080',
+        '--start-maximized',
       ],
+      defaultViewport: null,
     },
+    useFixedViewport: false,
   };
+}
+
+async function setupPage(page, { useFixedViewport }) {
+  await page.evaluateOnNewDocument(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => false });
+  });
+  await page.setUserAgent(UA);
+  if (useFixedViewport) {
+    await page.setViewport(VIEWPORT);
+  }
+}
+
+/** 쿠팡 쿠키·마케팅 동의 등 팝업 자동 클릭 */
+async function dismissCoupangConsent(page) {
+  try {
+    await page
+      .waitForSelector('button, [role="button"], a', { timeout: 2500 })
+      .catch(() => null);
+    const clicked = await page.evaluate(() => {
+      const candidates = document.querySelectorAll(
+        'button, [role="button"], a, div[tabindex="0"]'
+      );
+      const patterns = [
+        /동의하고/,
+        /동의합니다/,
+        /모두\s*동의/,
+        /^동의$/,
+        /필수\s*항목\s*동의/,
+        /수락/,
+      ];
+      for (const el of candidates) {
+        const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
+        if (!t || t.length > 80) continue;
+        if (patterns.some((re) => re.test(t))) {
+          el.click();
+          return t.slice(0, 50);
+        }
+      }
+      return null;
+    });
+    if (clicked) {
+      console.log('[INFO] 쿠키/동의 클릭:', clicked);
+      await sleep(800);
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 async function gotoWithRetry(page, url) {
@@ -86,7 +161,7 @@ async function gotoWithRetry(page, url) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       await page.goto(url, {
-        waitUntil: 'domcontentloaded',
+        waitUntil: 'networkidle2',
         timeout: GOTO_TIMEOUT_MS,
       });
       return true;
@@ -233,11 +308,10 @@ async function main() {
   let oosCount = 0;
   let failCount = 0;
 
-  const { puppeteer, options } = await getLaunchOptions();
-  const browser = await puppeteer.launch(options);
+  const { launchOpts, useFixedViewport } = await getLaunchConfig();
+  const browser = await puppeteer.launch(launchOpts);
   const page = await browser.newPage();
-  await page.setUserAgent(UA);
-  await page.setViewport({ width: 1280, height: 900 });
+  await setupPage(page, { useFixedViewport });
 
   try {
     for (let i = 0; i < batch.length; i++) {
@@ -254,7 +328,9 @@ async function main() {
         }
 
         await gotoWithRetry(page, url);
+        await dismissCoupangConsent(page);
         await waitForPriceDom(page);
+        await sleep(POST_NETWORKIDLE_EXTRA_MS);
 
         // 디버깅: 첫 번째 SKU만 페이지 HTML 일부 출력
         if (i === 0) {

@@ -50,13 +50,44 @@ module.exports = async (req, res) => {
     }
   }
 
-  const sku_id = body?.sku_id;
+  const rawSkuId = body?.sku_id;
   const price = body?.price;
-  if (!sku_id || price == null || Number.isNaN(Number(price))) {
+  if (!rawSkuId || price == null || Number.isNaN(Number(price))) {
     return json(res, 400, {
       ok: false,
       error: 'sku_id and numeric price are required',
     });
+  }
+
+  const incomingId = String(rawSkuId).trim();
+  let matched_from = null;
+  let sku_id = incomingId;
+
+  const { data: directRow, error: directErr } = await client
+    .from('sku_list')
+    .select('sku_id')
+    .eq('sku_id', incomingId)
+    .maybeSingle();
+
+  if (directErr) return json(res, 500, { ok: false, error: directErr.message });
+
+  if (directRow?.sku_id) {
+    sku_id = directRow.sku_id;
+    matched_from = null;
+  } else {
+    const likePattern = `%/products/${incomingId}%`;
+    const { data: urlRows, error: urlErr } = await client
+      .from('sku_list')
+      .select('sku_id')
+      .like('product_url', likePattern)
+      .limit(1);
+
+    if (urlErr) return json(res, 500, { ok: false, error: urlErr.message });
+
+    if (urlRows && urlRows.length > 0 && urlRows[0].sku_id) {
+      sku_id = urlRows[0].sku_id;
+      matched_from = 'product_url';
+    }
   }
 
   const original_price = body.original_price ?? null;
@@ -115,6 +146,7 @@ module.exports = async (req, res) => {
   return json(res, 200, {
     ok: true,
     sku_id,
+    matched_from,
     price: newPrice,
     prev_price,
     changed,
