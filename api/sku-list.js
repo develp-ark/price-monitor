@@ -2,6 +2,40 @@ const { getSupabase } = require('../lib/supabase');
 const { json, handleOptions } = require('../lib/cors');
 const { isCollectionDue, todayUtcYmd } = require('../lib/sku-due');
 
+async function fetchLatestPricesMap(client, skuIds) {
+  const map = new Map();
+  if (!skuIds.length) return map;
+
+  const { data: rpcData, error: rpcErr } = await client.rpc('fn_sku_latest_prices');
+  if (!rpcErr && Array.isArray(rpcData)) {
+    for (const row of rpcData) {
+      if (row.sku_id != null) map.set(row.sku_id, row.price);
+    }
+    return map;
+  }
+
+  const CHUNK = 30;
+  for (let i = 0; i < skuIds.length; i += CHUNK) {
+    const part = skuIds.slice(i, i + CHUNK);
+    const results = await Promise.all(
+      part.map((sku_id) =>
+        client
+          .from('price_history')
+          .select('price')
+          .eq('sku_id', sku_id)
+          .order('collected_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      )
+    );
+    for (let j = 0; j < part.length; j++) {
+      const r = results[j];
+      if (!r.error && r.data?.price != null) map.set(part[j], r.data.price);
+    }
+  }
+  return map;
+}
+
 module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return handleOptions(res);
   if (req.method !== 'GET') {
@@ -28,12 +62,23 @@ module.exports = async (req, res) => {
     );
   }
 
+  let priceMap;
+  try {
+    priceMap = await fetchLatestPricesMap(
+      client,
+      list.map((r) => r.sku_id)
+    );
+  } catch (e) {
+    return json(res, 500, { ok: false, error: e.message || 'price lookup failed' });
+  }
+
   const data = list.map((r) => ({
     sku_id: r.sku_id,
     brand: r.brand,
     sku_name: r.sku_name,
     product_url: r.product_url,
     collect_cycle: r.collect_cycle,
+    current_price: priceMap.get(r.sku_id) ?? null,
     last_collected: r.last_collected
       ? String(r.last_collected).slice(0, 10)
       : null,
