@@ -1,462 +1,800 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Price Monitor</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f6f8fb;color:#222}
-.wrap{max-width:1440px;margin:0 auto;padding:20px}
-.header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px}
-.title{font-size:24px;font-weight:700}
-.muted{color:#666;font-size:13px}
-.tabs{display:flex;gap:8px;margin-bottom:14px}
-.tab-btn{border:1px solid #d8dce5;background:#fff;color:#666;padding:10px 16px;border-radius:10px;cursor:pointer;font-weight:600}
-.tab-btn.active{background:#3182F6;color:#fff;border-color:#3182F6}
-.panel{display:none}
-.panel.active{display:block}
-.card{background:#fff;border:1px solid #e3e8f2;border-radius:14px;padding:16px;margin-bottom:14px}
-.card-title{font-size:16px;font-weight:700;margin-bottom:12px}
-.status-grid{display:grid;grid-template-columns:180px 1fr auto;gap:14px;align-items:center}
-.pill{display:inline-block;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700}
-.pill.idle{background:#eef3ff;color:#3182F6}
-.pill.running{background:#e8faf6;color:#00B493}
-.pill.done{background:#e9f7ef;color:#1a8f47}
-.pill.error{background:#fdecee;color:#F04452}
-.pill.stopping{background:#fff4e8;color:#e8861a}
-.progress-wrap{height:10px;background:#edf1f7;border-radius:999px;overflow:hidden}
-.progress-bar{height:100%;background:#3182F6;transition:width .25s}
-.btn{border:none;border-radius:10px;padding:9px 14px;font-weight:700;cursor:pointer}
-.btn.primary{background:#3182F6;color:#fff}
-.btn.danger{background:#F04452;color:#fff}
-.btn.ghost{background:#eef2f9;color:#42526b}
-.btn:disabled{opacity:.6;cursor:not-allowed}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{padding:10px;border-bottom:1px solid #eef1f6;text-align:left;vertical-align:top}
-th{background:#f8fafd;color:#666;font-size:12px}
-td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
-.up{color:#F04452;font-weight:700}
-.down{color:#3182F6;font-weight:700}
-.grid5{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
-.day-col{background:#fff;border:1px solid #e3e8f2;border-radius:12px;padding:10px;min-height:280px}
-.day-title{font-size:13px;font-weight:700;margin-bottom:8px;color:#444}
-.sku-item{display:flex;justify-content:space-between;gap:8px;padding:7px 8px;border:1px solid #eef1f6;border-radius:8px;background:#fbfcff;margin-bottom:7px}
-.sku-name{font-size:12px;color:#444;line-height:1.35}
-.x-btn{background:none;border:none;color:#F04452;font-weight:700;cursor:pointer}
-.empty{color:#9aa3b2;font-size:12px;padding:6px 2px}
-.target-list{margin-top:8px;font-size:12px;color:#666;max-height:110px;overflow:auto}
-.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.err{display:none;background:#fdecee;color:#ba1e2d;padding:10px;border-radius:10px;margin-bottom:10px}
-</style>
+  <meta charset="utf-8" />
+  <title>Price Monitor</title>
+  <style>
+    :root {
+      --primary: #3182F6;
+      --success: #00B493;
+      --danger: #F04452;
+      --warning: #FF9500;
+      --gray: #666;
+      --gray2: #999;
+      --border: #e9ecef;
+      --bg: #f8f9fa;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'Malgun Gothic', sans-serif;
+      background: var(--bg);
+      color: #222;
+      min-height: 100vh;
+    }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 { font-size: 22px; font-weight: 700; }
+    .header-meta { font-size: 13px; color: var(--gray); }
+    .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+    .tabs button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      background: #fff;
+      color: var(--gray);
+      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    }
+    .tabs button.active { background: var(--primary); color: #fff; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card h2 { font-size: 16px; margin-bottom: 14px; }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge.idle { background: #e9ecef; color: #555; }
+    .badge.running {
+      background: #dbeafe; color: var(--primary);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .65; }
+    }
+    .badge.stopping { background: #fff3cd; color: #856404; }
+    .badge.done { background: #d1fae5; color: var(--success); }
+    .badge.error { background: #fee2e2; color: var(--danger); }
+    .progress-bar {
+      height: 10px;
+      background: var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      margin: 12px 0;
+    }
+    .progress-bar > div {
+      height: 100%;
+      background: var(--primary);
+      transition: width .3s;
+    }
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-ghost { background: #fff; border: 1px solid var(--border); color: #333; }
+    .hint { font-size: 12px; color: var(--gray2); margin-top: 10px; line-height: 1.5; }
+    table.data {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    table.data th, table.data td {
+      padding: 10px 8px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    table.data th { background: #f8f9fa; color: var(--gray); font-weight: 600; }
+    table.data tbody tr:nth-child(even) { background: #fafbfc; }
+    table.data tbody tr:hover { background: #e8f4ff; }
+    .num { text-align: right !important; font-variant-numeric: tabular-nums; }
+    .up { color: var(--danger); font-weight: 600; }
+    .down { color: var(--success); font-weight: 600; }
+    .muted { color: var(--gray2); }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; justify-content: space-between; }
+    .brand-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+    .brand-tabs button {
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #fff;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .brand-tabs button.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .filter-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+    .filter-btns button {
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #fff;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .filter-btns button.on { background: #eef6ff; border-color: var(--primary); color: var(--primary); font-weight: 600; }
+    .flag-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: #f0f4f8;
+      font-size: 12px;
+    }
+    .modal-bg {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.4);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-bg.show { display: flex; }
+    .modal {
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px;
+      width: 100%;
+      max-width: 500px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal h3 { margin-bottom: 16px; font-size: 18px; }
+    .form-row { margin-bottom: 12px; }
+    .form-row label { display: block; font-size: 12px; color: var(--gray); margin-bottom: 4px; }
+    .form-row input, .form-row select, .form-row textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    .form-row textarea { min-height: 72px; resize: vertical; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+    a.link { color: var(--primary); text-decoration: none; }
+    a.link:hover { text-decoration: underline; }
+    .btn-icon { background: transparent; border: none; cursor: pointer; font-size: 16px; padding: 4px 8px; }
+    #csv-file { display: none; }
+  </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="header">
-    <div>
-      <div class="title">Price Monitor</div>
-      <div class="muted">수집 대시보드 + 스케줄 관리</div>
+  <div class="wrap">
+    <header>
+      <h1>Price Monitor</h1>
+      <div class="header-meta">갱신: <span id="clock">—</span></div>
+    </header>
+
+    <div class="tabs">
+      <button type="button" class="tab-btn active" data-tab="dash">대시보드</button>
+      <button type="button" class="tab-btn" data-tab="sku">SKU 관리</button>
     </div>
-    <div class="muted" id="refreshedAt"></div>
-  </div>
 
-  <div id="errBox" class="err"></div>
-
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="dashboard">대시보드</button>
-    <button class="tab-btn" data-tab="schedule">수집 스케줄</button>
-    <button class="tab-btn" data-tab="sku">SKU 리스트</button>
-  </div>
-
-  <section class="panel active" data-panel="dashboard">
-    <div class="card">
-      <div class="card-title">수집 현황</div>
-      <div class="status-grid">
-        <div>
-          <div class="muted">현재 상태</div>
-          <div id="statusLabel" class="pill idle">대기중</div>
+    <div id="panel-dash" class="panel active">
+      <div class="card">
+        <h2>수집 현황</h2>
+        <p><span id="cs-badge" class="badge idle">대기중</span></p>
+        <div id="cs-progress-wrap" style="display:none">
+          <div class="progress-bar"><div id="cs-bar" style="width:0%"></div></div>
+          <p id="cs-line" class="muted" style="margin-top:8px;font-size:13px"></p>
         </div>
-        <div>
-          <div class="progress-wrap"><div id="progressBar" class="progress-bar" style="width:0%"></div></div>
-          <div class="muted" id="progressText" style="margin-top:6px">0/0</div>
+        <p id="cs-done" style="display:none;margin-top:10px;font-size:14px"></p>
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button type="button" class="btn btn-primary" id="btn-cs-start" disabled>수집 시작</button>
+          <button type="button" class="btn btn-danger" id="btn-cs-stop" disabled>중지</button>
         </div>
-        <div class="row">
-          <button id="startCollectBtn" class="btn primary">수집 시작</button>
-          <button id="stopCollectBtn" class="btn danger">중지</button>
+        <p class="hint">수집은 크롬 확장프로그램에서 시작합니다. 웹에서는 중지만 요청할 수 있습니다.</p>
+      </div>
+
+      <div class="card">
+        <h2>오늘 수집 결과</h2>
+        <div style="overflow-x:auto">
+          <table class="data" id="tbl-today">
+            <thead>
+              <tr>
+                <th>SKU명</th>
+                <th>브랜드</th>
+                <th class="num">등록가</th>
+                <th class="num">현재가</th>
+                <th class="num">변동률</th>
+                <th>수집상태</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </div>
       </div>
-      <div id="todayTargets" class="target-list"></div>
-    </div>
 
-    <div class="card">
-      <div class="card-title">가격 변동 알림</div>
-      <table>
-        <thead>
-          <tr>
-            <th>SKU명</th>
-            <th>브랜드</th>
-            <th class="num">이전가격</th>
-            <th class="num">변동가격</th>
-            <th class="num">변동률(%)</th>
-            <th>감지일시</th>
-          </tr>
-        </thead>
-        <tbody id="alertTbody"></tbody>
-      </table>
-    </div>
-  </section>
-
-  <section class="panel" data-panel="schedule">
-    <div class="card">
-      <div class="row" style="justify-content:space-between;margin-bottom:10px">
-        <div class="card-title" style="margin-bottom:0">요일별 수집 배정</div>
-        <button id="autoDistributeBtn" class="btn ghost">자동 분배</button>
+      <div class="card">
+        <h2>가격 변동 알림</h2>
+        <div class="toolbar" style="margin-bottom:8px">
+          <div class="filter-btns" id="alert-brand-btns"></div>
+          <div class="filter-btns" id="alert-dir-btns"></div>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data" id="tbl-alerts">
+            <thead>
+              <tr>
+                <th>SKU명</th>
+                <th>브랜드</th>
+                <th class="num">이전가</th>
+                <th class="num">변동가</th>
+                <th class="num">변동률</th>
+                <th>감지일시</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
-      <div class="grid5" id="scheduleGrid"></div>
     </div>
-    <div class="card">
-      <div class="card-title">미배정 SKU</div>
-      <table>
-        <thead><tr><th>브랜드</th><th>SKU명</th><th>SKU ID</th><th class="num">현재가</th><th>마지막 수집</th></tr></thead>
-        <tbody id="unassignedTbody"></tbody>
-      </table>
+
+    <div id="panel-sku" class="panel">
+      <div class="card">
+        <div class="toolbar">
+          <div class="brand-tabs" id="sku-brand-tabs"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button type="button" class="btn btn-primary" id="btn-sku-add">SKU 추가</button>
+            <button type="button" class="btn btn-ghost" id="btn-csv-up">CSV 업로드</button>
+            <button type="button" class="btn btn-ghost" id="btn-csv-dl">CSV 다운로드</button>
+            <button type="button" class="btn btn-ghost" id="btn-auto-dist">자동 분배</button>
+          </div>
+        </div>
+        <input type="file" id="csv-file" accept=".csv,text/csv" />
+        <div style="overflow-x:auto">
+          <table class="data" id="tbl-sku">
+            <thead>
+              <tr>
+                <th>SKU ID</th>
+                <th>상품명</th>
+                <th class="num">등록가</th>
+                <th class="num">현재가</th>
+                <th class="num">변동률</th>
+                <th>플래그</th>
+                <th>수집주기</th>
+                <th>최근수집</th>
+                <th>수집스케줄</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
     </div>
-  </section>
+  </div>
 
-  <section class="panel" data-panel="sku">
-    <div class="card">
-      <div class="card-title">SKU 리스트</div>
-      <table>
-        <thead>
-          <tr>
-            <th>브랜드</th>
-            <th>SKU ID</th>
-            <th>상품명</th>
-            <th class="num">현재가</th>
-            <th>마지막 수집</th>
-            <th>URL</th>
-          </tr>
-        </thead>
-        <tbody id="skuTbody"></tbody>
-      </table>
+  <div class="modal-bg" id="modal-bg">
+    <div class="modal">
+      <h3>SKU 추가</h3>
+      <div class="form-row"><label>SKU ID *</label><input id="f-sku_id" /></div>
+      <div class="form-row"><label>상품명 *</label><input id="f-sku_name" /></div>
+      <div class="form-row"><label>브랜드 *</label>
+        <select id="f-brand-sel">
+          <option value="아리코">아리코</option>
+          <option value="윰">윰</option>
+          <option value="__custom">기타 (직접입력)</option>
+        </select>
+        <input id="f-brand-custom" placeholder="브랜드명" style="margin-top:6px;display:none" />
+      </div>
+      <div class="form-row"><label>쿠팡 URL *</label><input id="f-product_url" placeholder="https://www.coupang.com/vp/products/..." /></div>
+      <div class="form-row"><label>등록가 (원)</label><input id="f-registered_price" type="number" /></div>
+      <div class="form-row"><label>수집주기 (일)</label><input id="f-collect_cycle" type="number" value="7" /></div>
+      <div class="form-row"><label>플래그</label><input id="f-flag" /></div>
+      <div class="form-row"><label>메모</label><textarea id="f-memo"></textarea></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="modal-cancel">취소</button>
+        <button type="button" class="btn btn-primary" id="modal-save">저장</button>
+      </div>
     </div>
-  </section>
-</div>
+  </div>
 
-<script>
-const API = '';
-const DAY_META = [
-  { d: 1, name: '월요일' },
-  { d: 2, name: '화요일' },
-  { d: 3, name: '수요일' },
-  { d: 4, name: '목요일' },
-  { d: 5, name: '금요일' },
-];
+  <script>
+(function () {
+  var API_BASE = '/api';
+  var JSON_H = { 'Content-Type': 'application/json' };
+  var DAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
-const state = {
-  skuList: [],
-  alerts: [],
-  status: null,
-  scheduleByDay: { 1: [], 2: [], 3: [], 4: [], 5: [] },
-};
+  var pollTimer = null;
+  var alertRows = [];
+  var alertBrand = '전체';
+  var alertDir = 'all';
+  var skuRows = [];
+  var skuBrand = '전체';
+  var scheduleMap = {};
 
-function escapeHtml(v) {
-  if (v == null) return '';
-  return String(v)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function showErr(message) {
-  const box = document.getElementById('errBox');
-  box.style.display = 'block';
-  box.textContent = message;
-}
-
-function hideErr() {
-  const box = document.getElementById('errBox');
-  box.style.display = 'none';
-  box.textContent = '';
-}
-
-async function fetchJson(path, options) {
-  const res = await fetch(API + path, options);
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.ok === false) throw new Error(data.error || res.statusText || '요청 실패');
-  return data;
-}
-
-function postJson(path, body) {
-  return fetchJson(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-}
-
-function patchJson(path, body) {
-  return fetchJson(path, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-}
-
-function deleteJson(path, body) {
-  return fetchJson(path, {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-}
-
-function formatPrice(v) {
-  if (v == null) return '—';
-  return Number(v).toLocaleString('ko-KR');
-}
-
-function formatShortDate(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) {
-    const s = String(iso).slice(0, 10);
-    const t = s.split('-');
-    return t.length === 3 ? `${Number(t[1])}/${Number(t[2])}` : '—';
+  function tickClock() {
+    document.getElementById('clock').textContent = new Date().toLocaleString('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      hour12: true
+    });
   }
-  return `${d.getMonth() + 1}/${d.getDate()}`;
-}
 
-function formatDateTime(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('ko-KR');
-}
-
-function statusMeta(status) {
-  if (status === 'running') return { label: '수집중', cls: 'running' };
-  if (status === 'done') return { label: '완료', cls: 'done' };
-  if (status === 'error') return { label: '오류', cls: 'error' };
-  if (status === 'stopping') return { label: '중지 요청', cls: 'stopping' };
-  return { label: '대기중', cls: 'idle' };
-}
-
-function renderCollectStatus() {
-  const s = state.status || {};
-  const status = statusMeta(s.status);
-  const total = Number(s.total) || 0;
-  const current = Number(s.current) || 0;
-  const pct = total > 0 ? Math.min(100, Math.round((current / total) * 100)) : 0;
-  const currentName = s.current_sku_name ? ` (${s.current_sku_name})` : '';
-
-  const label = document.getElementById('statusLabel');
-  label.className = `pill ${status.cls}`;
-  label.textContent = status.label;
-  document.getElementById('progressBar').style.width = `${pct}%`;
-  document.getElementById('progressText').textContent = `${current}/${total} 수집중...${currentName}`;
-}
-
-function renderAlerts() {
-  const tbody = document.getElementById('alertTbody');
-  const rows = state.alerts || [];
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty">최근 변동이 없습니다.</td></tr>';
-    return;
+  function fmtMoney(n) {
+    if (n == null || n === '' || Number.isNaN(Number(n))) return '—';
+    return Number(n).toLocaleString('ko-KR') + '원';
   }
-  tbody.innerHTML = rows.map((a) => {
-    const pct = Number(a.change_pct || 0);
-    const cls = pct > 0 ? 'up' : pct < 0 ? 'down' : '';
-    const sign = pct > 0 ? '+' : '';
-    return `<tr>
-      <td>${escapeHtml(a.sku_name || a.sku_id)}</td>
-      <td>${escapeHtml(a.brand || '')}</td>
-      <td class="num">${formatPrice(a.prev_price)}</td>
-      <td class="num">${formatPrice(a.new_price)}</td>
-      <td class="num ${cls}">${sign}${pct.toFixed(2)}</td>
-      <td>${escapeHtml(formatDateTime(a.detected_at))}</td>
-    </tr>`;
-  }).join('');
-}
 
-function renderSkuTable() {
-  const tbody = document.getElementById('skuTbody');
-  if (!state.skuList.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty">SKU 데이터가 없습니다.</td></tr>';
-    return;
+  function fmtShortDate(s) {
+    if (!s) return '미수집';
+    var d = String(s).slice(0, 10).split('-');
+    if (d.length === 3) return parseInt(d[1], 10) + '/' + parseInt(d[2], 10);
+    return String(s);
   }
-  tbody.innerHTML = state.skuList.map((r) => {
-    const url = r.product_url || `https://www.coupang.com/vp/products/${r.sku_id}`;
-    return `<tr>
-      <td>${escapeHtml(r.brand || '')}</td>
-      <td>${escapeHtml(r.sku_id)}</td>
-      <td>${escapeHtml(r.sku_name || '')}</td>
-      <td class="num">${formatPrice(r.current_price)}</td>
-      <td>${formatShortDate(r.last_collected)}</td>
-      <td><a href="${escapeHtml(url)}" target="_blank" rel="noopener">링크</a></td>
-    </tr>`;
-  }).join('');
-}
 
-function assignedSet() {
-  const s = new Set();
-  for (const day of DAY_META) {
-    for (const item of state.scheduleByDay[day.d] || []) s.add(item.sku_id);
+  function kstTodayYmd() {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Seoul',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(new Date());
   }
-  return s;
-}
 
-function renderSchedule() {
-  const grid = document.getElementById('scheduleGrid');
-  grid.innerHTML = DAY_META.map((meta) => {
-    const rows = state.scheduleByDay[meta.d] || [];
-    const items = rows.length
-      ? rows.map((r) => `<div class="sku-item">
-          <div class="sku-name">${escapeHtml(r.sku_name || r.sku_id)}</div>
-          <button class="x-btn" data-day="${meta.d}" data-sku="${escapeHtml(r.sku_id)}">X</button>
-        </div>`).join('')
-      : '<div class="empty">배정된 SKU 없음</div>';
-    return `<div class="day-col">
-      <div class="day-title">${meta.name} (${rows.length})</div>
-      ${items}
-    </div>`;
-  }).join('');
+  function fmtDetectedAt(iso) {
+    if (!iso) return '—';
+    try {
+      return new Date(iso).toLocaleString('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (e) { return iso; }
+  }
 
-  grid.querySelectorAll('.x-btn').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      try {
-        hideErr();
-        await deleteJson('/api/collect-schedule', {
-          day_of_week: Number(btn.dataset.day),
-          sku_id: btn.dataset.sku,
+  function escapeHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+
+  function apiGet(path) {
+    return fetch(API_BASE + path).then(function (r) { return r.json(); });
+  }
+
+  function scheduleLabel(skuId) {
+    var arr = scheduleMap[skuId];
+    if (!arr || !arr.length) return '—';
+    var sorted = arr.slice().sort(function (a, b) { return a - b; });
+    return sorted.map(function (d) { return DAY_KO[d]; }).join(',');
+  }
+
+  function buildScheduleMap() {
+    var days = [0, 1, 2, 3, 4, 5, 6];
+    return Promise.all(days.map(function (d) {
+      return apiGet('/collect-schedule?day=' + d);
+    })).then(function (results) {
+      scheduleMap = {};
+      results.forEach(function (j, idx) {
+        if (!j.ok || !j.data) return;
+        var dow = j.day_of_week != null ? j.day_of_week : idx;
+        j.data.forEach(function (row) {
+          var id = String(row.sku_id);
+          if (!scheduleMap[id]) scheduleMap[id] = [];
+          if (scheduleMap[id].indexOf(dow) === -1) scheduleMap[id].push(dow);
         });
-        await loadScheduleOnly();
-      } catch (e) {
-        showErr(e.message || String(e));
+      });
+    });
+  }
+
+  function refreshCollectStatus() {
+    return apiGet('/collect-status').then(function (j) {
+      if (!j.ok || !j.data) return;
+      var d = j.data;
+      var st = d.status || 'idle';
+      var badge = document.getElementById('cs-badge');
+      badge.className = 'badge ' + (st === 'running' ? 'running' : st === 'stopping' ? 'stopping' : st === 'done' ? 'done' : st === 'error' ? 'error' : 'idle');
+      var labels = { idle: '대기중', running: '수집중', stopping: '중지중', done: '완료', error: '에러' };
+      badge.textContent = labels[st] || st;
+
+      var pw = document.getElementById('cs-progress-wrap');
+      var doneEl = document.getElementById('cs-done');
+      document.getElementById('btn-cs-stop').disabled = st !== 'running';
+
+      if (st === 'running' || st === 'stopping') {
+        pw.style.display = 'block';
+        doneEl.style.display = 'none';
+        var t = d.total || 0;
+        var c = d.current || 0;
+        var pct = t ? Math.round((c / t) * 100) : 0;
+        document.getElementById('cs-bar').style.width = pct + '%';
+        document.getElementById('cs-line').textContent = c + '/' + t + ' 수집중… (' + (d.current_sku_name || '—') + ')';
+      } else {
+        pw.style.display = 'none';
+        if (st === 'done') {
+          doneEl.style.display = 'block';
+          var fin = d.finished_at ? ' 완료시각: ' + fmtDetectedAt(d.finished_at) : '';
+          doneEl.textContent = (d.current || d.total || 0) + '/' + (d.total || 0) + ' 완료 (성공 ' + (d.success || 0) + ' / 실패 ' + (d.fail || 0) + ')' + fin;
+        } else {
+          doneEl.style.display = 'none';
+        }
+      }
+
+      if (st === 'running' || st === 'stopping') {
+        if (!pollTimer) pollTimer = setInterval(refreshCollectStatus, 5000);
+      } else {
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
       }
     });
-  });
-
-  const unassigned = state.skuList.filter((x) => !assignedSet().has(x.sku_id));
-  const utb = document.getElementById('unassignedTbody');
-  if (!unassigned.length) {
-    utb.innerHTML = '<tr><td colspan="5" class="empty">미배정 SKU가 없습니다.</td></tr>';
-  } else {
-    utb.innerHTML = unassigned.map((r) => `<tr>
-      <td>${escapeHtml(r.brand || '')}</td>
-      <td>${escapeHtml(r.sku_name || '')}</td>
-      <td>${escapeHtml(r.sku_id)}</td>
-      <td class="num">${formatPrice(r.current_price)}</td>
-      <td>${formatShortDate(r.last_collected)}</td>
-    </tr>`).join('');
   }
-}
 
-function renderTodayTargets(rows) {
-  const el = document.getElementById('todayTargets');
-  if (!rows.length) {
-    el.textContent = '오늘 배정된 SKU가 없습니다.';
-    return;
+  function loadTodayTable() {
+    return Promise.all([apiGet('/collect-schedule?day=today'), apiGet('/sku-detail')])
+      .then(function (arr) {
+        var today = arr[0];
+        var detail = arr[1];
+        var tbody = document.querySelector('#tbl-today tbody');
+        tbody.innerHTML = '';
+        var ymd = kstTodayYmd();
+        var byId = {};
+        if (detail.ok && detail.data) {
+          detail.data.forEach(function (r) { byId[String(r.sku_id)] = r; });
+        }
+        if (!today.ok || !today.data || !today.data.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="muted">오늘 배정된 SKU가 없습니다.</td></tr>';
+          return;
+        }
+        today.data.forEach(function (row) {
+          var m = byId[String(row.sku_id)] || {};
+          var reg = m.registered_price;
+          var cur = m.current_price;
+          var ch = m.change_pct;
+          var collected = m.last_collected && String(m.last_collected).slice(0, 10) === ymd;
+          var tr = document.createElement('tr');
+          var pctStr = '—';
+          var pctClass = 'muted';
+          if (ch != null && ch !== '' && !Number.isNaN(Number(ch))) {
+            var p = Number(ch);
+            if (p === 0) {
+              pctStr = '—';
+              pctClass = 'muted';
+            } else {
+              pctStr = (p > 0 ? '▲' : '▼') + Math.abs(p) + '%';
+              pctClass = p > 0 ? 'up' : 'down';
+            }
+          }
+          tr.innerHTML =
+            '<td>' + escapeHtml(row.sku_name || '—') + '</td>' +
+            '<td>' + escapeHtml(row.brand || '—') + '</td>' +
+            '<td class="num">' + fmtMoney(reg) + '</td>' +
+            '<td class="num">' + fmtMoney(cur) + '</td>' +
+            '<td class="num ' + pctClass + '">' + pctStr + '</td>' +
+            '<td>' + (collected ? '✅' : '미수집') + '</td>';
+          tbody.appendChild(tr);
+        });
+      });
   }
-  const names = rows.map((x) => x.sku_name || x.sku_id).slice(0, 10).join(', ');
-  const extra = rows.length > 10 ? ` 외 ${rows.length - 10}건` : '';
-  el.textContent = `오늘 배정 ${rows.length}건: ${names}${extra}`;
-}
 
-async function loadScheduleOnly() {
-  const reqs = DAY_META.map((d) => fetchJson(`/api/collect-schedule?day=${d.d}`));
-  const results = await Promise.all(reqs);
-  const next = { 1: [], 2: [], 3: [], 4: [], 5: [] };
-  results.forEach((r) => {
-    next[r.day_of_week] = r.data || [];
-  });
-  state.scheduleByDay = next;
-  renderSchedule();
-}
-
-async function loadAll() {
-  hideErr();
-  const [sku, alerts, status] = await Promise.all([
-    fetchJson('/api/sku-list'),
-    fetchJson('/api/price-alert?days=14'),
-    fetchJson('/api/collect-status'),
-  ]);
-  state.skuList = sku.data || [];
-  state.alerts = alerts.alerts || [];
-  state.status = status.data || null;
-  await loadScheduleOnly();
-  renderCollectStatus();
-  renderAlerts();
-  renderSkuTable();
-  document.getElementById('refreshedAt').textContent = `갱신: ${new Date().toLocaleString('ko-KR')}`;
-}
-
-function bindTabs() {
-  const tabs = document.querySelectorAll('.tab-btn');
-  const panels = document.querySelectorAll('.panel');
-  tabs.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      tabs.forEach((t) => t.classList.remove('active'));
-      panels.forEach((p) => p.classList.remove('active'));
-      btn.classList.add('active');
-      document.querySelector(`.panel[data-panel="${btn.dataset.tab}"]`).classList.add('active');
+  function renderAlertFilters() {
+    var brands = new Set();
+    alertRows.forEach(function (r) { if (r.brand) brands.add(r.brand); });
+    var brandBtns = document.getElementById('alert-brand-btns');
+    brandBtns.innerHTML = '';
+    function addBrandBtn(label, val) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = label;
+      if (alertBrand === val) b.classList.add('on');
+      b.onclick = function () {
+        alertBrand = val;
+        Array.from(brandBtns.children).forEach(function (x) { x.classList.remove('on'); });
+        b.classList.add('on');
+        renderAlertsTable();
+      };
+      brandBtns.appendChild(b);
+    }
+    addBrandBtn('전체', '전체');
+    Array.from(brands).sort().forEach(function (br) {
+      addBrandBtn(br, br);
     });
-  });
-}
 
-function bindActions() {
-  document.getElementById('autoDistributeBtn').addEventListener('click', async () => {
-    try {
-      hideErr();
-      await postJson('/api/collect-schedule', { action: 'auto_distribute' });
-      await loadScheduleOnly();
-    } catch (e) {
-      showErr(e.message || String(e));
+    var dirs = [
+      { k: 'all', t: '전체' },
+      { k: 'up', t: '상승▲' },
+      { k: 'down', t: '하락▼' }
+    ];
+    var dirBtns = document.getElementById('alert-dir-btns');
+    dirBtns.innerHTML = '';
+    dirs.forEach(function (o) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = o.t;
+      if (alertDir === o.k) b.classList.add('on');
+      b.onclick = function () {
+        alertDir = o.k;
+        Array.from(dirBtns.children).forEach(function (x) { x.classList.remove('on'); });
+        b.classList.add('on');
+        renderAlertsTable();
+      };
+      dirBtns.appendChild(b);
+    });
+  }
+
+  function renderAlertsTable() {
+    var rows = alertRows.slice();
+    if (alertBrand && alertBrand !== '전체') {
+      rows = rows.filter(function (r) { return (r.brand || '') === alertBrand; });
     }
-  });
-
-  document.getElementById('startCollectBtn').addEventListener('click', async () => {
-    try {
-      hideErr();
-      const dayRes = await fetchJson('/api/collect-schedule?day=today');
-      const rows = dayRes.data || [];
-      renderTodayTargets(rows);
-      await postJson('/api/collect-status', { action: 'start', total: rows.length });
-      await refreshStatusOnly();
-    } catch (e) {
-      showErr(e.message || String(e));
+    if (alertDir === 'up') rows = rows.filter(function (r) { return (r.change_pct || 0) > 0; });
+    if (alertDir === 'down') rows = rows.filter(function (r) { return (r.change_pct || 0) < 0; });
+    rows.sort(function (a, b) {
+      return new Date(b.detected_at || 0) - new Date(a.detected_at || 0);
+    });
+    var tbody = document.querySelector('#tbl-alerts tbody');
+    tbody.innerHTML = '';
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="muted">알림이 없습니다.</td></tr>';
+      return;
     }
-  });
+    rows.forEach(function (r) {
+      var tr = document.createElement('tr');
+      var ch = r.change_pct || 0;
+      var cls = ch > 0 ? 'up' : ch < 0 ? 'down' : 'muted';
+      tr.innerHTML =
+        '<td>' + escapeHtml(r.sku_name || '—') + '</td>' +
+        '<td>' + escapeHtml(r.brand || '—') + '</td>' +
+        '<td class="num">' + fmtMoney(r.prev_price) + '</td>' +
+        '<td class="num">' + fmtMoney(r.new_price) + '</td>' +
+        '<td class="num ' + cls + '">' + (r.change_pct != null ? r.change_pct + '%' : '—') + '</td>' +
+        '<td>' + fmtDetectedAt(r.detected_at) + '</td>';
+      tbody.appendChild(tr);
+    });
+  }
 
-  document.getElementById('stopCollectBtn').addEventListener('click', async () => {
-    try {
-      hideErr();
-      await postJson('/api/collect-status', { action: 'stop' });
-      await refreshStatusOnly();
-    } catch (e) {
-      showErr(e.message || String(e));
+  function loadAlerts() {
+    return apiGet('/price-alert').then(function (j) {
+      alertRows = j.alerts || [];
+      renderAlertFilters();
+      renderAlertsTable();
+    });
+  }
+
+  function countByBrand(rows) {
+    var m = { 전체: rows.length };
+    rows.forEach(function (r) {
+      var b = r.brand || '기타';
+      m[b] = (m[b] || 0) + 1;
+    });
+    return m;
+  }
+
+  function renderSkuTable() {
+    var rows = skuRows.slice();
+    if (skuBrand && skuBrand !== '전체') {
+      rows = rows.filter(function (r) { return (r.brand || '') === skuBrand; });
     }
+    var tbody = document.querySelector('#tbl-sku tbody');
+    tbody.innerHTML = '';
+    rows.forEach(function (r) {
+      var tr = document.createElement('tr');
+      var ch = r.change_pct;
+      var cls = ch == null || ch === 0 ? 'muted' : ch > 0 ? 'up' : 'down';
+      var chStr = ch == null || ch === 0 ? '—' : (ch > 0 ? '' : '') + Number(ch).toFixed(2) + '%';
+      if (ch != null && ch !== 0) {
+        chStr = (ch > 0 ? '▲' : '▼') + Math.abs(Number(ch)).toFixed(2) + '%';
+      }
+      var name = escapeHtml(r.sku_name || '—');
+      var url = r.product_url ? escapeHtml(r.product_url) : '';
+      var link = url ? '<a class="link" href="' + url + '" target="_blank" rel="noopener">' + name + '</a>' : name;
+      var flag = r.flag ? '<span class="flag-badge">' + escapeHtml(r.flag) + '</span>' : '—';
+      tr.innerHTML =
+        '<td style="font-size:12px;color:#666">' + escapeHtml(String(r.sku_id)) + '</td>' +
+        '<td>' + link + '</td>' +
+        '<td class="num">' + fmtMoney(r.registered_price) + '</td>' +
+        '<td class="num">' + (r.current_price != null ? fmtMoney(r.current_price) : '—') + '</td>' +
+        '<td class="num ' + cls + '">' + chStr + '</td>' +
+        '<td>' + flag + '</td>' +
+        '<td>' + (r.collect_cycle != null ? r.collect_cycle + '일' : '—') + '</td>' +
+        '<td>' + fmtShortDate(r.last_collected) + '</td>' +
+        '<td>' + scheduleLabel(String(r.sku_id)) + '</td>' +
+        '<td><button type="button" class="btn-icon btn-del" data-id="' + escapeHtml(String(r.sku_id)) + '" data-name="' + escapeHtml(r.sku_name || '') + '" title="삭제">🗑</button></td>';
+      tbody.appendChild(tr);
+    });
+    document.querySelectorAll('.btn-del').forEach(function (btn) {
+      btn.onclick = function (e) {
+        e.stopPropagation();
+        var id = btn.getAttribute('data-id');
+        var nm = btn.getAttribute('data-name') || id;
+        if (!confirm("'" + nm + "'을(를) 삭제하시겠습니까?")) return;
+        fetch(API_BASE + '/sku-delete', {
+          method: 'DELETE',
+          headers: JSON_H,
+          body: JSON.stringify({ sku_id: id })
+        }).then(function (r) { return r.json(); }).then(function (j) {
+          if (j.ok) loadSkuPage();
+          else alert(j.error || '삭제 실패');
+        }).catch(function (err) { alert(err.message); });
+      };
+    });
+  }
+
+  function loadSkuPage() {
+    return apiGet('/sku-detail').then(function (j) {
+      skuRows = j.data || [];
+      var counts = countByBrand(skuRows);
+      var tabs = document.getElementById('sku-brand-tabs');
+      tabs.innerHTML = '';
+      var ordered = ['전체', '아리코', '윰'];
+      var seen = new Set(ordered);
+      skuRows.forEach(function (r) {
+        var b = r.brand;
+        if (b && !seen.has(b)) { ordered.push(b); seen.add(b); }
+      });
+      if (ordered.indexOf(skuBrand) === -1) skuBrand = '전체';
+      ordered.forEach(function (b) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        var c = b === '전체' ? counts['전체'] : (counts[b] || 0);
+        btn.textContent = b + '(' + c + ')';
+        if (b === skuBrand) btn.classList.add('on');
+        btn.onclick = function () {
+          skuBrand = b;
+          Array.from(tabs.children).forEach(function (x) { x.classList.remove('on'); });
+          btn.classList.add('on');
+          renderSkuTable();
+        };
+        tabs.appendChild(btn);
+      });
+      return buildScheduleMap();
+    }).then(function () {
+      renderSkuTable();
+    });
+  }
+
+  document.querySelectorAll('.tab-btn').forEach(function (btn) {
+    btn.onclick = function () {
+      document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
+      var id = btn.getAttribute('data-tab') === 'dash' ? 'panel-dash' : 'panel-sku';
+      document.getElementById(id).classList.add('active');
+      if (id === 'panel-dash') {
+        refreshCollectStatus();
+        loadTodayTable();
+        loadAlerts();
+      } else loadSkuPage();
+    };
   });
 
-  window.testPatchStatus = (payload) => patchJson('/api/collect-status', payload);
-}
+  document.getElementById('btn-cs-stop').onclick = function () {
+    fetch(API_BASE + '/collect-status', {
+      method: 'POST',
+      headers: JSON_H,
+      body: JSON.stringify({ action: 'stop' })
+    }).then(function () { refreshCollectStatus(); });
+  };
 
-async function refreshStatusOnly() {
-  const status = await fetchJson('/api/collect-status');
-  state.status = status.data || null;
-  renderCollectStatus();
-}
+  document.getElementById('f-brand-sel').onchange = function () {
+    var v = document.getElementById('f-brand-sel').value;
+    document.getElementById('f-brand-custom').style.display = v === '__custom' ? 'block' : 'none';
+  };
 
-bindTabs();
-bindActions();
-loadAll().catch((e) => showErr(e.message || String(e)));
-setInterval(() => {
-  refreshStatusOnly().catch((e) => showErr(e.message || String(e)));
-}, 5000);
-setInterval(() => {
-  loadAll().catch((e) => showErr(e.message || String(e)));
-}, 60000);
-</script>
+  document.getElementById('btn-sku-add').onclick = function () {
+    document.getElementById('modal-bg').classList.add('show');
+  };
+  document.getElementById('modal-cancel').onclick = function () {
+    document.getElementById('modal-bg').classList.remove('show');
+  };
+  document.getElementById('modal-save').onclick = function () {
+    var sel = document.getElementById('f-brand-sel').value;
+    var brand = sel === '__custom' ? document.getElementById('f-brand-custom').value.trim() : sel;
+    var body = {
+      sku_id: document.getElementById('f-sku_id').value.trim(),
+      sku_name: document.getElementById('f-sku_name').value.trim(),
+      brand: brand,
+      product_url: document.getElementById('f-product_url').value.trim(),
+      registered_price: document.getElementById('f-registered_price').value
+        ? Number(document.getElementById('f-registered_price').value) : null,
+      collect_cycle: document.getElementById('f-collect_cycle').value
+        ? Number(document.getElementById('f-collect_cycle').value) : 7,
+      flag: document.getElementById('f-flag').value.trim(),
+      memo: document.getElementById('f-memo').value.trim()
+    };
+    if (!body.sku_id || !body.sku_name || !body.brand || !body.product_url) {
+      alert('필수: SKU ID, 상품명, 브랜드, 쿠팡 URL');
+      return;
+    }
+    fetch(API_BASE + '/sku-add', {
+      method: 'POST',
+      headers: JSON_H,
+      body: JSON.stringify(body)
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j.ok) {
+        document.getElementById('modal-bg').classList.remove('show');
+        loadSkuPage();
+      } else alert(j.error || '저장 실패');
+    }).catch(function (e) { alert(e.message); });
+  };
+
+  document.getElementById('btn-csv-up').onclick = function () {
+    document.getElementById('csv-file').click();
+  };
+  document.getElementById('csv-file').onchange = function (ev) {
+    var f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    var fd = new FormData();
+    fd.append('file', f, f.name);
+    fetch(API_BASE + '/sku-upload', { method: 'POST', body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (j.ok) loadSkuPage();
+        else alert(j.error || '업로드 실패');
+      })
+      .catch(function (e) { alert(e.message); });
+    ev.target.value = '';
+  };
+
+  document.getElementById('btn-csv-dl').onclick = function () {
+    var rows = skuRows.slice();
+    if (skuBrand && skuBrand !== '전체') {
+      rows = rows.filter(function (r) { return (r.brand || '') === skuBrand; });
+    }
+    var cols = ['sku_id', 'brand', 'sku_name', 'product_url', 'registered_price', 'current_price', 'change_pct', 'flag', 'collect_cycle', 'last_collected'];
+    var csv = cols.join(',') + '\n';
+    rows.forEach(function (r) {
+      var line = cols.map(function (c) {
+        var v = r[c];
+        if (v == null) v = '';
+        v = String(v).replace(/"/g, '""');
+        if (/[",\n]/.test(v)) v = '"' + v + '"';
+        return v;
+      });
+      csv += line.join(',') + '\n';
+    });
+    var ymd = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date()).replace(/-/g, '');
+    var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'sku_list_' + ymd + '.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  document.getElementById('btn-auto-dist').onclick = function () {
+    if (!confirm('전체 SKU를 요일에 자동 분배합니다. 기존 배정이 해당 로직에 따라 바뀔 수 있습니다. 계속할까요?')) return;
+    fetch(API_BASE + '/collect-schedule', {
+      method: 'POST',
+      headers: JSON_H,
+      body: JSON.stringify({ action: 'auto_distribute' })
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j.ok) loadSkuPage();
+      else alert(j.error || '실패');
+    }).catch(function (e) { alert(e.message); });
+  };
+
+  tickClock();
+  setInterval(tickClock, 60000);
+  refreshCollectStatus();
+  loadTodayTable();
+  loadAlerts();
+})();
+  </script>
 </body>
 </html>

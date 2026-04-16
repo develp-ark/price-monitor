@@ -1,16 +1,26 @@
 {
   "rewrites": [{ "source": "/", "destination": "/index.html" }],
   "functions": {
-    "api/sku-upload.js": { "maxDuration": 60 },
+    "api/price.js": { "maxDuration": 60 },
+    "api/price-alert.js": { "maxDuration": 60 },
+    "api/sku-list.js": { "maxDuration": 60 },
     "api/sku-detail.js": { "maxDuration": 60 },
-    "api/sku-batch-toggle.js": { "maxDuration": 30 }
+    "api/sku-upload.js": { "maxDuration": 60 },
+    "api/sku-add.js": { "maxDuration": 60 },
+    "api/sku-delete.js": { "maxDuration": 60 },
+    "api/sku-batch-toggle.js": { "maxDuration": 60 },
+    "api/collect-schedule.js": { "maxDuration": 60 },
+    "api/collect-status.js": { "maxDuration": 60 }
   },
   "headers": [
     {
       "source": "/api/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET,POST,OPTIONS,PATCH,DELETE"
+        },
         { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
       ]
     }
