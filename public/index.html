@@ -309,6 +309,85 @@
       color: #999;
       margin-top: 8px;
     }
+    .schedule-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+    }
+    .schedule-col {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+      overflow: hidden;
+      border: 1px solid #e5e8eb;
+    }
+    .schedule-col-header {
+      padding: 14px 16px;
+      background: #f8f9fa;
+      font-weight: 700;
+      font-size: 14px;
+      border-bottom: 1px solid #e5e8eb;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .schedule-col-header .count {
+      background: #3182F6;
+      color: #fff;
+      border-radius: 12px;
+      padding: 2px 10px;
+      font-size: 12px;
+    }
+    .schedule-col-body {
+      max-height: 400px;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+    .schedule-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 16px;
+      font-size: 13px;
+      border-bottom: 1px solid #f1f3f5;
+      gap: 8px;
+    }
+    .schedule-item:hover { background: #f8f9fb; }
+    .schedule-item .brand-tag {
+      font-size: 11px;
+      color: #999;
+      margin-right: 6px;
+    }
+    .schedule-item .name {
+      max-width: 220px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .schedule-item .remove-btn {
+      background: none;
+      border: none;
+      color: #ccc;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0 4px;
+    }
+    .schedule-item .remove-btn:hover { color: #F04452; }
+    .btn-day {
+      padding: 4px 8px;
+      border: 1px solid #e5e8eb;
+      border-radius: 6px;
+      background: #fff;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .btn-day:hover {
+      background: #3182F6;
+      color: #fff;
+      border-color: #3182F6;
+    }
     .cell-schedule {
       cursor: pointer;
       color: #3182F6;
@@ -345,6 +424,7 @@
 
     <div class="tabs">
       <button type="button" id="tab-dash" class="active">대시보드</button>
+      <button type="button" id="tab-schedule">수집 스케줄</button>
       <button type="button" id="tab-sku">SKU 관리</button>
     </div>
 
@@ -357,9 +437,11 @@
             <div class="progress-bar" id="collect-progress-wrap" style="display:none;"><div id="collect-progress-bar" style="width:0%;"></div></div>
             <div id="collect-running-text" class="hint" style="display:none;"></div>
           </div>
-          <button type="button" class="btn btn-danger" id="btn-stop-collect" disabled>중지</button>
+          <div class="actions">
+            <button type="button" class="btn btn-primary" id="btn-start-today">▶ 오늘 수집 시작</button>
+            <button type="button" class="btn btn-danger" id="btn-stop-collect" disabled>■ 중지</button>
+          </div>
         </div>
-        <p class="hint">수집은 Chrome 확장프로그램에서 시작합니다.</p>
       </div>
 
       <div class="card">
@@ -434,6 +516,56 @@
             <tbody id="alert-tbody"></tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <div id="panel-schedule" class="panel">
+      <div style="display:flex;gap:16px;margin-bottom:20px">
+        <div class="card" style="flex:1;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:#3182F6" id="sch-total">0</div>
+          <div style="font-size:12px;color:#999">전체 활성 SKU</div>
+        </div>
+        <div class="card" style="flex:1;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:#00B493" id="sch-assigned">0</div>
+          <div style="font-size:12px;color:#999">배정 완료</div>
+        </div>
+        <div class="card" style="flex:1;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:#F04452" id="sch-unassigned">0</div>
+          <div style="font-size:12px;color:#999">미배정</div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-head" style="margin-bottom:0;">
+          <h2>요일별 분배 현황</h2>
+          <button type="button" class="btn btn-ghost" id="btn-sch-auto-dist">자동 분배</button>
+        </div>
+      </div>
+      <div class="schedule-grid" id="schedule-grid">
+        <div class="schedule-col">
+          <div class="schedule-col-header"><span>월요일</span><span class="count" id="sch-count-1">0</span></div>
+          <div class="schedule-col-body" id="sch-body-1"></div>
+        </div>
+        <div class="schedule-col">
+          <div class="schedule-col-header"><span>화요일</span><span class="count" id="sch-count-2">0</span></div>
+          <div class="schedule-col-body" id="sch-body-2"></div>
+        </div>
+        <div class="schedule-col">
+          <div class="schedule-col-header"><span>수요일</span><span class="count" id="sch-count-3">0</span></div>
+          <div class="schedule-col-body" id="sch-body-3"></div>
+        </div>
+        <div class="schedule-col">
+          <div class="schedule-col-header"><span>목요일</span><span class="count" id="sch-count-4">0</span></div>
+          <div class="schedule-col-body" id="sch-body-4"></div>
+        </div>
+        <div class="schedule-col">
+          <div class="schedule-col-header"><span>금요일</span><span class="count" id="sch-count-5">0</span></div>
+          <div class="schedule-col-body" id="sch-body-5"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px" id="unassigned-card">
+        <h2>미배정 SKU</h2>
+        <p class="hint" style="margin-bottom:12px">아래 SKU는 어떤 요일에도 배정되지 않았습니다. 요일 버튼을 클릭하여 배정하세요.</p>
+        <div id="unassigned-list"></div>
       </div>
     </div>
 
@@ -671,6 +803,12 @@
     if (event.data.type === 'PRICE_COLLECT_RESULT') {
       handleCollectResult(event.data);
     }
+
+    if (event.data.type === 'SCHEDULE_COLLECT_DONE') {
+      loadCollectStatus().then(function () {
+        loadTodaySection();
+      });
+    }
   });
 
   function escapeHtml(s) {
@@ -804,6 +942,13 @@
     }, 5000);
   }
 
+  function setStartTodayButtonState(isRunning) {
+    var btn = document.getElementById('btn-start-today');
+    if (!btn) return;
+    btn.disabled = !!isRunning;
+    btn.textContent = isRunning ? '수집 중...' : '▶ 오늘 수집 시작';
+  }
+
   function loadCollectStatus() {
     return apiFetch('GET', '/collect-status', null)
       .then(function (json) {
@@ -815,6 +960,7 @@
 
         var btnStop = document.getElementById('btn-stop-collect');
         btnStop.disabled = st !== 'running';
+        setStartTodayButtonState(st === 'running');
 
         var progWrap = document.getElementById('collect-progress-wrap');
         var progBar = document.getElementById('collect-progress-bar');
@@ -1517,6 +1663,91 @@
     loadAlerts();
   }
 
+  function loadScheduleTab() {
+    return Promise.all([
+      apiFetch('GET', '/sku-detail', null),
+      apiFetch('GET', '/collect-schedule-all', null)
+    ])
+      .then(function (results) {
+        var allSkus = (results[0] && results[0].data) || [];
+        var scheduleData = (results[1] && results[1].data) || [];
+        var dayMap = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+        var assignedMap = {};
+        var skuMap = {};
+        var i;
+        for (i = 0; i < allSkus.length; i++) {
+          skuMap[String(allSkus[i].sku_id)] = allSkus[i];
+        }
+        for (i = 0; i < scheduleData.length; i++) {
+          var row = scheduleData[i] || {};
+          var d = Number(row.day_of_week);
+          var sid = String(row.sku_id || '');
+          if (!sid) continue;
+          if (d >= 1 && d <= 5) {
+            dayMap[d].push(sid);
+            assignedMap[sid] = true;
+          }
+        }
+
+        var totalActive = allSkus.length;
+        var assignedCount = Object.keys(assignedMap).length;
+        document.getElementById('sch-total').textContent = String(totalActive);
+        document.getElementById('sch-assigned').textContent = String(assignedCount);
+        document.getElementById('sch-unassigned').textContent = String(totalActive - assignedCount);
+
+        for (var day = 1; day <= 5; day++) {
+          var ids = dayMap[day] || [];
+          document.getElementById('sch-count-' + day).textContent = String(ids.length);
+          var body = document.getElementById('sch-body-' + day);
+          var h = '';
+          for (var j = 0; j < ids.length; j++) {
+            var sid2 = ids[j];
+            var s = skuMap[sid2];
+            if (!s) continue;
+            h += '<div class="schedule-item">';
+            h += '<div>';
+            h += '<span class="brand-tag">' + escapeHtml(s.brand || '') + '</span>';
+            h += '<span class="name">' + escapeHtml(s.sku_name || '') + '</span>';
+            h += '</div>';
+            h += '<button type="button" class="remove-btn" data-sch-remove-day="' + day + '" data-sch-remove-sku="' + escapeHtml(sid2) + '" title="삭제">×</button>';
+            h += '</div>';
+          }
+          if (!h) h = '<div class="schedule-item"><span class="muted">배정 없음</span></div>';
+          body.innerHTML = h;
+        }
+
+        var ua = [];
+        for (i = 0; i < allSkus.length; i++) {
+          var sid3 = String(allSkus[i].sku_id);
+          if (!assignedMap[sid3]) ua.push(allSkus[i]);
+        }
+        var ul = document.getElementById('unassigned-list');
+        var uh = '';
+        for (i = 0; i < ua.length; i++) {
+          var s2 = ua[i];
+          uh += '<div class="schedule-item">';
+          uh += '<div>';
+          uh += '<span class="brand-tag">' + escapeHtml(s2.brand || '') + '</span>';
+          uh += '<span class="name">' + escapeHtml(s2.sku_name || '') + '</span>';
+          uh += '</div>';
+          uh += '<div style="display:flex;gap:4px">';
+          uh += '<button type="button" class="btn-day" data-sch-add-day="1" data-sch-add-sku="' + escapeHtml(String(s2.sku_id)) + '">월</button>';
+          uh += '<button type="button" class="btn-day" data-sch-add-day="2" data-sch-add-sku="' + escapeHtml(String(s2.sku_id)) + '">화</button>';
+          uh += '<button type="button" class="btn-day" data-sch-add-day="3" data-sch-add-sku="' + escapeHtml(String(s2.sku_id)) + '">수</button>';
+          uh += '<button type="button" class="btn-day" data-sch-add-day="4" data-sch-add-sku="' + escapeHtml(String(s2.sku_id)) + '">목</button>';
+          uh += '<button type="button" class="btn-day" data-sch-add-day="5" data-sch-add-sku="' + escapeHtml(String(s2.sku_id)) + '">금</button>';
+          uh += '</div>';
+          uh += '</div>';
+        }
+        if (!uh) uh = '<div class="schedule-item"><span class="muted">미배정 SKU가 없습니다.</span></div>';
+        ul.innerHTML = uh;
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
+      });
+  }
+
   function updateClock() {
     var el = document.getElementById('clock');
     var now = new Date();
@@ -1534,20 +1765,40 @@
     el.textContent = s;
   }
 
-  document.getElementById('tab-dash').addEventListener('click', function () {
-    document.getElementById('tab-dash').classList.add('active');
+  function activateTab(tabId) {
+    document.getElementById('tab-dash').classList.remove('active');
+    document.getElementById('tab-schedule').classList.remove('active');
     document.getElementById('tab-sku').classList.remove('active');
-    document.getElementById('panel-dash').classList.add('active');
+    document.getElementById('panel-dash').classList.remove('active');
+    document.getElementById('panel-schedule').classList.remove('active');
     document.getElementById('panel-sku').classList.remove('active');
-    refreshDashboard();
+    if (tabId === 'dash') {
+      document.getElementById('tab-dash').classList.add('active');
+      document.getElementById('panel-dash').classList.add('active');
+      refreshDashboard();
+      return;
+    }
+    if (tabId === 'schedule') {
+      document.getElementById('tab-schedule').classList.add('active');
+      document.getElementById('panel-schedule').classList.add('active');
+      loadScheduleTab();
+      return;
+    }
+    document.getElementById('tab-sku').classList.add('active');
+    document.getElementById('panel-sku').classList.add('active');
+    loadSkuPage(false);
+  }
+
+  document.getElementById('tab-dash').addEventListener('click', function () {
+    activateTab('dash');
+  });
+
+  document.getElementById('tab-schedule').addEventListener('click', function () {
+    activateTab('schedule');
   });
 
   document.getElementById('tab-sku').addEventListener('click', function () {
-    document.getElementById('tab-sku').classList.add('active');
-    document.getElementById('tab-dash').classList.remove('active');
-    document.getElementById('panel-sku').classList.add('active');
-    document.getElementById('panel-dash').classList.remove('active');
-    loadSkuPage(false);
+    activateTab('sku');
   });
 
   document.getElementById('btn-stop-collect').addEventListener('click', function () {
@@ -1559,6 +1810,53 @@
       .catch(function (e) {
         console.error(e);
         alert(e.message || String(e));
+      });
+  });
+
+  document.getElementById('btn-start-today').addEventListener('click', function () {
+    var btn = this;
+    if (!extensionReady) {
+      alert('Chrome 확장프로그램이 감지되지 않습니다.\n이 페이지에서 확장프로그램이 로드되었는지 확인하세요.');
+      return;
+    }
+    apiFetch('GET', '/collect-schedule?day=today', null)
+      .then(function (j) {
+        var rows = (j && j.data) || [];
+        if (!rows.length) {
+          alert('오늘 수집 대상이 없습니다.');
+          return;
+        }
+        var list = [];
+        for (var i = 0; i < rows.length; i++) {
+          if (rows[i].is_active !== false) list.push(rows[i]);
+        }
+        if (!list.length) {
+          alert('오늘 수집 대상 중 활성 SKU가 없습니다.');
+          return;
+        }
+        if (!confirm('오늘 수집 대상 ' + list.length + '개 상품을 수집하시겠습니까?')) return;
+        btn.disabled = true;
+        btn.textContent = '수집 중...';
+        window.postMessage(
+          {
+            type: 'SCHEDULE_COLLECT_START',
+            skuList: list.map(function (r) {
+              return {
+                sku_id: r.sku_id,
+                sku_name: r.sku_name,
+                brand: r.brand,
+                product_url: r.product_url
+              };
+            })
+          },
+          '*'
+        );
+        loadCollectStatus();
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
+        setStartTodayButtonState(false);
       });
   });
 
@@ -1865,6 +2163,19 @@
       });
   });
 
+  document.getElementById('btn-sch-auto-dist').addEventListener('click', function () {
+    if (!confirm('요일별 자동 분배를 실행할까요?')) return;
+    apiFetch('POST', '/collect-schedule', { action: 'auto_distribute' })
+      .then(function () {
+        invalidateSkuCache();
+        return loadScheduleTab();
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
+      });
+  });
+
   document.getElementById('btn-sku-refresh').addEventListener('click', function () {
     invalidateSkuCache();
     loadSkuPage(true);
@@ -1994,6 +2305,38 @@
         .then(function () {
           invalidateSkuCache();
           return loadSkuPage(true);
+        })
+        .catch(function (e) {
+          console.error(e);
+          alert(e.message || String(e));
+        });
+    }
+    var schDelDay = t.getAttribute('data-sch-remove-day');
+    var schDelSku = t.getAttribute('data-sch-remove-sku');
+    if (schDelDay != null && schDelSku != null) {
+      apiFetch('DELETE', '/collect-schedule', {
+        day_of_week: Number(schDelDay),
+        sku_id: String(schDelSku)
+      })
+        .then(function () {
+          invalidateSkuCache();
+          return loadScheduleTab();
+        })
+        .catch(function (e) {
+          console.error(e);
+          alert(e.message || String(e));
+        });
+    }
+    var schAddDay = t.getAttribute('data-sch-add-day');
+    var schAddSku = t.getAttribute('data-sch-add-sku');
+    if (schAddDay != null && schAddSku != null) {
+      apiFetch('POST', '/collect-schedule', {
+        day_of_week: Number(schAddDay),
+        sku_ids: [String(schAddSku)]
+      })
+        .then(function () {
+          invalidateSkuCache();
+          return loadScheduleTab();
         })
         .catch(function (e) {
           console.error(e);
