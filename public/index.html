@@ -452,6 +452,7 @@
           <input type="file" id="csv-file" accept=".csv,text/csv" />
           <button type="button" class="btn btn-ghost" id="btn-sku-csv-dl">CSV 다운로드</button>
           <button type="button" class="btn btn-ghost" id="btn-auto-dist">자동 분배</button>
+          <button type="button" class="btn btn-ghost" id="btn-sku-refresh">🔄 새로고침</button>
         </div>
       </div>
       <div class="card" style="padding:0; overflow:hidden;">
@@ -651,6 +652,8 @@
     alertSkuUrlMap: {},
     queueSkuSelected: {},
     queueSkuListFiltered: [],
+    skuCache: null,
+    skuCacheTime: 0,
     schedulePopoverSkuId: null
   };
 
@@ -1133,20 +1136,17 @@
   }
 
   function loadSkuSchedules() {
-    var reqs = [];
-    for (var d = 0; d < 7; d++) {
-      reqs.push(apiFetch('GET', '/collect-schedule?day=' + d, null));
-    }
-    return Promise.all(reqs)
-      .then(function (arr) {
+    return apiFetch('GET', '/collect-schedule-all', null)
+      .then(function (j) {
         var map = {};
-        for (var di = 0; di < arr.length; di++) {
-          var data = (arr[di] && arr[di].data) || [];
-          for (var j = 0; j < data.length; j++) {
-            var sid = String(data[j].sku_id);
-            if (!map[sid]) map[sid] = [];
-            map[sid].push(di);
-          }
+        var rows = (j && j.data) || [];
+        for (var i = 0; i < rows.length; i++) {
+          var row = rows[i] || {};
+          var sid = String(row.sku_id);
+          var dow = Number(row.day_of_week);
+          if (sid === '' || isNaN(dow)) continue;
+          if (!map[sid]) map[sid] = [];
+          if (map[sid].indexOf(dow) === -1) map[sid].push(dow);
         }
         for (var k in map) {
           if (Object.prototype.hasOwnProperty.call(map, k)) {
@@ -1264,6 +1264,12 @@
   }
 
   var SKU_PAGE_SIZE = 30;
+  var SKU_CACHE_TTL = 60000;
+
+  function invalidateSkuCache() {
+    state.skuCache = null;
+    state.skuCacheTime = 0;
+  }
 
   function getFilteredSkuRows() {
     var rows = state.skuDetailList || [];
@@ -1368,12 +1374,27 @@
     }
   }
 
-  function loadSkuTable() {
+  function loadSkuPage(forceRefresh) {
+    var now = Date.now();
+    if (
+      !forceRefresh &&
+      state.skuCache &&
+      now - state.skuCacheTime < SKU_CACHE_TTL
+    ) {
+      state.skuDetailList = state.skuCache;
+      document.getElementById('sku-search').value = state.skuSearch;
+      renderSkuBrandTabs();
+      renderSkuTablePage();
+      return Promise.resolve();
+    }
+
     return Promise.all([apiFetch('GET', '/sku-detail', null), loadSkuSchedules()])
       .then(function (res) {
         var json = res[0];
         var rows = json.data || [];
         state.skuDetailList = rows;
+        state.skuCache = rows;
+        state.skuCacheTime = Date.now();
         document.getElementById('sku-search').value = state.skuSearch;
         renderSkuBrandTabs();
         renderSkuTablePage();
@@ -1383,6 +1404,10 @@
         console.error(e);
         alert(e.message || String(e));
       });
+  }
+
+  function loadSkuTable() {
+    return loadSkuPage(false);
   }
 
   function filteredSkuRowsForCsv() {
@@ -1522,7 +1547,7 @@
     document.getElementById('tab-dash').classList.remove('active');
     document.getElementById('panel-sku').classList.add('active');
     document.getElementById('panel-dash').classList.remove('active');
-    loadSkuTable();
+    loadSkuPage(false);
   });
 
   document.getElementById('btn-stop-collect').addEventListener('click', function () {
@@ -1755,7 +1780,8 @@
     apiFetch('POST', '/sku-add', payload)
       .then(function () {
         closeModal('modal-sku-add');
-        return loadSkuTable();
+        invalidateSkuCache();
+        return loadSkuPage(true);
       })
       .catch(function (e) {
         console.error(e);
@@ -1789,7 +1815,8 @@
     apiFetch('PATCH', '/sku-update', payload)
       .then(function () {
         closeModal('modal-sku-edit');
-        return loadSkuTable();
+        invalidateSkuCache();
+        return loadSkuPage(true);
       })
       .catch(function (e) {
         console.error(e);
@@ -1814,7 +1841,8 @@
       })
       .then(function () {
         ev.target.value = '';
-        return loadSkuTable();
+        invalidateSkuCache();
+        return loadSkuPage(true);
       })
       .catch(function (e) {
         console.error(e);
@@ -1828,12 +1856,18 @@
     if (!confirm('SKU를 요일에 자동 분배할까요?')) return;
     apiFetch('POST', '/collect-schedule', { action: 'auto_distribute' })
       .then(function () {
-        return loadSkuTable();
+        invalidateSkuCache();
+        return loadSkuPage(true);
       })
       .catch(function (e) {
         console.error(e);
         alert(e.message || String(e));
       });
+  });
+
+  document.getElementById('btn-sku-refresh').addEventListener('click', function () {
+    invalidateSkuCache();
+    loadSkuPage(true);
   });
 
   document.getElementById('btn-today-csv').addEventListener('click', btnTodayCsvClick);
@@ -1958,7 +1992,8 @@
       if (!confirm('이 SKU를 삭제할까요?')) return;
       apiFetch('DELETE', '/sku-delete', { sku_id: del })
         .then(function () {
-          return loadSkuTable();
+          invalidateSkuCache();
+          return loadSkuPage(true);
         })
         .catch(function (e) {
           console.error(e);
