@@ -219,6 +219,17 @@
     a.link { color: var(--primary); text-decoration: none; font-weight: 600; }
     a.link:hover { text-decoration: underline; }
     .btn-icon { background: transparent; border: none; cursor: pointer; font-size: 16px; padding: 4px 8px; }
+    .btn-collect {
+      background: transparent;
+      border: 1px solid #e5e8eb;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 4px 8px;
+      transition: background 0.2s;
+    }
+    .btn-collect:hover { background: #f0f4ff; }
+    .btn-collect:disabled { opacity: 0.5; cursor: not-allowed; }
     #csv-file, #csv-file-hidden { display: none; }
     .sub-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
     .sub-tabs button { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: #fff; cursor: pointer; font-size: 12px; font-weight: 600; }
@@ -605,6 +616,22 @@
     queueSkuSelected: {},
     queueSkuListFiltered: []
   };
+
+  var extensionReady = false;
+
+  window.addEventListener('message', function (event) {
+    if (event.source !== window) return;
+    if (!event.data) return;
+
+    if (event.data.type === 'PRICE_EXTENSION_READY') {
+      extensionReady = true;
+      console.log('[PM] 확장프로그램 연결됨');
+    }
+
+    if (event.data.type === 'PRICE_COLLECT_RESULT') {
+      handleCollectResult(event.data);
+    }
+  });
 
   function escapeHtml(s) {
     if (s == null) return '';
@@ -1154,13 +1181,13 @@
       h += '<td><a class="link" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(r.sku_name || '') + '</a></td>';
       h += '<td>' + escapeHtml(r.brand || '') + '</td>';
       h += '<td class="num">' + escapeHtml(formatMoney(r.registered_price)) + '</td>';
-      h += '<td class="num">' + escapeHtml(formatMoney(r.current_price)) + '</td>';
+      h += '<td class="num cell-current-price">' + escapeHtml(formatMoney(r.current_price)) + '</td>';
       h += '<td class="num">' + formatChangeCellHtml(r.change_pct) + '</td>';
       h += '<td>' + (r.flag ? '<span class="flag-badge">' + escapeHtml(r.flag) + '</span>' : '—') + '</td>';
       h += '<td class="num">' + escapeHtml(r.collect_cycle != null ? String(r.collect_cycle) : '') + '</td>';
-      h += '<td>' + escapeHtml(formatMdFromYmd(r.last_collected)) + '</td>';
+      h += '<td class="cell-last-collected">' + escapeHtml(formatMdFromYmd(r.last_collected)) + '</td>';
       h += '<td>' + escapeHtml(scheduleDaysLabel(r.sku_id)) + '</td>';
-      h += '<td><button type="button" class="btn-icon" data-collect-sku="' + escapeHtml(String(r.sku_id)) + '" title="수집 큐에 추가">▶</button></td>';
+      h += '<td><button type="button" class="btn-icon btn-collect" data-collect-sku="' + escapeHtml(String(r.sku_id)) + '" data-sku-id="' + escapeHtml(String(r.sku_id)) + '" title="즉시 수집">▶</button></td>';
       h += '<td><button type="button" class="btn-icon" data-edit-sku="' + escapeHtml(String(r.sku_id)) + '" title="수정">✏️</button></td>';
       h += '<td><button type="button" class="btn-icon" data-del-sku="' + escapeHtml(String(r.sku_id)) + '" title="삭제">🗑</button></td>';
       h += '</tr>';
@@ -1252,6 +1279,37 @@
     document.getElementById('e-flag').value = row.flag || '';
     document.getElementById('e-memo').value = row.memo || '';
     openModal('modal-sku-edit');
+  }
+
+  function handleCollectResult(data) {
+    if (!data || data.sku_id == null) return;
+    var btn = document.querySelector('.btn-collect[data-sku-id="' + String(data.sku_id) + '"]');
+    if (!btn) return;
+
+    if (btn._timeout) {
+      clearTimeout(btn._timeout);
+      btn._timeout = null;
+    }
+
+    var tr = btn.closest ? btn.closest('tr') : null;
+    if (data.success) {
+      btn.textContent = '✅';
+      var priceCell = tr ? tr.querySelector('.cell-current-price') : null;
+      if (priceCell && data.price != null && data.price !== '') {
+        priceCell.textContent = Number(data.price).toLocaleString('ko-KR') + '원';
+      }
+      var dateCell = tr ? tr.querySelector('.cell-last-collected') : null;
+      if (dateCell) {
+        var now = new Date();
+        dateCell.textContent = (now.getMonth() + 1) + '/' + now.getDate();
+      }
+    } else {
+      btn.textContent = '❌';
+      console.error('[PM] 수집 실패:', data.sku_id, data.error);
+    }
+
+    btn.disabled = false;
+    setTimeout(function () { btn.textContent = '▶'; }, 3000);
   }
 
   function btnSkuCsvDl() {
@@ -1680,21 +1738,30 @@
     }
     var cs = t.getAttribute('data-collect-sku');
     if (cs != null) {
+      if (!extensionReady) {
+        alert('Chrome 확장프로그램이 감지되지 않습니다.\nprice-monitor 페이지에서 확장프로그램이 설치되어 있는지 확인하세요.');
+        return;
+      }
       var rowC = findSkuRowById(cs);
-      var nm = rowC && rowC.sku_name ? String(rowC.sku_name) : String(cs);
-      var cmsg =
-        nm.indexOf("'") >= 0
-          ? '"' + nm + '" 수집 큐에 추가하시겠습니까?'
-          : "'" + nm + "' 수집 큐에 추가하시겠습니까?";
-      if (!confirm(cmsg)) return;
-      apiFetch('POST', '/collect-queue', { sku_ids: [String(cs)] })
-        .then(function () {
-          alert('수집 큐에 추가되었습니다. 확장프로그램에서 수동 수집을 시작하세요.');
-        })
-        .catch(function (e) {
-          console.error(e);
-          alert(e.message || String(e));
-        });
+      var btnCollect = t;
+      var skuData = {
+        sku_id: rowC && rowC.sku_id != null ? rowC.sku_id : cs,
+        sku_name: rowC && rowC.sku_name ? rowC.sku_name : '',
+        brand: rowC && rowC.brand ? rowC.brand : '',
+        product_url: rowC && rowC.product_url ? rowC.product_url : ''
+      };
+      btnCollect.textContent = '⏳';
+      btnCollect.disabled = true;
+      if (btnCollect._timeout) clearTimeout(btnCollect._timeout);
+      btnCollect._timeout = setTimeout(function () {
+        btnCollect.textContent = '❌';
+        btnCollect.disabled = false;
+        setTimeout(function () { btnCollect.textContent = '▶'; }, 3000);
+      }, 60000);
+      window.postMessage({
+        type: 'PRICE_COLLECT_REQUEST',
+        sku: skuData
+      }, '*');
     }
     var es = t.getAttribute('data-edit-sku');
     if (es != null) {
