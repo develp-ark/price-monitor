@@ -59,6 +59,17 @@ module.exports = async (req, res) => {
   if (envErr) return json(res, 500, { ok: false, error: envErr });
 
   if (req.method === 'GET') {
+    if (req.query.day === 'all') {
+      const { data, error } = await client
+        .from('collect_schedule')
+        .select('day_of_week, sku_id')
+        .order('day_of_week')
+        .order('sku_id');
+
+      if (error) return json(res, 500, { ok: false, error: error.message });
+      return json(res, 200, { ok: true, count: (data || []).length, data: data || [] });
+    }
+
     const day = parseDay(req.query.day);
     if (day == null) {
       return json(res, 400, { ok: false, error: 'day must be 0..6 or today' });

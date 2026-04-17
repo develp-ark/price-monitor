@@ -11,7 +11,6 @@
     "api/sku-delete.js": { "maxDuration": 60 },
     "api/sku-batch-toggle.js": { "maxDuration": 60 },
     "api/collect-schedule.js": { "maxDuration": 60 },
-    "api/collect-schedule-all.js": { "maxDuration": 60 },
     "api/collect-status.js": { "maxDuration": 60 },
     "api/collect-queue.js": { "maxDuration": 60 }
   },

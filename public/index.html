@@ -1282,7 +1282,7 @@
   }
 
   function loadSkuSchedules() {
-    return apiFetch('GET', '/collect-schedule-all', null)
+    return apiFetch('GET', '/collect-schedule?day=all', null)
       .then(function (j) {
         var map = {};
         var rows = (j && j.data) || [];
@@ -1666,7 +1666,7 @@
   function loadScheduleTab() {
     return Promise.all([
       apiFetch('GET', '/sku-detail', null),
-      apiFetch('GET', '/collect-schedule-all', null)
+      apiFetch('GET', '/collect-schedule?day=all', null)
     ])
       .then(function (results) {
         var allSkus = (results[0] && results[0].data) || [];
