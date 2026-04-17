@@ -7,6 +7,7 @@
     "api/sku-detail.js": { "maxDuration": 60 },
     "api/sku-upload.js": { "maxDuration": 60 },
     "api/sku-add.js": { "maxDuration": 60 },
+    "api/sku-update.js": { "maxDuration": 60 },
     "api/sku-delete.js": { "maxDuration": 60 },
     "api/sku-batch-toggle.js": { "maxDuration": 60 },
     "api/collect-schedule.js": { "maxDuration": 60 },

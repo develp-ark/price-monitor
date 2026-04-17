@@ -230,6 +230,63 @@
     .status-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; }
     .empty { color: var(--muted2); font-size: 13px; padding: 16px 0; }
     .collect-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .sku-toolbar-left { flex: 1; min-width: 0; }
+    .sku-search-row { margin-top: 10px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    #sku-search {
+      width: 240px;
+      padding: 8px 12px;
+      border: 1px solid #e5e8eb;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    #sku-search-clear {
+      min-width: 32px;
+      height: 32px;
+      padding: 0 8px;
+      border-radius: 8px;
+      border: 1px solid #e5e8eb;
+      background: #fff;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      color: #666;
+    }
+    .form-row input[readonly], .form-row textarea[readonly] {
+      background: #f8f9fa;
+      color: #666;
+    }
+    .pagination {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+    .pagination button {
+      min-width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      border: 1px solid #e5e8eb;
+      background: #fff;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .pagination button.active {
+      background: #3182F6;
+      color: #fff;
+      border-color: #3182F6;
+    }
+    .pagination button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .page-info {
+      font-size: 12px;
+      color: #999;
+      margin-top: 8px;
+    }
   </style>
 </head>
 <body>
@@ -335,7 +392,13 @@
 
     <div id="panel-sku" class="panel">
       <div class="toolbar">
-        <div class="brand-tabs" id="sku-brand-tabs"></div>
+        <div class="sku-toolbar-left">
+          <div class="brand-tabs" id="sku-brand-tabs"></div>
+          <div class="sku-search-row">
+            <input type="search" id="sku-search" placeholder="상품명 또는 SKU ID 검색" autocomplete="off" />
+            <button type="button" id="sku-search-clear" title="검색어 지우기">×</button>
+          </div>
+        </div>
         <div class="toolbar-actions">
           <button type="button" class="btn btn-primary" id="btn-sku-add">SKU 추가</button>
           <button type="button" class="btn btn-ghost" id="btn-csv-upload">CSV 업로드</button>
@@ -359,11 +422,17 @@
                 <th class="num">수집주기</th>
                 <th>최근수집일</th>
                 <th>수집요일</th>
+                <th>수집</th>
+                <th>수정</th>
                 <th>삭제</th>
               </tr>
             </thead>
             <tbody id="sku-tbody"></tbody>
           </table>
+        </div>
+        <div style="padding: 0 16px 16px;">
+          <div class="page-info" id="sku-page-info"></div>
+          <div class="pagination" id="sku-pagination"></div>
         </div>
       </div>
     </div>
@@ -415,6 +484,56 @@
       <div class="modal-actions">
         <button type="button" class="btn btn-ghost" data-close="modal-sku-add">취소</button>
         <button type="button" class="btn btn-primary" id="btn-sku-save">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="modal-sku-edit">
+    <div class="modal">
+      <h3>SKU 정보 수정</h3>
+      <div class="form-row">
+        <label for="e-sku-id">SKU ID</label>
+        <input type="text" id="e-sku-id" readonly autocomplete="off" />
+      </div>
+      <div class="form-row">
+        <label for="e-url">쿠팡 URL</label>
+        <input type="url" id="e-url" readonly autocomplete="off" />
+      </div>
+      <div class="form-row">
+        <label for="e-sku-name">상품명 *</label>
+        <input type="text" id="e-sku-name" autocomplete="off" />
+      </div>
+      <div class="form-row">
+        <label for="e-brand-mode">브랜드 *</label>
+        <select id="e-brand-mode">
+          <option value="아리코">아리코</option>
+          <option value="윰">윰</option>
+          <option value="__custom__">직접입력</option>
+        </select>
+      </div>
+      <div class="form-row" id="e-brand-custom-wrap" style="display:none;">
+        <label for="e-brand-custom">브랜드 이름</label>
+        <input type="text" id="e-brand-custom" autocomplete="off" />
+      </div>
+      <div class="form-row">
+        <label for="e-reg-price">등록가</label>
+        <input type="number" id="e-reg-price" min="0" step="1" />
+      </div>
+      <div class="form-row">
+        <label for="e-cycle">수집주기(일)</label>
+        <input type="number" id="e-cycle" min="1" step="1" />
+      </div>
+      <div class="form-row">
+        <label for="e-flag">구분(flag)</label>
+        <input type="text" id="e-flag" placeholder="예: TOP(3월)" autocomplete="off" />
+      </div>
+      <div class="form-row">
+        <label for="e-memo">메모</label>
+        <textarea id="e-memo"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-close="modal-sku-edit">취소</button>
+        <button type="button" class="btn btn-primary" id="btn-sku-edit-save">저장</button>
       </div>
     </div>
   </div>
@@ -477,9 +596,12 @@
     alertBrand: '__all__',
     alertDir: 'all',
     skuBrand: '__all__',
+    skuPage: 1,
+    skuSearch: '',
     skuDetailList: [],
     skuScheduleMap: {},
     alertRaw: [],
+    alertSkuUrlMap: {},
     queueSkuSelected: {},
     queueSkuListFiltered: []
   };
@@ -491,6 +613,19 @@
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  function productNameLinkHtml(name, url) {
+    var n = name == null ? '' : String(name);
+    var u = url == null ? '' : String(url).trim();
+    if (!u) return escapeHtml(n);
+    return (
+      '<a class="link" href="' +
+      escapeHtml(u) +
+      '" target="_blank" rel="noopener">' +
+      escapeHtml(n) +
+      '</a>'
+    );
   }
 
   function formatMoney(v) {
@@ -736,10 +871,12 @@
         var h = '';
         for (var i = 0; i < merged.length; i++) {
           var r = merged[i];
+          var schedRow = scheduleRows[i];
+          var pu = r.product_url || (schedRow && schedRow.product_url) || '';
           var lc = r.last_collected ? String(r.last_collected).slice(0, 10) : '';
           var okToday = lc === todayYmd;
           h += '<tr>';
-          h += '<td>' + escapeHtml(r.sku_name || '') + '</td>';
+          h += '<td>' + productNameLinkHtml(r.sku_name, pu) + '</td>';
           h += '<td>' + escapeHtml(r.brand || '') + '</td>';
           h += '<td class="num">' + escapeHtml(formatMoney(r.registered_price)) + '</td>';
           h += '<td class="num">' + escapeHtml(formatMoney(r.current_price)) + '</td>';
@@ -818,9 +955,19 @@
   }
 
   function loadAlerts() {
-    return apiFetch('GET', '/price-alert', null)
-      .then(function (json) {
+    return Promise.all([apiFetch('GET', '/price-alert', null), apiFetch('GET', '/sku-detail', null)])
+      .then(function (results) {
+        var json = results[0];
+        var detail = results[1];
         state.alertRaw = json.alerts || [];
+        var detailRows = (detail && detail.data) || [];
+        var urlMap = {};
+        for (var di = 0; di < detailRows.length; di++) {
+          var dr = detailRows[di];
+          var sid = dr && dr.sku_id != null ? String(dr.sku_id) : '';
+          if (sid && dr.product_url) urlMap[sid] = dr.product_url;
+        }
+        state.alertSkuUrlMap = urlMap;
         renderAlertFilters();
         renderAlertTable();
         return json;
@@ -890,8 +1037,9 @@
     var h = '';
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
+      var alertUrl = state.alertSkuUrlMap[String(r.sku_id)];
       h += '<tr>';
-      h += '<td>' + escapeHtml(r.sku_name || '') + '</td>';
+      h += '<td>' + productNameLinkHtml(r.sku_name, alertUrl) + '</td>';
       h += '<td>' + escapeHtml(r.brand || '') + '</td>';
       h += '<td class="num">' + escapeHtml(formatMoney(r.prev_price)) + '</td>';
       h += '<td class="num">' + escapeHtml(formatMoney(r.new_price)) + '</td>';
@@ -952,51 +1100,116 @@
     return m;
   }
 
+  var SKU_PAGE_SIZE = 30;
+
+  function getFilteredSkuRows() {
+    var rows = state.skuDetailList || [];
+    var q = (state.skuSearch || '').trim().toLowerCase();
+    var out = [];
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (state.skuBrand !== '__all__' && String(r.brand) !== state.skuBrand) continue;
+      if (q) {
+        var sid = String(r.sku_id != null ? r.sku_id : '').toLowerCase();
+        var sn = String(r.sku_name || '').toLowerCase();
+        if (sid.indexOf(q) === -1 && sn.indexOf(q) === -1) continue;
+      }
+      out.push(r);
+    }
+    return out;
+  }
+
+  function renderSkuBrandTabs() {
+    var rows = state.skuDetailList || [];
+    var counts = countByBrand(rows);
+    var brands = Object.keys(counts);
+    brands.sort();
+    var tabs = document.getElementById('sku-brand-tabs');
+    var th = '<button type="button" data-sb="__all__" class="' + (state.skuBrand === '__all__' ? 'on' : '') + '">전체(' + rows.length + ')</button>';
+    for (var i = 0; i < brands.length; i++) {
+      var br = brands[i];
+      th += '<button type="button" data-sb="' + escapeHtml(br) + '" class="' + (state.skuBrand === br ? 'on' : '') + '">' + escapeHtml(br) + '(' + counts[br] + ')</button>';
+    }
+    tabs.innerHTML = th;
+  }
+
+  function renderSkuTablePage() {
+    var filtered = getFilteredSkuRows();
+    var total = filtered.length;
+    var totalPages = total === 0 ? 1 : Math.ceil(total / SKU_PAGE_SIZE);
+    if (state.skuPage > totalPages) state.skuPage = totalPages;
+    if (state.skuPage < 1) state.skuPage = 1;
+    var startIdx = (state.skuPage - 1) * SKU_PAGE_SIZE;
+    var start = total === 0 ? 0 : startIdx + 1;
+    var end = Math.min(startIdx + SKU_PAGE_SIZE, total);
+    var slice = filtered.slice(startIdx, startIdx + SKU_PAGE_SIZE);
+
+    var tbody = document.getElementById('sku-tbody');
+    var h = '';
+    for (var k = 0; k < slice.length; k++) {
+      var r = slice[k];
+      var url = r.product_url || '#';
+      h += '<tr>';
+      h += '<td>' + escapeHtml(String(r.sku_id)) + '</td>';
+      h += '<td><a class="link" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(r.sku_name || '') + '</a></td>';
+      h += '<td>' + escapeHtml(r.brand || '') + '</td>';
+      h += '<td class="num">' + escapeHtml(formatMoney(r.registered_price)) + '</td>';
+      h += '<td class="num">' + escapeHtml(formatMoney(r.current_price)) + '</td>';
+      h += '<td class="num">' + formatChangeCellHtml(r.change_pct) + '</td>';
+      h += '<td>' + (r.flag ? '<span class="flag-badge">' + escapeHtml(r.flag) + '</span>' : '—') + '</td>';
+      h += '<td class="num">' + escapeHtml(r.collect_cycle != null ? String(r.collect_cycle) : '') + '</td>';
+      h += '<td>' + escapeHtml(formatMdFromYmd(r.last_collected)) + '</td>';
+      h += '<td>' + escapeHtml(scheduleDaysLabel(r.sku_id)) + '</td>';
+      h += '<td><button type="button" class="btn-icon" data-collect-sku="' + escapeHtml(String(r.sku_id)) + '" title="수집 큐에 추가">▶</button></td>';
+      h += '<td><button type="button" class="btn-icon" data-edit-sku="' + escapeHtml(String(r.sku_id)) + '" title="수정">✏️</button></td>';
+      h += '<td><button type="button" class="btn-icon" data-del-sku="' + escapeHtml(String(r.sku_id)) + '" title="삭제">🗑</button></td>';
+      h += '</tr>';
+    }
+    tbody.innerHTML = h;
+
+    document.getElementById('sku-page-info').textContent =
+      '전체 ' + total + '개 중 ' + (total === 0 ? '0-0' : start + '-' + end);
+
+    var pag = document.getElementById('sku-pagination');
+    var ph = '';
+    ph +=
+      '<button type="button" data-sku-page="prev"' +
+      (state.skuPage <= 1 ? ' disabled' : '') +
+      '>◀ 이전</button>';
+    for (var p = 1; p <= totalPages; p++) {
+      ph +=
+        '<button type="button" data-sku-page="num" data-sku-pn="' +
+        p +
+        '" class="' +
+        (p === state.skuPage ? 'active' : '') +
+        '">' +
+        p +
+        '</button>';
+    }
+    ph +=
+      '<button type="button" data-sku-page="next"' +
+      (state.skuPage >= totalPages ? ' disabled' : '') +
+      '>다음 ▶</button>';
+    pag.innerHTML = ph;
+
+    var tabBtns = document.querySelectorAll('#sku-brand-tabs [data-sb]');
+    for (var ti = 0; ti < tabBtns.length; ti++) {
+      var btn = tabBtns[ti];
+      var sb = btn.getAttribute('data-sb');
+      if (sb === state.skuBrand) btn.classList.add('on');
+      else btn.classList.remove('on');
+    }
+  }
+
   function loadSkuTable() {
     return Promise.all([apiFetch('GET', '/sku-detail', null), loadSkuSchedules()])
       .then(function (res) {
         var json = res[0];
         var rows = json.data || [];
         state.skuDetailList = rows;
-        var counts = countByBrand(rows);
-        var brands = Object.keys(counts);
-        brands.sort();
-
-        var tabs = document.getElementById('sku-brand-tabs');
-        var th = '<button type="button" data-sb="__all__" class="' + (state.skuBrand === '__all__' ? 'on' : '') + '">전체(' + rows.length + ')</button>';
-        for (var i = 0; i < brands.length; i++) {
-          var br = brands[i];
-          th += '<button type="button" data-sb="' + escapeHtml(br) + '" class="' + (state.skuBrand === br ? 'on' : '') + '">' + escapeHtml(br) + '(' + counts[br] + ')</button>';
-        }
-        tabs.innerHTML = th;
-
-        var filtered = [];
-        for (var j = 0; j < rows.length; j++) {
-          if (state.skuBrand === '__all__' || String(rows[j].brand) === state.skuBrand) {
-            filtered.push(rows[j]);
-          }
-        }
-
-        var tbody = document.getElementById('sku-tbody');
-        var h = '';
-        for (var k = 0; k < filtered.length; k++) {
-          var r = filtered[k];
-          var url = r.product_url || '#';
-          h += '<tr>';
-          h += '<td>' + escapeHtml(String(r.sku_id)) + '</td>';
-          h += '<td><a class="link" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(r.sku_name || '') + '</a></td>';
-          h += '<td>' + escapeHtml(r.brand || '') + '</td>';
-          h += '<td class="num">' + escapeHtml(formatMoney(r.registered_price)) + '</td>';
-          h += '<td class="num">' + escapeHtml(formatMoney(r.current_price)) + '</td>';
-          h += '<td class="num">' + formatChangeCellHtml(r.change_pct) + '</td>';
-          h += '<td>' + (r.flag ? '<span class="flag-badge">' + escapeHtml(r.flag) + '</span>' : '—') + '</td>';
-          h += '<td class="num">' + escapeHtml(r.collect_cycle != null ? String(r.collect_cycle) : '') + '</td>';
-          h += '<td>' + escapeHtml(formatMdFromYmd(r.last_collected)) + '</td>';
-          h += '<td>' + escapeHtml(scheduleDaysLabel(r.sku_id)) + '</td>';
-          h += '<td><button type="button" class="btn-icon" data-del-sku="' + escapeHtml(String(r.sku_id)) + '" title="삭제">🗑</button></td>';
-          h += '</tr>';
-        }
-        tbody.innerHTML = h;
+        document.getElementById('sku-search').value = state.skuSearch;
+        renderSkuBrandTabs();
+        renderSkuTablePage();
         return json;
       })
       .catch(function (e) {
@@ -1006,14 +1219,39 @@
   }
 
   function filteredSkuRowsForCsv() {
-    var rows = state.skuDetailList || [];
-    var out = [];
-    for (var i = 0; i < rows.length; i++) {
-      if (state.skuBrand === '__all__' || String(rows[i].brand) === state.skuBrand) {
-        out.push(rows[i]);
-      }
+    return getFilteredSkuRows();
+  }
+
+  function findSkuRowById(skuId) {
+    var list = state.skuDetailList || [];
+    var sid = String(skuId);
+    for (var i = 0; i < list.length; i++) {
+      if (String(list[i].sku_id) === sid) return list[i];
     }
-    return out;
+    return null;
+  }
+
+  function openSkuEditModal(skuId) {
+    var row = findSkuRowById(skuId);
+    if (!row) return;
+    document.getElementById('e-sku-id').value = row.sku_id != null ? String(row.sku_id) : '';
+    document.getElementById('e-url').value = row.product_url || '';
+    document.getElementById('e-sku-name').value = row.sku_name || '';
+    var br = row.brand || '';
+    if (br === '아리코' || br === '윰') {
+      document.getElementById('e-brand-mode').value = br;
+      document.getElementById('e-brand-custom-wrap').style.display = 'none';
+      document.getElementById('e-brand-custom').value = '';
+    } else {
+      document.getElementById('e-brand-mode').value = '__custom__';
+      document.getElementById('e-brand-custom-wrap').style.display = '';
+      document.getElementById('e-brand-custom').value = br;
+    }
+    document.getElementById('e-reg-price').value = row.registered_price != null ? String(row.registered_price) : '';
+    document.getElementById('e-cycle').value = row.collect_cycle != null ? String(row.collect_cycle) : '7';
+    document.getElementById('e-flag').value = row.flag || '';
+    document.getElementById('e-memo').value = row.memo || '';
+    openModal('modal-sku-edit');
   }
 
   function btnSkuCsvDl() {
@@ -1275,6 +1513,24 @@
     document.getElementById('f-brand-custom-wrap').style.display = v === '__custom__' ? '' : 'none';
   });
 
+  document.getElementById('e-brand-mode').addEventListener('change', function () {
+    var v = document.getElementById('e-brand-mode').value;
+    document.getElementById('e-brand-custom-wrap').style.display = v === '__custom__' ? '' : 'none';
+  });
+
+  document.getElementById('sku-search').addEventListener('input', function () {
+    state.skuSearch = this.value;
+    state.skuPage = 1;
+    renderSkuTablePage();
+  });
+
+  document.getElementById('sku-search-clear').addEventListener('click', function () {
+    state.skuSearch = '';
+    document.getElementById('sku-search').value = '';
+    state.skuPage = 1;
+    renderSkuTablePage();
+  });
+
   document.getElementById('btn-sku-save').addEventListener('click', function () {
     var skuId = document.getElementById('f-sku-id').value.trim();
     var skuName = document.getElementById('f-sku-name').value.trim();
@@ -1302,6 +1558,40 @@
     apiFetch('POST', '/sku-add', payload)
       .then(function () {
         closeModal('modal-sku-add');
+        return loadSkuTable();
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
+      });
+  });
+
+  document.getElementById('btn-sku-edit-save').addEventListener('click', function () {
+    var skuId = document.getElementById('e-sku-id').value.trim();
+    var skuName = document.getElementById('e-sku-name').value.trim();
+    var mode = document.getElementById('e-brand-mode').value;
+    var brand = mode === '__custom__' ? document.getElementById('e-brand-custom').value.trim() : mode;
+    if (!skuId || !skuName || !brand) {
+      alert('필수 항목을 입력하세요.');
+      return;
+    }
+    var reg = document.getElementById('e-reg-price').value;
+    var cycle = parseInt(document.getElementById('e-cycle').value, 10);
+    if (isNaN(cycle) || cycle < 1) cycle = 7;
+    var flag = document.getElementById('e-flag').value.trim();
+    var memo = document.getElementById('e-memo').value.trim();
+    var payload = {
+      sku_id: skuId,
+      sku_name: skuName,
+      brand: brand,
+      collect_cycle: cycle,
+      registered_price: reg !== '' ? Number(reg) : null,
+      flag: flag || null,
+      memo: memo || null
+    };
+    apiFetch('PATCH', '/sku-update', payload)
+      .then(function () {
+        closeModal('modal-sku-edit');
         return loadSkuTable();
       })
       .catch(function (e) {
@@ -1371,7 +1661,44 @@
     var sb = t.getAttribute('data-sb');
     if (sb != null) {
       state.skuBrand = sb;
-      loadSkuTable();
+      state.skuPage = 1;
+      renderSkuTablePage();
+    }
+    var sp = t.getAttribute('data-sku-page');
+    if (sp === 'prev') {
+      state.skuPage--;
+      renderSkuTablePage();
+    } else if (sp === 'next') {
+      state.skuPage++;
+      renderSkuTablePage();
+    } else if (sp === 'num') {
+      var pn = parseInt(t.getAttribute('data-sku-pn'), 10);
+      if (!isNaN(pn)) {
+        state.skuPage = pn;
+        renderSkuTablePage();
+      }
+    }
+    var cs = t.getAttribute('data-collect-sku');
+    if (cs != null) {
+      var rowC = findSkuRowById(cs);
+      var nm = rowC && rowC.sku_name ? String(rowC.sku_name) : String(cs);
+      var cmsg =
+        nm.indexOf("'") >= 0
+          ? '"' + nm + '" 수집 큐에 추가하시겠습니까?'
+          : "'" + nm + "' 수집 큐에 추가하시겠습니까?";
+      if (!confirm(cmsg)) return;
+      apiFetch('POST', '/collect-queue', { sku_ids: [String(cs)] })
+        .then(function () {
+          alert('수집 큐에 추가되었습니다. 확장프로그램에서 수동 수집을 시작하세요.');
+        })
+        .catch(function (e) {
+          console.error(e);
+          alert(e.message || String(e));
+        });
+    }
+    var es = t.getAttribute('data-edit-sku');
+    if (es != null) {
+      openSkuEditModal(es);
     }
     var del = t.getAttribute('data-del-sku');
     if (del != null) {
