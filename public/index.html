@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Price Monitor</title>
   <style>
     :root {
@@ -9,19 +10,23 @@
       --success: #00B493;
       --danger: #F04452;
       --warning: #FF9500;
-      --gray: #666;
-      --gray2: #999;
-      --border: #e9ecef;
-      --bg: #f8f9fa;
+      --text: #1a1a1a;
+      --muted: #666;
+      --muted2: #999;
+      --border: #e5e8eb;
+      --bg: #f5f6f8;
+      --card: #ffffff;
+      --thead: #f8f9fa;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, 'Malgun Gothic', sans-serif;
+      font-family: -apple-system, 'Pretendard', 'Malgun Gothic', sans-serif;
       background: var(--bg);
-      color: #222;
+      color: var(--text);
+      font-size: 13px;
       min-height: 100vh;
     }
-    .wrap { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 24px; }
     header {
       display: flex;
       justify-content: space-between;
@@ -30,39 +35,51 @@
       padding-bottom: 16px;
       border-bottom: 1px solid var(--border);
     }
-    header h1 { font-size: 22px; font-weight: 700; }
-    .header-meta { font-size: 13px; color: var(--gray); }
-    .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+    header h1 { font-size: 20px; font-weight: 700; color: var(--text); }
+    .header-meta { font-size: 12px; color: var(--muted); }
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
     .tabs button {
-      padding: 10px 20px;
+      padding: 10px 18px;
       border: none;
       border-radius: 10px;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      background: #fff;
-      color: var(--gray);
-      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+      background: var(--card);
+      color: var(--muted);
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
     }
     .tabs button.active { background: var(--primary); color: #fff; }
     .panel { display: none; }
     .panel.active { display: block; }
     .card {
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      background: var(--card);
+      border-radius: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
       padding: 24px;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
+      border: 1px solid var(--border);
     }
-    .card h2 { font-size: 16px; margin-bottom: 14px; }
+    .card-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .card-head h2 { font-size: 15px; font-weight: 700; color: var(--text); }
+    .card-head .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .section-title { font-size: 15px; font-weight: 700; margin-bottom: 12px; color: var(--text); }
+    .hint { font-size: 12px; color: var(--muted2); margin-top: 10px; line-height: 1.5; }
     .badge {
       display: inline-block;
       padding: 4px 10px;
-      border-radius: 20px;
+      border-radius: 16px;
       font-size: 12px;
       font-weight: 600;
     }
-    .badge.idle { background: #e9ecef; color: #555; }
+    .badge.idle { background: #f1f3f5; color: #868e96; }
     .badge.running {
       background: #dbeafe; color: var(--primary);
       animation: pulse 1.5s ease-in-out infinite;
@@ -74,10 +91,14 @@
     .badge.stopping { background: #fff3cd; color: #856404; }
     .badge.done { background: #d1fae5; color: var(--success); }
     .badge.error { background: #fee2e2; color: var(--danger); }
+    .badge.q-pending { background: #e3f2fd; color: #1565c0; }
+    .badge.q-collecting { background: #fff3e0; color: #e65100; }
+    .badge.q-done { background: #e8f5e9; color: #2e7d32; }
+    .badge.q-failed { background: #ffebee; color: #c62828; }
     .progress-bar {
       height: 10px;
-      background: var(--border);
-      border-radius: 6px;
+      background: #e5e8eb;
+      border-radius: 8px;
       overflow: hidden;
       margin: 12px 0;
     }
@@ -94,30 +115,42 @@
       font-weight: 600;
       cursor: pointer;
     }
-    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .btn-primary { background: var(--primary); color: #fff; }
     .btn-danger { background: var(--danger); color: #fff; }
-    .btn-ghost { background: #fff; border: 1px solid var(--border); color: #333; }
-    .hint { font-size: 12px; color: var(--gray2); margin-top: 10px; line-height: 1.5; }
+    .btn-ghost { background: #fff; border: 1px solid var(--border); color: var(--text); }
     table.data {
       width: 100%;
       border-collapse: collapse;
       font-size: 13px;
     }
     table.data th, table.data td {
-      padding: 10px 8px;
+      padding: 10px 10px;
       text-align: left;
       border-bottom: 1px solid var(--border);
     }
-    table.data th { background: #f8f9fa; color: var(--gray); font-weight: 600; }
-    table.data tbody tr:nth-child(even) { background: #fafbfc; }
-    table.data tbody tr:hover { background: #e8f4ff; }
+    table.data thead th {
+      background: var(--thead);
+      color: var(--muted);
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    table.data tbody tr:hover { background: #f0f4ff; }
     .num { text-align: right !important; font-variant-numeric: tabular-nums; }
     .up { color: var(--danger); font-weight: 600; }
     .down { color: var(--success); font-weight: 600; }
-    .muted { color: var(--gray2); }
-    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; justify-content: space-between; }
-    .brand-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+    .muted { color: var(--muted2); }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .brand-tabs { display: flex; flex-wrap: wrap; gap: 6px; max-width: 70%; }
     .brand-tabs button {
       padding: 6px 12px;
       border-radius: 8px;
@@ -125,24 +158,28 @@
       background: #fff;
       cursor: pointer;
       font-size: 12px;
+      font-weight: 600;
     }
     .brand-tabs button.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .toolbar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
     .filter-btns { display: flex; flex-wrap: wrap; gap: 6px; }
     .filter-btns button {
       padding: 6px 12px;
-      border-radius: 8px;
+      border-radius: 16px;
       border: 1px solid var(--border);
       background: #fff;
       cursor: pointer;
       font-size: 12px;
+      font-weight: 600;
     }
-    .filter-btns button.on { background: #eef6ff; border-color: var(--primary); color: var(--primary); font-weight: 600; }
+    .filter-btns button.on { background: #eef6ff; border-color: var(--primary); color: var(--primary); }
     .flag-badge {
       display: inline-block;
-      padding: 2px 8px;
-      border-radius: 6px;
+      padding: 4px 8px;
+      border-radius: 8px;
       background: #f0f4f8;
       font-size: 12px;
+      font-weight: 600;
     }
     .modal-bg {
       display: none;
@@ -157,16 +194,19 @@
     .modal-bg.show { display: flex; }
     .modal {
       background: #fff;
-      border-radius: 12px;
+      border-radius: 16px;
       padding: 24px;
       width: 100%;
-      max-width: 500px;
+      max-width: 520px;
       max-height: 90vh;
       overflow-y: auto;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+      border: 1px solid var(--border);
     }
-    .modal h3 { margin-bottom: 16px; font-size: 18px; }
+    .modal.wide { max-width: 760px; }
+    .modal h3 { margin-bottom: 16px; font-size: 18px; font-weight: 700; }
     .form-row { margin-bottom: 12px; }
-    .form-row label { display: block; font-size: 12px; color: var(--gray); margin-bottom: 4px; }
+    .form-row label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
     .form-row input, .form-row select, .form-row textarea {
       width: 100%;
       padding: 8px 10px;
@@ -174,233 +214,253 @@
       border-radius: 8px;
       font-size: 13px;
     }
-    .form-row textarea { min-height: 72px; resize: vertical; }
+    .form-row textarea { min-height: 88px; resize: vertical; }
     .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
-    a.link { color: var(--primary); text-decoration: none; }
+    a.link { color: var(--primary); text-decoration: none; font-weight: 600; }
     a.link:hover { text-decoration: underline; }
     .btn-icon { background: transparent; border: none; cursor: pointer; font-size: 16px; padding: 4px 8px; }
-    #csv-file { display: none; }
-    .modal.wide { max-width: 720px; }
+    #csv-file, #csv-file-hidden { display: none; }
     .sub-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
-    .sub-tabs button { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: #fff; cursor: pointer; font-size: 12px; }
+    .sub-tabs button { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: #fff; cursor: pointer; font-size: 12px; font-weight: 600; }
     .sub-tabs button.on { background: var(--primary); color: #fff; border-color: var(--primary); }
-    .badge.q-pending { background: #e3f2fd; color: #1565c0; }
-    .badge.q-collecting { background: #fff3e0; color: #e65100; }
-    .badge.q-done { background: #e8f5e9; color: #2e7d32; }
-    .badge.q-failed { background: #ffebee; color: #c62828; }
-    .scroll-box { max-height: 220px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
-    .url-clip { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .scroll-box { max-height: 280px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+    .queue-add-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; align-items: center; }
+    .queue-add-tools select, .queue-add-tools input { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); font-size: 12px; }
+    .queue-add-tools input[type="search"] { min-width: 160px; flex: 1; }
+    .status-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .empty { color: var(--muted2); font-size: 13px; padding: 16px 0; }
+    .collect-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <header>
       <h1>Price Monitor</h1>
-      <div class="header-meta">갱신: <span id="clock">—</span></div>
+      <div class="header-meta">KST <span id="clock">—</span></div>
     </header>
 
     <div class="tabs">
-      <button type="button" class="tab-btn active" data-tab="dash">대시보드</button>
-      <button type="button" class="tab-btn" data-tab="sku">SKU 관리</button>
+      <button type="button" id="tab-dash" class="active">대시보드</button>
+      <button type="button" id="tab-sku">SKU 관리</button>
     </div>
 
     <div id="panel-dash" class="panel active">
-      <div class="card">
-        <h2>수집 현황</h2>
-        <p><span id="cs-badge" class="badge idle">대기중</span></p>
-        <div id="cs-progress-wrap" style="display:none">
-          <div class="progress-bar"><div id="cs-bar" style="width:0%"></div></div>
-          <p id="cs-line" class="muted" style="margin-top:8px;font-size:13px"></p>
+      <div class="card" id="card-collect">
+        <div class="collect-top">
+          <div>
+            <span id="collect-badge" class="badge idle">idle</span>
+            <div id="collect-detail" class="hint" style="margin-top:8px;">—</div>
+            <div class="progress-bar" id="collect-progress-wrap" style="display:none;"><div id="collect-progress-bar" style="width:0%;"></div></div>
+            <div id="collect-running-text" class="hint" style="display:none;"></div>
+          </div>
+          <button type="button" class="btn btn-danger" id="btn-stop-collect" disabled>중지</button>
         </div>
-        <p id="cs-done" style="display:none;margin-top:10px;font-size:14px"></p>
-        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button type="button" class="btn btn-primary" id="btn-cs-start" disabled>수집 시작</button>
-          <button type="button" class="btn btn-danger" id="btn-cs-stop" disabled>중지</button>
-        </div>
-        <p class="hint">수집은 크롬 확장프로그램에서 시작합니다. 웹에서는 중지만 요청할 수 있습니다.</p>
+        <p class="hint">수집은 Chrome 확장프로그램에서 시작합니다.</p>
       </div>
 
-      <div class="card" id="manual-collect-card">
-        <h2>수동 수집 큐</h2>
-        <div class="toolbar" style="margin-bottom: 10px">
-          <button type="button" class="btn btn-primary" id="btn-manual-add">수동 수집 추가</button>
-          <button type="button" class="btn btn-ghost" id="btn-manual-start-hint" disabled>수동 수집 시작</button>
-          <button type="button" class="btn btn-ghost" id="btn-queue-clear">큐 비우기</button>
+      <div class="card">
+        <div class="card-head">
+          <h2>수동 수집 큐</h2>
+          <div class="actions">
+            <button type="button" class="btn btn-primary" id="btn-queue-add">수집 추가</button>
+            <button type="button" class="btn btn-ghost" id="btn-queue-clear">큐 비우기</button>
+          </div>
         </div>
-        <p class="hint" style="margin-bottom: 10px">수동 수집 실행은 크롬 확장프로그램 팝업에서 진행합니다. pending이 있을 때 아래 버튼으로 안내를 띄울 수 있습니다.</p>
-        <div style="overflow-x:auto">
-          <table class="data" id="tbl-queue">
+        <p id="queue-pending-hint" class="hint" style="display:none;">확장프로그램에서 수동 수집을 시작하세요</p>
+        <div id="queue-empty" class="empty">수동 수집 대기 항목이 없습니다.</div>
+        <div id="queue-table-wrap" style="display:none;">
+          <table class="data">
             <thead>
               <tr>
-                <th class="num">id</th>
-                <th>SKU명</th>
+                <th class="num">#</th>
+                <th>상품명</th>
                 <th>브랜드</th>
-                <th>URL</th>
                 <th>상태</th>
-                <th class="num">수집가</th>
+                <th class="num">수집가격</th>
                 <th>등록시간</th>
               </tr>
             </thead>
-            <tbody></tbody>
+            <tbody id="queue-tbody"></tbody>
           </table>
         </div>
       </div>
 
       <div class="card">
-        <h2>오늘 수집 결과</h2>
-        <div style="overflow-x:auto">
-          <table class="data" id="tbl-today">
+        <div class="card-head">
+          <h2>오늘 수집 현황</h2>
+          <button type="button" class="btn btn-ghost" id="btn-today-csv">CSV 다운로드</button>
+        </div>
+        <div id="today-empty" class="empty">오늘 배정된 SKU가 없습니다.</div>
+        <div id="today-table-wrap" style="display:none;">
+          <table class="data">
             <thead>
               <tr>
-                <th>SKU명</th>
+                <th>상품명</th>
                 <th>브랜드</th>
                 <th class="num">등록가</th>
                 <th class="num">현재가</th>
                 <th class="num">변동률</th>
-                <th>수집상태</th>
+                <th>수집여부</th>
               </tr>
             </thead>
-            <tbody></tbody>
+            <tbody id="today-tbody"></tbody>
           </table>
         </div>
       </div>
 
       <div class="card">
-        <h2>가격 변동 알림</h2>
-        <div class="toolbar" style="margin-bottom:8px">
-          <div class="filter-btns" id="alert-brand-btns"></div>
-          <div class="filter-btns" id="alert-dir-btns"></div>
+        <div class="card-head">
+          <h2>가격 변동 알림</h2>
         </div>
-        <div style="overflow-x:auto">
-          <table class="data" id="tbl-alerts">
+        <div class="filter-btns" id="alert-brand-filters" style="margin-bottom:8px;"></div>
+        <div class="filter-btns" id="alert-dir-filters" style="margin-bottom:12px;"></div>
+        <div id="alert-empty" class="empty">알림이 없습니다.</div>
+        <div id="alert-table-wrap" style="display:none;">
+          <table class="data">
             <thead>
               <tr>
-                <th>SKU명</th>
+                <th>상품명</th>
                 <th>브랜드</th>
                 <th class="num">이전가</th>
-                <th class="num">변동가</th>
+                <th class="num">현재가</th>
                 <th class="num">변동률</th>
                 <th>감지일시</th>
               </tr>
             </thead>
-            <tbody></tbody>
+            <tbody id="alert-tbody"></tbody>
           </table>
         </div>
       </div>
     </div>
 
     <div id="panel-sku" class="panel">
-      <div class="card">
-        <div class="toolbar">
-          <div class="brand-tabs" id="sku-brand-tabs"></div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button type="button" class="btn btn-primary" id="btn-sku-add">SKU 추가</button>
-            <button type="button" class="btn btn-ghost" id="btn-csv-up">CSV 업로드</button>
-            <button type="button" class="btn btn-ghost" id="btn-csv-dl">CSV 다운로드</button>
-            <button type="button" class="btn btn-ghost" id="btn-auto-dist">자동 분배</button>
-          </div>
+      <div class="toolbar">
+        <div class="brand-tabs" id="sku-brand-tabs"></div>
+        <div class="toolbar-actions">
+          <button type="button" class="btn btn-primary" id="btn-sku-add">SKU 추가</button>
+          <button type="button" class="btn btn-ghost" id="btn-csv-upload">CSV 업로드</button>
+          <input type="file" id="csv-file" accept=".csv,text/csv" />
+          <button type="button" class="btn btn-ghost" id="btn-sku-csv-dl">CSV 다운로드</button>
+          <button type="button" class="btn btn-ghost" id="btn-auto-dist">자동 분배</button>
         </div>
-        <input type="file" id="csv-file" accept=".csv,text/csv" />
-        <div style="overflow-x:auto">
-          <table class="data" id="tbl-sku">
+      </div>
+      <div class="card" style="padding:0; overflow:hidden;">
+        <div style="overflow:auto; max-height:70vh;">
+          <table class="data">
             <thead>
               <tr>
                 <th>SKU ID</th>
                 <th>상품명</th>
+                <th>브랜드</th>
                 <th class="num">등록가</th>
                 <th class="num">현재가</th>
                 <th class="num">변동률</th>
-                <th>플래그</th>
-                <th>수집주기</th>
-                <th>최근수집</th>
-                <th>수집스케줄</th>
-                <th>관리</th>
+                <th>구분</th>
+                <th class="num">수집주기</th>
+                <th>최근수집일</th>
+                <th>수집요일</th>
+                <th>삭제</th>
               </tr>
             </thead>
-            <tbody></tbody>
+            <tbody id="sku-tbody"></tbody>
           </table>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="modal-bg" id="modal-bg">
+  <div class="modal-bg" id="modal-sku-add">
     <div class="modal">
       <h3>SKU 추가</h3>
-      <div class="form-row"><label>SKU ID *</label><input id="f-sku_id" /></div>
-      <div class="form-row"><label>상품명 *</label><input id="f-sku_name" /></div>
-      <div class="form-row"><label>브랜드 *</label>
-        <select id="f-brand-sel">
+      <div class="form-row">
+        <label for="f-sku-id">SKU ID *</label>
+        <input type="text" id="f-sku-id" autocomplete="off" />
+      </div>
+      <div class="form-row">
+        <label for="f-sku-name">상품명 *</label>
+        <input type="text" id="f-sku-name" autocomplete="off" />
+      </div>
+      <div class="form-row">
+        <label for="f-brand-mode">브랜드 *</label>
+        <select id="f-brand-mode">
           <option value="아리코">아리코</option>
           <option value="윰">윰</option>
-          <option value="__custom">기타 (직접입력)</option>
+          <option value="__custom__">직접입력</option>
         </select>
-        <input id="f-brand-custom" placeholder="브랜드명" style="margin-top:6px;display:none" />
       </div>
-      <div class="form-row"><label>쿠팡 URL *</label><input id="f-product_url" placeholder="https://www.coupang.com/vp/products/..." /></div>
-      <div class="form-row"><label>등록가 (원)</label><input id="f-registered_price" type="number" /></div>
-      <div class="form-row"><label>수집주기 (일)</label><input id="f-collect_cycle" type="number" value="7" /></div>
-      <div class="form-row"><label>플래그</label><input id="f-flag" /></div>
-      <div class="form-row"><label>메모</label><textarea id="f-memo"></textarea></div>
+      <div class="form-row" id="f-brand-custom-wrap" style="display:none;">
+        <label for="f-brand-custom">브랜드 이름</label>
+        <input type="text" id="f-brand-custom" autocomplete="off" />
+      </div>
+      <div class="form-row">
+        <label for="f-url">쿠팡 URL *</label>
+        <input type="url" id="f-url" autocomplete="off" />
+      </div>
+      <div class="form-row">
+        <label for="f-reg-price">등록가</label>
+        <input type="number" id="f-reg-price" min="0" step="1" />
+      </div>
+      <div class="form-row">
+        <label for="f-cycle">수집주기(일)</label>
+        <input type="number" id="f-cycle" min="1" value="7" step="1" />
+      </div>
+      <div class="form-row">
+        <label for="f-flag">구분(flag)</label>
+        <input type="text" id="f-flag" placeholder="예: TOP(3월)" autocomplete="off" />
+      </div>
+      <div class="form-row">
+        <label for="f-memo">메모</label>
+        <textarea id="f-memo"></textarea>
+      </div>
       <div class="modal-actions">
-        <button type="button" class="btn btn-ghost" id="modal-cancel">취소</button>
-        <button type="button" class="btn btn-primary" id="modal-save">저장</button>
+        <button type="button" class="btn btn-ghost" data-close="modal-sku-add">취소</button>
+        <button type="button" class="btn btn-primary" id="btn-sku-save">저장</button>
       </div>
     </div>
   </div>
 
-  <div class="modal-bg" id="modal-manual-bg">
+  <div class="modal-bg" id="modal-queue-add">
     <div class="modal wide">
       <h3>수동 수집 추가</h3>
       <div class="sub-tabs">
-        <button type="button" class="on" id="manual-tab-a" data-tab="a">SKU 선택</button>
-        <button type="button" id="manual-tab-b" data-tab="b">URL 직접 입력</button>
+        <button type="button" class="on" id="qtab-sku">SKU 선택</button>
+        <button type="button" id="qtab-url">URL 직접입력</button>
       </div>
-      <div id="manual-pane-a">
-        <div class="form-row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-          <div style="flex:1;min-width:120px">
-            <label>브랜드</label>
-            <select id="pick-brand">
-              <option value="전체">전체</option>
-              <option value="아리코">아리코</option>
-              <option value="윰">윰</option>
-            </select>
-          </div>
-          <div style="flex:1;min-width:140px">
-            <label>검색</label>
-            <input id="pick-search" placeholder="상품명 또는 SKU ID" />
-          </div>
+      <div id="queue-panel-sku">
+        <div class="queue-add-tools">
+          <select id="queue-brand-sel"></select>
+          <input type="search" id="queue-sku-search" placeholder="상품명 검색" />
+          <label style="font-size:12px; display:flex; align-items:center; gap:6px;">
+            <input type="checkbox" id="queue-check-all" /> 전체 선택
+          </label>
         </div>
-        <p style="font-size:12px;margin:8px 0">
-          <label><input type="checkbox" id="pick-select-all" /> 전체 선택</label>
-        </p>
         <div class="scroll-box">
-          <table class="data" id="tbl-sku-pick">
+          <table class="data">
             <thead>
               <tr>
-                <th style="width:36px"></th>
+                <th style="width:36px;"></th>
                 <th>SKU ID</th>
                 <th>상품명</th>
                 <th>브랜드</th>
                 <th class="num">현재가</th>
               </tr>
             </thead>
-            <tbody></tbody>
+            <tbody id="queue-sku-tbody"></tbody>
           </table>
         </div>
-        <div class="modal-actions" style="margin-top:12px">
-          <button type="button" class="btn btn-ghost" id="manual-add-cancel">닫기</button>
-          <button type="button" class="btn btn-primary" id="manual-add-sku">선택한 SKU 큐에 추가</button>
+        <div class="modal-actions" style="margin-top:12px;">
+          <button type="button" class="btn btn-ghost" data-close="modal-queue-add">닫기</button>
+          <button type="button" class="btn btn-primary" id="btn-queue-sku-submit">추가</button>
         </div>
       </div>
-      <div id="manual-pane-b" style="display:none">
+      <div id="queue-panel-url" style="display:none;">
         <div class="form-row">
-          <label>쿠팡 URL (한 줄에 하나)</label>
-          <textarea id="manual-urls" placeholder="https://www.coupang.com/vp/products/..." style="min-height:120px"></textarea>
+          <label for="queue-url-ta">URL (줄바꿈으로 구분)</label>
+          <textarea id="queue-url-ta" placeholder="https://www.coupang.com/..."></textarea>
         </div>
         <div class="modal-actions">
-          <button type="button" class="btn btn-ghost" id="manual-url-cancel">닫기</button>
-          <button type="button" class="btn btn-primary" id="manual-add-url">큐에 추가</button>
+          <button type="button" class="btn btn-ghost" data-close="modal-queue-add">닫기</button>
+          <button type="button" class="btn btn-primary" id="btn-queue-url-submit">추가</button>
         </div>
       </div>
     </div>
@@ -409,630 +469,938 @@
   <script>
 (function () {
   var API_BASE = '/api';
-  var JSON_H = { 'Content-Type': 'application/json' };
-  var DAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
+  var DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 
-  var pollTimer = null;
-  var alertRows = [];
-  var alertBrand = '전체';
-  var alertDir = 'all';
-  var skuRows = [];
-  var skuBrand = '전체';
-  var scheduleMap = {};
-  var skuPickerRows = [];
+  var state = {
+    collectPollTimer: null,
+    clockTimer: null,
+    alertBrand: '__all__',
+    alertDir: 'all',
+    skuBrand: '__all__',
+    skuDetailList: [],
+    skuScheduleMap: {},
+    alertRaw: [],
+    queueSkuSelected: {},
+    queueSkuListFiltered: []
+  };
 
-  function queueStatusBadge(st) {
-    var c = 'q-pending';
-    var t = st || 'pending';
-    if (t === 'collecting') c = 'q-collecting';
-    if (t === 'done') c = 'q-done';
-    if (t === 'failed') c = 'q-failed';
-    return '<span class="badge ' + c + '">' + escapeHtml(t) + '</span>';
+  function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
-  function loadQueueDashboard() {
-    return apiGet('/collect-queue?status=all').then(function (j) {
-      var rows = (j.ok && j.data) ? j.data : [];
-      var pending = rows.filter(function (r) { return r.status === 'pending'; });
-      document.getElementById('btn-manual-start-hint').disabled = pending.length === 0;
-
-      var tbody = document.querySelector('#tbl-queue tbody');
-      tbody.innerHTML = '';
-      if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="muted">큐가 비어 있습니다.</td></tr>';
-        return;
-      }
-      rows.forEach(function (r) {
-        var tr = document.createElement('tr');
-        tr.innerHTML =
-          '<td class="num">' + escapeHtml(String(r.id)) + '</td>' +
-          '<td>' + escapeHtml(r.sku_name || '—') + '</td>' +
-          '<td>' + escapeHtml(r.brand || '—') + '</td>' +
-          '<td class="url-clip" title="' + escapeHtml(r.product_url || '') + '">' + escapeHtml(r.product_url || '—') + '</td>' +
-          '<td>' + queueStatusBadge(r.status) + '</td>' +
-          '<td class="num">' + (r.result_price != null ? fmtMoney(r.result_price) : '—') + '</td>' +
-          '<td>' + fmtDetectedAt(r.created_at) + '</td>';
-        tbody.appendChild(tr);
-      });
-    });
+  function formatMoney(v) {
+    if (v === null || v === undefined || v === '') return '';
+    var n = Number(v);
+    if (isNaN(n)) return '';
+    return n.toLocaleString('ko-KR') + '원';
   }
 
-  function renderSkuPicker() {
-    var brand = document.getElementById('pick-brand').value;
-    var q = (document.getElementById('pick-search').value || '').trim().toLowerCase();
-    var filtered = skuPickerRows.filter(function (r) {
-      if (brand && brand !== '전체' && (r.brand || '') !== brand) return false;
-      if (!q) return true;
-      var id = String(r.sku_id || '').toLowerCase();
-      var nm = String(r.sku_name || '').toLowerCase();
-      return id.indexOf(q) >= 0 || nm.indexOf(q) >= 0;
-    });
-    var tbody = document.querySelector('#tbl-sku-pick tbody');
-    tbody.innerHTML = '';
-    filtered.forEach(function (r) {
-      var tr = document.createElement('tr');
-      tr.innerHTML =
-        '<td><input type="checkbox" class="pick-cb" data-sku-id="' + escapeHtml(String(r.sku_id)) + '" /></td>' +
-        '<td style="font-size:12px">' + escapeHtml(String(r.sku_id)) + '</td>' +
-        '<td>' + escapeHtml(r.sku_name || '—') + '</td>' +
-        '<td>' + escapeHtml(r.brand || '—') + '</td>' +
-        '<td class="num">' + fmtMoney(r.current_price) + '</td>';
-      tbody.appendChild(tr);
-    });
-    document.getElementById('pick-select-all').checked = false;
-  }
-
-  function openManualModal() {
-    document.getElementById('modal-manual-bg').classList.add('show');
-    apiGet('/sku-detail').then(function (j) {
-      skuPickerRows = j.data || [];
-      renderSkuPicker();
-    });
-  }
-
-  function tickClock() {
-    document.getElementById('clock').textContent = new Date().toLocaleString('ko-KR', {
-      timeZone: 'Asia/Seoul',
-      hour12: true
-    });
-  }
-
-  function fmtMoney(n) {
-    if (n == null || n === '' || Number.isNaN(Number(n))) return '—';
-    return Number(n).toLocaleString('ko-KR') + '원';
-  }
-
-  function fmtShortDate(s) {
-    if (!s) return '미수집';
-    var d = String(s).slice(0, 10).split('-');
-    if (d.length === 3) return parseInt(d[1], 10) + '/' + parseInt(d[2], 10);
-    return String(s);
-  }
-
-  function kstTodayYmd() {
-    return new Intl.DateTimeFormat('en-CA', {
+  function kstYmd() {
+    var parts = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Seoul',
       year: 'numeric',
       month: '2-digit',
       day: '2-digit'
-    }).format(new Date());
+    }).formatToParts(new Date());
+    var y, m, d;
+    for (var i = 0; i < parts.length; i++) {
+      if (parts[i].type === 'year') y = parts[i].value;
+      if (parts[i].type === 'month') m = parts[i].value;
+      if (parts[i].type === 'day') d = parts[i].value;
+    }
+    return y + '-' + m + '-' + d;
   }
 
-  function fmtDetectedAt(iso) {
-    if (!iso) return '—';
-    try {
-      return new Date(iso).toLocaleString('ko-KR', {
-        timeZone: 'Asia/Seoul',
-        month: 'numeric',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      });
-    } catch (e) { return iso; }
+  function formatMdFromYmd(ymd) {
+    if (!ymd || String(ymd).length < 10) return '—';
+    var p = String(ymd).slice(0, 10).split('-');
+    if (p.length < 3) return '—';
+    var mo = parseInt(p[1], 10);
+    var da = parseInt(p[2], 10);
+    if (isNaN(mo) || isNaN(da)) return '—';
+    return mo + '/' + da;
   }
 
-  function escapeHtml(s) {
-    var d = document.createElement('div');
-    d.textContent = s == null ? '' : String(s);
-    return d.innerHTML;
+  function formatKstDateTimeShort(isoStr) {
+    if (!isoStr) return '—';
+    var d = new Date(isoStr);
+    if (isNaN(d.getTime())) return '—';
+    return new Intl.DateTimeFormat('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    }).format(d);
   }
 
-  function apiGet(path) {
-    return fetch(API_BASE + path).then(function (r) { return r.json(); });
+  function formatChangeCellHtml(pct) {
+    if (pct === null || pct === undefined || pct === '') {
+      return '<span class="muted">—</span>';
+    }
+    var n = Number(pct);
+    if (isNaN(n)) return '<span class="muted">—</span>';
+    if (n === 0) return '<span class="muted">—</span>';
+    var absStr = Math.abs(n).toFixed(2).replace(/\.?0+$/, '');
+    if (n > 0) return '<span class="up">▲' + escapeHtml(absStr) + '%</span>';
+    return '<span class="down">▼' + escapeHtml(absStr) + '%</span>';
   }
 
-  function scheduleLabel(skuId) {
-    var arr = scheduleMap[skuId];
-    if (!arr || !arr.length) return '—';
-    var sorted = arr.slice().sort(function (a, b) { return a - b; });
-    return sorted.map(function (d) { return DAY_KO[d]; }).join(',');
-  }
-
-  function buildScheduleMap() {
-    var days = [0, 1, 2, 3, 4, 5, 6];
-    return Promise.all(days.map(function (d) {
-      return apiGet('/collect-schedule?day=' + d);
-    })).then(function (results) {
-      scheduleMap = {};
-      results.forEach(function (j, idx) {
-        if (!j.ok || !j.data) return;
-        var dow = j.day_of_week != null ? j.day_of_week : idx;
-        j.data.forEach(function (row) {
-          var id = String(row.sku_id);
-          if (!scheduleMap[id]) scheduleMap[id] = [];
-          if (scheduleMap[id].indexOf(dow) === -1) scheduleMap[id].push(dow);
-        });
+  function apiFetch(method, path, bodyObj) {
+    var opts = { method: method, headers: {} };
+    if (bodyObj !== undefined && bodyObj !== null) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(bodyObj);
+    }
+    return fetch(API_BASE + path, opts).then(function (res) {
+      return res.json().then(function (json) {
+        if (!res.ok) {
+          var msg = (json && json.error) || res.statusText || '요청 실패';
+          throw new Error(msg);
+        }
+        return json;
       });
     });
   }
 
-  function refreshCollectStatus() {
-    return apiGet('/collect-status').then(function (j) {
-      if (!j.ok || !j.data) return;
-      var d = j.data;
-      var st = d.status || 'idle';
-      var badge = document.getElementById('cs-badge');
-      badge.className = 'badge ' + (st === 'running' ? 'running' : st === 'stopping' ? 'stopping' : st === 'done' ? 'done' : st === 'error' ? 'error' : 'idle');
-      var labels = { idle: '대기중', running: '수집중', stopping: '중지중', done: '완료', error: '에러' };
-      badge.textContent = labels[st] || st;
+  function stopCollectPolling() {
+    if (state.collectPollTimer) {
+      clearInterval(state.collectPollTimer);
+      state.collectPollTimer = null;
+    }
+  }
 
-      var pw = document.getElementById('cs-progress-wrap');
-      var doneEl = document.getElementById('cs-done');
-      document.getElementById('btn-cs-stop').disabled = st !== 'running';
+  function startCollectPollingIfNeeded(status) {
+    stopCollectPolling();
+    if (status !== 'running' && status !== 'stopping') return;
+    state.collectPollTimer = setInterval(function () {
+      loadCollectStatus();
+    }, 5000);
+  }
 
-      if (st === 'running' || st === 'stopping') {
-        pw.style.display = 'block';
-        doneEl.style.display = 'none';
-        var t = d.total || 0;
-        var c = d.current || 0;
-        var pct = t ? Math.round((c / t) * 100) : 0;
-        document.getElementById('cs-bar').style.width = pct + '%';
-        document.getElementById('cs-line').textContent = c + '/' + t + ' 수집중… (' + (d.current_sku_name || '—') + ')';
-      } else {
-        pw.style.display = 'none';
-        if (st === 'done') {
-          doneEl.style.display = 'block';
-          var fin = d.finished_at ? ' 완료시각: ' + fmtDetectedAt(d.finished_at) : '';
-          doneEl.textContent = (d.current || d.total || 0) + '/' + (d.total || 0) + ' 완료 (성공 ' + (d.success || 0) + ' / 실패 ' + (d.fail || 0) + ')' + fin;
+  function loadCollectStatus() {
+    return apiFetch('GET', '/collect-status', null)
+      .then(function (json) {
+        var d = json.data || {};
+        var st = d.status || 'idle';
+        var badge = document.getElementById('collect-badge');
+        badge.className = 'badge ' + st;
+        badge.textContent = st;
+
+        var btnStop = document.getElementById('btn-stop-collect');
+        btnStop.disabled = st !== 'running';
+
+        var progWrap = document.getElementById('collect-progress-wrap');
+        var progBar = document.getElementById('collect-progress-bar');
+        var runText = document.getElementById('collect-running-text');
+        var detail = document.getElementById('collect-detail');
+
+        if (st === 'running' || st === 'stopping') {
+          progWrap.style.display = '';
+          runText.style.display = '';
+          var total = Number(d.total) || 0;
+          var cur = Number(d.current) || 0;
+          var pct = total > 0 ? Math.min(100, Math.round((cur / total) * 100)) : 0;
+          progBar.style.width = pct + '%';
+          var skuName = d.current_sku_name ? String(d.current_sku_name) : '';
+          if (st === 'stopping') {
+            runText.textContent = cur + '/' + total + ' 중지 중' + (skuName ? ' (' + skuName + ')' : '');
+          } else {
+            runText.textContent = cur + '/' + total + ' 수집 중' + (skuName ? ' (' + skuName + ')' : '');
+          }
+          detail.textContent = '';
         } else {
-          doneEl.style.display = 'none';
+          progWrap.style.display = 'none';
+          runText.style.display = 'none';
         }
-      }
 
-      if (st === 'running' || st === 'stopping') {
-        if (!pollTimer) pollTimer = setInterval(refreshCollectStatus, 5000);
-      } else {
-        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-      }
-    });
+        if (st === 'done') {
+          var total2 = Number(d.total) || 0;
+          var succ = Number(d.success) || 0;
+          var fail = Number(d.fail) || 0;
+          var fin = d.finished_at ? formatKstDateTimeShort(d.finished_at) : '—';
+          detail.textContent = total2 + '/' + total2 + ' 완료 (성공 ' + succ + ' / 실패 ' + fail + ') · 완료: ' + fin;
+        } else if (st === 'idle' || st === 'error') {
+          detail.textContent = st === 'error' ? '오류가 발생했습니다.' : '대기 중입니다.';
+        } else if (st !== 'running') {
+          detail.textContent = '';
+        }
+
+        startCollectPollingIfNeeded(st);
+        return json;
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
+      });
   }
 
-  function loadTodayTable() {
-    return Promise.all([apiGet('/collect-schedule?day=today'), apiGet('/sku-detail')])
-      .then(function (arr) {
-        var today = arr[0];
-        var detail = arr[1];
-        var tbody = document.querySelector('#tbl-today tbody');
-        tbody.innerHTML = '';
-        var ymd = kstTodayYmd();
-        var byId = {};
-        if (detail.ok && detail.data) {
-          detail.data.forEach(function (r) { byId[String(r.sku_id)] = r; });
+  function mapQueueStatusBadge(st) {
+    var s = String(st || '').toLowerCase();
+    if (s === 'pending') return '<span class="badge q-pending">pending</span>';
+    if (s === 'collecting' || s === 'processing') return '<span class="badge q-collecting">' + escapeHtml(st) + '</span>';
+    if (s === 'done' || s === 'success') return '<span class="badge q-done">done</span>';
+    if (s === 'failed' || s === 'error') return '<span class="badge q-failed">' + escapeHtml(st) + '</span>';
+    return '<span class="badge idle">' + escapeHtml(st || '—') + '</span>';
+  }
+
+  function loadQueue() {
+    return apiFetch('GET', '/collect-queue?status=all', null)
+      .then(function (json) {
+        var rows = json.data || [];
+        var wrap = document.getElementById('queue-table-wrap');
+        var empty = document.getElementById('queue-empty');
+        var hint = document.getElementById('queue-pending-hint');
+        var tbody = document.getElementById('queue-tbody');
+        var hasPending = false;
+        for (var i = 0; i < rows.length; i++) {
+          if (String(rows[i].status).toLowerCase() === 'pending') {
+            hasPending = true;
+            break;
+          }
         }
-        if (!today.ok || !today.data || !today.data.length) {
-          tbody.innerHTML = '<tr><td colspan="6" class="muted">오늘 배정된 SKU가 없습니다.</td></tr>';
+        hint.style.display = hasPending ? '' : 'none';
+
+        if (!rows.length) {
+          empty.style.display = '';
+          wrap.style.display = 'none';
+          tbody.innerHTML = '';
+          return json;
+        }
+        empty.style.display = 'none';
+        wrap.style.display = '';
+        var h = '';
+        for (var j = 0; j < rows.length; j++) {
+          var r = rows[j];
+          h += '<tr>';
+          h += '<td class="num">' + escapeHtml(String(j + 1)) + '</td>';
+          h += '<td>' + escapeHtml(r.sku_name || '') + '</td>';
+          h += '<td>' + escapeHtml(r.brand || '') + '</td>';
+          h += '<td>' + mapQueueStatusBadge(r.status) + '</td>';
+          h += '<td class="num">' + escapeHtml(formatMoney(r.result_price)) + '</td>';
+          h += '<td>' + escapeHtml(formatKstDateTimeShort(r.created_at)) + '</td>';
+          h += '</tr>';
+        }
+        tbody.innerHTML = h;
+        return json;
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
+      });
+  }
+
+  function mergeSkuMaps(scheduleRows, detailRows) {
+    var byId = {};
+    for (var i = 0; i < detailRows.length; i++) {
+      byId[String(detailRows[i].sku_id)] = detailRows[i];
+    }
+    var out = [];
+    for (var j = 0; j < scheduleRows.length; j++) {
+      var sid = String(scheduleRows[j].sku_id);
+      var base = byId[sid] || scheduleRows[j];
+      out.push(base);
+    }
+    return out;
+  }
+
+  function loadTodaySection() {
+    return Promise.all([
+      apiFetch('GET', '/collect-schedule?day=today', null),
+      apiFetch('GET', '/sku-detail', null)
+    ])
+      .then(function (results) {
+        var sched = results[0];
+        var detail = results[1];
+        var scheduleRows = sched.data || [];
+        var detailRows = detail.data || [];
+        var merged = mergeSkuMaps(scheduleRows, detailRows);
+        var todayYmd = kstYmd();
+        var empty = document.getElementById('today-empty');
+        var wrap = document.getElementById('today-table-wrap');
+        var tbody = document.getElementById('today-tbody');
+        if (!merged.length) {
+          empty.style.display = '';
+          wrap.style.display = 'none';
+          tbody.innerHTML = '';
           return;
         }
-        today.data.forEach(function (row) {
-          var m = byId[String(row.sku_id)] || {};
-          var reg = m.registered_price;
-          var cur = m.current_price;
-          var ch = m.change_pct;
-          var collected = m.last_collected && String(m.last_collected).slice(0, 10) === ymd;
-          var tr = document.createElement('tr');
-          var pctStr = '—';
-          var pctClass = 'muted';
-          if (ch != null && ch !== '' && !Number.isNaN(Number(ch))) {
-            var p = Number(ch);
-            if (p === 0) {
-              pctStr = '—';
-              pctClass = 'muted';
-            } else {
-              pctStr = (p > 0 ? '▲' : '▼') + Math.abs(p) + '%';
-              pctClass = p > 0 ? 'up' : 'down';
-            }
-          }
-          tr.innerHTML =
-            '<td>' + escapeHtml(row.sku_name || '—') + '</td>' +
-            '<td>' + escapeHtml(row.brand || '—') + '</td>' +
-            '<td class="num">' + fmtMoney(reg) + '</td>' +
-            '<td class="num">' + fmtMoney(cur) + '</td>' +
-            '<td class="num ' + pctClass + '">' + pctStr + '</td>' +
-            '<td>' + (collected ? '✅' : '미수집') + '</td>';
-          tbody.appendChild(tr);
-        });
+        empty.style.display = 'none';
+        wrap.style.display = '';
+        var h = '';
+        for (var i = 0; i < merged.length; i++) {
+          var r = merged[i];
+          var lc = r.last_collected ? String(r.last_collected).slice(0, 10) : '';
+          var okToday = lc === todayYmd;
+          h += '<tr>';
+          h += '<td>' + escapeHtml(r.sku_name || '') + '</td>';
+          h += '<td>' + escapeHtml(r.brand || '') + '</td>';
+          h += '<td class="num">' + escapeHtml(formatMoney(r.registered_price)) + '</td>';
+          h += '<td class="num">' + escapeHtml(formatMoney(r.current_price)) + '</td>';
+          h += '<td class="num">' + formatChangeCellHtml(r.change_pct) + '</td>';
+          h += '<td>' + (okToday ? '✅' : '⏳') + '</td>';
+          h += '</tr>';
+        }
+        tbody.innerHTML = h;
+        window.__todayCsvPayload = merged;
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
+      });
+  }
+
+  function downloadCsv(filename, header, rows) {
+    var lines = [];
+    lines.push(header.join(','));
+    for (var i = 0; i < rows.length; i++) {
+      var cells = rows[i];
+      var esc = [];
+      for (var j = 0; j < cells.length; j++) {
+        var v = cells[j] == null ? '' : String(cells[j]);
+        if (/[",\n]/.test(v)) {
+          v = '"' + v.replace(/"/g, '""') + '"';
+        }
+        esc.push(v);
+      }
+      lines.push(esc.join(','));
+    }
+    var blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function btnTodayCsvClick() {
+    var merged = window.__todayCsvPayload;
+    if (!merged || !merged.length) {
+      alert('다운로드할 데이터가 없습니다.');
+      return;
+    }
+    var header = ['sku_id', 'brand', 'sku_name', 'registered_price', 'current_price', 'change_pct', 'last_collected'];
+    var rows = [];
+    for (var i = 0; i < merged.length; i++) {
+      var r = merged[i];
+      rows.push([
+        r.sku_id,
+        r.brand,
+        r.sku_name,
+        r.registered_price,
+        r.current_price,
+        r.change_pct,
+        r.last_collected
+      ]);
+    }
+    var ymd = kstYmd().replace(/-/g, '');
+    downloadCsv('today_collect_' + ymd + '.csv', header, rows);
+  }
+
+  function uniqueBrandsFromAlerts(alerts) {
+    var m = {};
+    for (var i = 0; i < alerts.length; i++) {
+      var b = alerts[i].brand;
+      if (b) m[String(b)] = true;
+    }
+    var arr = [];
+    for (var k in m) {
+      if (Object.prototype.hasOwnProperty.call(m, k)) arr.push(k);
+    }
+    arr.sort();
+    return arr;
+  }
+
+  function loadAlerts() {
+    return apiFetch('GET', '/price-alert', null)
+      .then(function (json) {
+        state.alertRaw = json.alerts || [];
+        renderAlertFilters();
+        renderAlertTable();
+        return json;
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
       });
   }
 
   function renderAlertFilters() {
-    var brands = new Set();
-    alertRows.forEach(function (r) { if (r.brand) brands.add(r.brand); });
-    var brandBtns = document.getElementById('alert-brand-btns');
-    brandBtns.innerHTML = '';
-    function addBrandBtn(label, val) {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = label;
-      if (alertBrand === val) b.classList.add('on');
-      b.onclick = function () {
-        alertBrand = val;
-        Array.from(brandBtns.children).forEach(function (x) { x.classList.remove('on'); });
-        b.classList.add('on');
-        renderAlertsTable();
-      };
-      brandBtns.appendChild(b);
+    var brands = uniqueBrandsFromAlerts(state.alertRaw);
+    var fb = document.getElementById('alert-brand-filters');
+    var h = '<button type="button" data-ab="__all__" class="' + (state.alertBrand === '__all__' ? 'on' : '') + '">전체</button>';
+    for (var i = 0; i < brands.length; i++) {
+      var b = brands[i];
+      h += '<button type="button" data-ab="' + escapeHtml(b) + '" class="' + (state.alertBrand === b ? 'on' : '') + '">' + escapeHtml(b) + '</button>';
     }
-    addBrandBtn('전체', '전체');
-    Array.from(brands).sort().forEach(function (br) {
-      addBrandBtn(br, br);
-    });
+    fb.innerHTML = h;
 
+    var fd = document.getElementById('alert-dir-filters');
     var dirs = [
-      { k: 'all', t: '전체' },
-      { k: 'up', t: '상승▲' },
-      { k: 'down', t: '하락▼' }
+      { id: 'all', label: '전체' },
+      { id: 'up', label: '상승' },
+      { id: 'down', label: '하락' }
     ];
-    var dirBtns = document.getElementById('alert-dir-btns');
-    dirBtns.innerHTML = '';
-    dirs.forEach(function (o) {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = o.t;
-      if (alertDir === o.k) b.classList.add('on');
-      b.onclick = function () {
-        alertDir = o.k;
-        Array.from(dirBtns.children).forEach(function (x) { x.classList.remove('on'); });
-        b.classList.add('on');
-        renderAlertsTable();
-      };
-      dirBtns.appendChild(b);
-    });
+    var h2 = '';
+    for (var j = 0; j < dirs.length; j++) {
+      var d = dirs[j];
+      h2 += '<button type="button" data-ad="' + d.id + '" class="' + (state.alertDir === d.id ? 'on' : '') + '">' + escapeHtml(d.label) + '</button>';
+    }
+    fd.innerHTML = h2;
   }
 
-  function renderAlertsTable() {
-    var rows = alertRows.slice();
-    if (alertBrand && alertBrand !== '전체') {
-      rows = rows.filter(function (r) { return (r.brand || '') === alertBrand; });
-    }
-    if (alertDir === 'up') rows = rows.filter(function (r) { return (r.change_pct || 0) > 0; });
-    if (alertDir === 'down') rows = rows.filter(function (r) { return (r.change_pct || 0) < 0; });
-    rows.sort(function (a, b) {
-      return new Date(b.detected_at || 0) - new Date(a.detected_at || 0);
+  function filterAlerts() {
+    var list = state.alertRaw.slice();
+    list.sort(function (a, b) {
+      var ta = new Date(a.detected_at || 0).getTime();
+      var tb = new Date(b.detected_at || 0).getTime();
+      return tb - ta;
     });
-    var tbody = document.querySelector('#tbl-alerts tbody');
-    tbody.innerHTML = '';
+    var out = [];
+    for (var i = 0; i < list.length; i++) {
+      var a = list[i];
+      if (state.alertBrand !== '__all__' && String(a.brand) !== state.alertBrand) continue;
+      var ch = Number(a.change_pct);
+      if (state.alertDir === 'up' && !(ch > 0)) continue;
+      if (state.alertDir === 'down' && !(ch < 0)) continue;
+      out.push(a);
+    }
+    return out;
+  }
+
+  function renderAlertTable() {
+    var rows = filterAlerts();
+    var empty = document.getElementById('alert-empty');
+    var wrap = document.getElementById('alert-table-wrap');
+    var tbody = document.getElementById('alert-tbody');
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="muted">알림이 없습니다.</td></tr>';
+      empty.style.display = '';
+      wrap.style.display = 'none';
+      tbody.innerHTML = '';
       return;
     }
-    rows.forEach(function (r) {
-      var tr = document.createElement('tr');
-      var ch = r.change_pct || 0;
-      var cls = ch > 0 ? 'up' : ch < 0 ? 'down' : 'muted';
-      tr.innerHTML =
-        '<td>' + escapeHtml(r.sku_name || '—') + '</td>' +
-        '<td>' + escapeHtml(r.brand || '—') + '</td>' +
-        '<td class="num">' + fmtMoney(r.prev_price) + '</td>' +
-        '<td class="num">' + fmtMoney(r.new_price) + '</td>' +
-        '<td class="num ' + cls + '">' + (r.change_pct != null ? r.change_pct + '%' : '—') + '</td>' +
-        '<td>' + fmtDetectedAt(r.detected_at) + '</td>';
-      tbody.appendChild(tr);
-    });
+    empty.style.display = 'none';
+    wrap.style.display = '';
+    var h = '';
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      h += '<tr>';
+      h += '<td>' + escapeHtml(r.sku_name || '') + '</td>';
+      h += '<td>' + escapeHtml(r.brand || '') + '</td>';
+      h += '<td class="num">' + escapeHtml(formatMoney(r.prev_price)) + '</td>';
+      h += '<td class="num">' + escapeHtml(formatMoney(r.new_price)) + '</td>';
+      h += '<td class="num">' + formatChangeCellHtml(r.change_pct) + '</td>';
+      h += '<td>' + escapeHtml(formatKstDateTimeShort(r.detected_at)) + '</td>';
+      h += '</tr>';
+    }
+    tbody.innerHTML = h;
   }
 
-  function loadAlerts() {
-    return apiGet('/price-alert').then(function (j) {
-      alertRows = j.alerts || [];
-      renderAlertFilters();
-      renderAlertsTable();
-    });
+  function loadSkuSchedules() {
+    var reqs = [];
+    for (var d = 0; d < 7; d++) {
+      reqs.push(apiFetch('GET', '/collect-schedule?day=' + d, null));
+    }
+    return Promise.all(reqs)
+      .then(function (arr) {
+        var map = {};
+        for (var di = 0; di < arr.length; di++) {
+          var data = (arr[di] && arr[di].data) || [];
+          for (var j = 0; j < data.length; j++) {
+            var sid = String(data[j].sku_id);
+            if (!map[sid]) map[sid] = [];
+            map[sid].push(di);
+          }
+        }
+        for (var k in map) {
+          if (Object.prototype.hasOwnProperty.call(map, k)) {
+            map[k].sort(function (a, b) { return a - b; });
+          }
+        }
+        state.skuScheduleMap = map;
+        return map;
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
+      });
+  }
+
+  function scheduleDaysLabel(skuId) {
+    var days = state.skuScheduleMap[String(skuId)];
+    if (!days || !days.length) return '—';
+    var parts = [];
+    for (var i = 0; i < days.length; i++) {
+      parts.push(DAY_NAMES[days[i]]);
+    }
+    return parts.join(',');
   }
 
   function countByBrand(rows) {
-    var m = { 전체: rows.length };
-    rows.forEach(function (r) {
-      var b = r.brand || '기타';
-      m[b] = (m[b] || 0) + 1;
-    });
+    var m = {};
+    for (var i = 0; i < rows.length; i++) {
+      var b = rows[i].brand || '(없음)';
+      var k = String(b);
+      m[k] = (m[k] || 0) + 1;
+    }
     return m;
   }
 
-  function renderSkuTable() {
-    var rows = skuRows.slice();
-    if (skuBrand && skuBrand !== '전체') {
-      rows = rows.filter(function (r) { return (r.brand || '') === skuBrand; });
-    }
-    var tbody = document.querySelector('#tbl-sku tbody');
-    tbody.innerHTML = '';
-    rows.forEach(function (r) {
-      var tr = document.createElement('tr');
-      var ch = r.change_pct;
-      var cls = ch == null || ch === 0 ? 'muted' : ch > 0 ? 'up' : 'down';
-      var chStr = ch == null || ch === 0 ? '—' : (ch > 0 ? '' : '') + Number(ch).toFixed(2) + '%';
-      if (ch != null && ch !== 0) {
-        chStr = (ch > 0 ? '▲' : '▼') + Math.abs(Number(ch)).toFixed(2) + '%';
+  function loadSkuTable() {
+    return Promise.all([apiFetch('GET', '/sku-detail', null), loadSkuSchedules()])
+      .then(function (res) {
+        var json = res[0];
+        var rows = json.data || [];
+        state.skuDetailList = rows;
+        var counts = countByBrand(rows);
+        var brands = Object.keys(counts);
+        brands.sort();
+
+        var tabs = document.getElementById('sku-brand-tabs');
+        var th = '<button type="button" data-sb="__all__" class="' + (state.skuBrand === '__all__' ? 'on' : '') + '">전체(' + rows.length + ')</button>';
+        for (var i = 0; i < brands.length; i++) {
+          var br = brands[i];
+          th += '<button type="button" data-sb="' + escapeHtml(br) + '" class="' + (state.skuBrand === br ? 'on' : '') + '">' + escapeHtml(br) + '(' + counts[br] + ')</button>';
+        }
+        tabs.innerHTML = th;
+
+        var filtered = [];
+        for (var j = 0; j < rows.length; j++) {
+          if (state.skuBrand === '__all__' || String(rows[j].brand) === state.skuBrand) {
+            filtered.push(rows[j]);
+          }
+        }
+
+        var tbody = document.getElementById('sku-tbody');
+        var h = '';
+        for (var k = 0; k < filtered.length; k++) {
+          var r = filtered[k];
+          var url = r.product_url || '#';
+          h += '<tr>';
+          h += '<td>' + escapeHtml(String(r.sku_id)) + '</td>';
+          h += '<td><a class="link" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(r.sku_name || '') + '</a></td>';
+          h += '<td>' + escapeHtml(r.brand || '') + '</td>';
+          h += '<td class="num">' + escapeHtml(formatMoney(r.registered_price)) + '</td>';
+          h += '<td class="num">' + escapeHtml(formatMoney(r.current_price)) + '</td>';
+          h += '<td class="num">' + formatChangeCellHtml(r.change_pct) + '</td>';
+          h += '<td>' + (r.flag ? '<span class="flag-badge">' + escapeHtml(r.flag) + '</span>' : '—') + '</td>';
+          h += '<td class="num">' + escapeHtml(r.collect_cycle != null ? String(r.collect_cycle) : '') + '</td>';
+          h += '<td>' + escapeHtml(formatMdFromYmd(r.last_collected)) + '</td>';
+          h += '<td>' + escapeHtml(scheduleDaysLabel(r.sku_id)) + '</td>';
+          h += '<td><button type="button" class="btn-icon" data-del-sku="' + escapeHtml(String(r.sku_id)) + '" title="삭제">🗑</button></td>';
+          h += '</tr>';
+        }
+        tbody.innerHTML = h;
+        return json;
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
+      });
+  }
+
+  function filteredSkuRowsForCsv() {
+    var rows = state.skuDetailList || [];
+    var out = [];
+    for (var i = 0; i < rows.length; i++) {
+      if (state.skuBrand === '__all__' || String(rows[i].brand) === state.skuBrand) {
+        out.push(rows[i]);
       }
-      var name = escapeHtml(r.sku_name || '—');
-      var url = r.product_url ? escapeHtml(r.product_url) : '';
-      var link = url ? '<a class="link" href="' + url + '" target="_blank" rel="noopener">' + name + '</a>' : name;
-      var flag = r.flag ? '<span class="flag-badge">' + escapeHtml(r.flag) + '</span>' : '—';
-      tr.innerHTML =
-        '<td style="font-size:12px;color:#666">' + escapeHtml(String(r.sku_id)) + '</td>' +
-        '<td>' + link + '</td>' +
-        '<td class="num">' + fmtMoney(r.registered_price) + '</td>' +
-        '<td class="num">' + (r.current_price != null ? fmtMoney(r.current_price) : '—') + '</td>' +
-        '<td class="num ' + cls + '">' + chStr + '</td>' +
-        '<td>' + flag + '</td>' +
-        '<td>' + (r.collect_cycle != null ? r.collect_cycle + '일' : '—') + '</td>' +
-        '<td>' + fmtShortDate(r.last_collected) + '</td>' +
-        '<td>' + scheduleLabel(String(r.sku_id)) + '</td>' +
-        '<td><button type="button" class="btn-icon btn-del" data-id="' + escapeHtml(String(r.sku_id)) + '" data-name="' + escapeHtml(r.sku_name || '') + '" title="삭제">🗑</button></td>';
-      tbody.appendChild(tr);
-    });
-    document.querySelectorAll('.btn-del').forEach(function (btn) {
-      btn.onclick = function (e) {
-        e.stopPropagation();
-        var id = btn.getAttribute('data-id');
-        var nm = btn.getAttribute('data-name') || id;
-        if (!confirm("'" + nm + "'을(를) 삭제하시겠습니까?")) return;
-        fetch(API_BASE + '/sku-delete', {
-          method: 'DELETE',
-          headers: JSON_H,
-          body: JSON.stringify({ sku_id: id })
-        }).then(function (r) { return r.json(); }).then(function (j) {
-          if (j.ok) loadSkuPage();
-          else alert(j.error || '삭제 실패');
-        }).catch(function (err) { alert(err.message); });
-      };
-    });
+    }
+    return out;
   }
 
-  function loadSkuPage() {
-    return apiGet('/sku-detail').then(function (j) {
-      skuRows = j.data || [];
-      var counts = countByBrand(skuRows);
-      var tabs = document.getElementById('sku-brand-tabs');
-      tabs.innerHTML = '';
-      var ordered = ['전체', '아리코', '윰'];
-      var seen = new Set(ordered);
-      skuRows.forEach(function (r) {
-        var b = r.brand;
-        if (b && !seen.has(b)) { ordered.push(b); seen.add(b); }
-      });
-      if (ordered.indexOf(skuBrand) === -1) skuBrand = '전체';
-      ordered.forEach(function (b) {
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        var c = b === '전체' ? counts['전체'] : (counts[b] || 0);
-        btn.textContent = b + '(' + c + ')';
-        if (b === skuBrand) btn.classList.add('on');
-        btn.onclick = function () {
-          skuBrand = b;
-          Array.from(tabs.children).forEach(function (x) { x.classList.remove('on'); });
-          btn.classList.add('on');
-          renderSkuTable();
-        };
-        tabs.appendChild(btn);
-      });
-      return buildScheduleMap();
-    }).then(function () {
-      renderSkuTable();
-    });
-  }
-
-  document.querySelectorAll('.tab-btn').forEach(function (btn) {
-    btn.onclick = function () {
-      document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
-      var id = btn.getAttribute('data-tab') === 'dash' ? 'panel-dash' : 'panel-sku';
-      document.getElementById(id).classList.add('active');
-      if (id === 'panel-dash') {
-        refreshCollectStatus();
-        loadTodayTable();
-        loadAlerts();
-        loadQueueDashboard();
-      } else loadSkuPage();
-    };
-  });
-
-  document.getElementById('btn-cs-stop').onclick = function () {
-    fetch(API_BASE + '/collect-status', {
-      method: 'POST',
-      headers: JSON_H,
-      body: JSON.stringify({ action: 'stop' })
-    }).then(function () { refreshCollectStatus(); });
-  };
-
-  document.getElementById('f-brand-sel').onchange = function () {
-    var v = document.getElementById('f-brand-sel').value;
-    document.getElementById('f-brand-custom').style.display = v === '__custom' ? 'block' : 'none';
-  };
-
-  document.getElementById('btn-sku-add').onclick = function () {
-    document.getElementById('modal-bg').classList.add('show');
-  };
-  document.getElementById('modal-cancel').onclick = function () {
-    document.getElementById('modal-bg').classList.remove('show');
-  };
-  document.getElementById('modal-save').onclick = function () {
-    var sel = document.getElementById('f-brand-sel').value;
-    var brand = sel === '__custom' ? document.getElementById('f-brand-custom').value.trim() : sel;
-    var body = {
-      sku_id: document.getElementById('f-sku_id').value.trim(),
-      sku_name: document.getElementById('f-sku_name').value.trim(),
-      brand: brand,
-      product_url: document.getElementById('f-product_url').value.trim(),
-      registered_price: document.getElementById('f-registered_price').value
-        ? Number(document.getElementById('f-registered_price').value) : null,
-      collect_cycle: document.getElementById('f-collect_cycle').value
-        ? Number(document.getElementById('f-collect_cycle').value) : 7,
-      flag: document.getElementById('f-flag').value.trim(),
-      memo: document.getElementById('f-memo').value.trim()
-    };
-    if (!body.sku_id || !body.sku_name || !body.brand || !body.product_url) {
-      alert('필수: SKU ID, 상품명, 브랜드, 쿠팡 URL');
+  function btnSkuCsvDl() {
+    var rows = filteredSkuRowsForCsv();
+    if (!rows.length) {
+      alert('다운로드할 SKU가 없습니다.');
       return;
     }
-    fetch(API_BASE + '/sku-add', {
-      method: 'POST',
-      headers: JSON_H,
-      body: JSON.stringify(body)
-    }).then(function (r) { return r.json(); }).then(function (j) {
-      if (j.ok) {
-        document.getElementById('modal-bg').classList.remove('show');
-        loadSkuPage();
-      } else alert(j.error || '저장 실패');
-    }).catch(function (e) { alert(e.message); });
-  };
+    var header = ['sku_id', 'brand', 'sku_name', 'product_url', 'registered_price', 'current_price', 'change_pct', 'flag', 'collect_cycle', 'last_collected'];
+    var csvRows = [];
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      csvRows.push([
+        r.sku_id,
+        r.brand,
+        r.sku_name,
+        r.product_url,
+        r.registered_price,
+        r.current_price,
+        r.change_pct,
+        r.flag,
+        r.collect_cycle,
+        r.last_collected
+      ]);
+    }
+    var ymd = kstYmd().replace(/-/g, '');
+    downloadCsv('sku_list_' + ymd + '.csv', header, csvRows);
+  }
 
-  document.getElementById('btn-csv-up').onclick = function () {
+  function openModal(id) {
+    document.getElementById(id).classList.add('show');
+  }
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('show');
+  }
+
+  function refreshDashboard() {
+    loadCollectStatus();
+    loadQueue();
+    loadTodaySection();
+    loadAlerts();
+  }
+
+  function updateClock() {
+    var el = document.getElementById('clock');
+    var now = new Date();
+    var s = new Intl.DateTimeFormat('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      weekday: 'short',
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    }).format(now);
+    el.textContent = s;
+  }
+
+  document.getElementById('tab-dash').addEventListener('click', function () {
+    document.getElementById('tab-dash').classList.add('active');
+    document.getElementById('tab-sku').classList.remove('active');
+    document.getElementById('panel-dash').classList.add('active');
+    document.getElementById('panel-sku').classList.remove('active');
+    refreshDashboard();
+  });
+
+  document.getElementById('tab-sku').addEventListener('click', function () {
+    document.getElementById('tab-sku').classList.add('active');
+    document.getElementById('tab-dash').classList.remove('active');
+    document.getElementById('panel-sku').classList.add('active');
+    document.getElementById('panel-dash').classList.remove('active');
+    loadSkuTable();
+  });
+
+  document.getElementById('btn-stop-collect').addEventListener('click', function () {
+    if (!confirm('수집을 중지할까요?')) return;
+    apiFetch('POST', '/collect-status', { action: 'stop' })
+      .then(function () {
+        return loadCollectStatus();
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
+      });
+  });
+
+  document.getElementById('btn-queue-clear').addEventListener('click', function () {
+    if (!confirm('완료된 항목을 큐에서 비울까요?')) return;
+    apiFetch('DELETE', '/collect-queue', { action: 'clear_done' })
+      .then(function () {
+        return loadQueue();
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
+      });
+  });
+
+  document.getElementById('btn-queue-add').addEventListener('click', function () {
+    state.queueSkuSelected = {};
+    openModal('modal-queue-add');
+    document.getElementById('qtab-sku').classList.add('on');
+    document.getElementById('qtab-url').classList.remove('on');
+    document.getElementById('queue-panel-sku').style.display = '';
+    document.getElementById('queue-panel-url').style.display = 'none';
+    apiFetch('GET', '/sku-detail', null)
+      .then(function (json) {
+        var rows = json.data || [];
+        var brands = countByBrand(rows);
+        var bk = Object.keys(brands);
+        bk.sort();
+        var sel = document.getElementById('queue-brand-sel');
+        var opts = '<option value="__all__">전체 브랜드</option>';
+        for (var i = 0; i < bk.length; i++) {
+          opts += '<option value="' + escapeHtml(bk[i]) + '">' + escapeHtml(bk[i]) + '</option>';
+        }
+        sel.innerHTML = opts;
+        window.__queueSkuAll = rows;
+        renderQueueSkuTable();
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
+      });
+  });
+
+  function getQueueFilteredList() {
+    var rows = window.__queueSkuAll || [];
+    var brand = document.getElementById('queue-brand-sel').value;
+    var q = (document.getElementById('queue-sku-search').value || '').toLowerCase();
+    var out = [];
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (brand !== '__all__' && String(r.brand) !== brand) continue;
+      var name = (r.sku_name || '').toLowerCase();
+      if (q && name.indexOf(q) === -1) continue;
+      out.push(r);
+    }
+    return out;
+  }
+
+  function renderQueueSkuTable() {
+    var rows = getQueueFilteredList();
+    state.queueSkuListFiltered = rows;
+    var tbody = document.getElementById('queue-sku-tbody');
+    var h = '';
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var sid = String(r.sku_id);
+      var checked = state.queueSkuSelected[sid] ? ' checked' : '';
+      h += '<tr>';
+      h += '<td><input type="checkbox" class="queue-sku-cb" data-sid="' + escapeHtml(sid) + '"' + checked + ' /></td>';
+      h += '<td>' + escapeHtml(sid) + '</td>';
+      h += '<td>' + escapeHtml(r.sku_name || '') + '</td>';
+      h += '<td>' + escapeHtml(r.brand || '') + '</td>';
+      h += '<td class="num">' + escapeHtml(formatMoney(r.current_price)) + '</td>';
+      h += '</tr>';
+    }
+    tbody.innerHTML = h;
+    var cbs = tbody.querySelectorAll('.queue-sku-cb');
+    for (var j = 0; j < cbs.length; j++) {
+      cbs[j].addEventListener('change', function (ev) {
+        var sid = ev.target.getAttribute('data-sid');
+        state.queueSkuSelected[sid] = ev.target.checked;
+      });
+    }
+  }
+
+  document.getElementById('queue-brand-sel').addEventListener('change', renderQueueSkuTable);
+  document.getElementById('queue-sku-search').addEventListener('input', renderQueueSkuTable);
+
+  document.getElementById('queue-check-all').addEventListener('change', function (ev) {
+    var on = ev.target.checked;
+    var rows = state.queueSkuListFiltered || [];
+    for (var i = 0; i < rows.length; i++) {
+      state.queueSkuSelected[String(rows[i].sku_id)] = on;
+    }
+    renderQueueSkuTable();
+  });
+
+  document.getElementById('qtab-sku').addEventListener('click', function () {
+    document.getElementById('qtab-sku').classList.add('on');
+    document.getElementById('qtab-url').classList.remove('on');
+    document.getElementById('queue-panel-sku').style.display = '';
+    document.getElementById('queue-panel-url').style.display = 'none';
+  });
+  document.getElementById('qtab-url').addEventListener('click', function () {
+    document.getElementById('qtab-url').classList.add('on');
+    document.getElementById('qtab-sku').classList.remove('on');
+    document.getElementById('queue-panel-url').style.display = '';
+    document.getElementById('queue-panel-sku').style.display = 'none';
+  });
+
+  document.getElementById('btn-queue-sku-submit').addEventListener('click', function () {
+    var ids = [];
+    for (var k in state.queueSkuSelected) {
+      if (Object.prototype.hasOwnProperty.call(state.queueSkuSelected, k) && state.queueSkuSelected[k]) {
+        ids.push(k);
+      }
+    }
+    if (!ids.length) {
+      alert('선택된 SKU가 없습니다.');
+      return;
+    }
+    apiFetch('POST', '/collect-queue', { sku_ids: ids })
+      .then(function () {
+        closeModal('modal-queue-add');
+        return loadQueue();
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
+      });
+  });
+
+  document.getElementById('btn-queue-url-submit').addEventListener('click', function () {
+    var ta = document.getElementById('queue-url-ta').value || '';
+    var lines = ta.split(/\r?\n/);
+    var items = [];
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (!line) continue;
+      items.push({ product_url: line });
+    }
+    if (!items.length) {
+      alert('URL을 입력하세요.');
+      return;
+    }
+    apiFetch('POST', '/collect-queue', { items: items })
+      .then(function () {
+        document.getElementById('queue-url-ta').value = '';
+        closeModal('modal-queue-add');
+        return loadQueue();
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
+      });
+  });
+
+  document.getElementById('btn-sku-add').addEventListener('click', function () {
+    document.getElementById('f-sku-id').value = '';
+    document.getElementById('f-sku-name').value = '';
+    document.getElementById('f-brand-mode').value = '아리코';
+    document.getElementById('f-brand-custom').value = '';
+    document.getElementById('f-brand-custom-wrap').style.display = 'none';
+    document.getElementById('f-url').value = '';
+    document.getElementById('f-reg-price').value = '';
+    document.getElementById('f-cycle').value = '7';
+    document.getElementById('f-flag').value = '';
+    document.getElementById('f-memo').value = '';
+    openModal('modal-sku-add');
+  });
+
+  document.getElementById('f-brand-mode').addEventListener('change', function () {
+    var v = document.getElementById('f-brand-mode').value;
+    document.getElementById('f-brand-custom-wrap').style.display = v === '__custom__' ? '' : 'none';
+  });
+
+  document.getElementById('btn-sku-save').addEventListener('click', function () {
+    var skuId = document.getElementById('f-sku-id').value.trim();
+    var skuName = document.getElementById('f-sku-name').value.trim();
+    var mode = document.getElementById('f-brand-mode').value;
+    var brand = mode === '__custom__' ? document.getElementById('f-brand-custom').value.trim() : mode;
+    var url = document.getElementById('f-url').value.trim();
+    if (!skuId || !skuName || !brand || !url) {
+      alert('필수 항목을 입력하세요.');
+      return;
+    }
+    var reg = document.getElementById('f-reg-price').value;
+    var cycle = parseInt(document.getElementById('f-cycle').value, 10) || 7;
+    var flag = document.getElementById('f-flag').value.trim();
+    var memo = document.getElementById('f-memo').value.trim();
+    var payload = {
+      sku_id: skuId,
+      sku_name: skuName,
+      brand: brand,
+      product_url: url,
+      collect_cycle: cycle
+    };
+    if (reg !== '') payload.registered_price = Number(reg);
+    if (flag) payload.flag = flag;
+    if (memo) payload.memo = memo;
+    apiFetch('POST', '/sku-add', payload)
+      .then(function () {
+        closeModal('modal-sku-add');
+        return loadSkuTable();
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
+      });
+  });
+
+  document.getElementById('btn-csv-upload').addEventListener('click', function () {
     document.getElementById('csv-file').click();
-  };
-  document.getElementById('csv-file').onchange = function (ev) {
+  });
+  document.getElementById('csv-file').addEventListener('change', function (ev) {
     var f = ev.target.files && ev.target.files[0];
     if (!f) return;
     var fd = new FormData();
-    fd.append('file', f, f.name);
+    fd.append('file', f);
     fetch(API_BASE + '/sku-upload', { method: 'POST', body: fd })
-      .then(function (r) { return r.json(); })
-      .then(function (j) {
-        if (j.ok) loadSkuPage();
-        else alert(j.error || '업로드 실패');
+      .then(function (res) {
+        return res.json().then(function (json) {
+          if (!res.ok) throw new Error((json && json.error) || res.statusText);
+          return json;
+        });
       })
-      .catch(function (e) { alert(e.message); });
-    ev.target.value = '';
-  };
-
-  document.getElementById('btn-csv-dl').onclick = function () {
-    var rows = skuRows.slice();
-    if (skuBrand && skuBrand !== '전체') {
-      rows = rows.filter(function (r) { return (r.brand || '') === skuBrand; });
-    }
-    var cols = ['sku_id', 'brand', 'sku_name', 'product_url', 'registered_price', 'current_price', 'change_pct', 'flag', 'collect_cycle', 'last_collected'];
-    var csv = cols.join(',') + '\n';
-    rows.forEach(function (r) {
-      var line = cols.map(function (c) {
-        var v = r[c];
-        if (v == null) v = '';
-        v = String(v).replace(/"/g, '""');
-        if (/[",\n]/.test(v)) v = '"' + v + '"';
-        return v;
+      .then(function () {
+        ev.target.value = '';
+        return loadSkuTable();
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
       });
-      csv += line.join(',') + '\n';
-    });
-    var ymd = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date()).replace(/-/g, '');
-    var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'sku_list_' + ymd + '.csv';
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
+  });
 
-  document.getElementById('btn-auto-dist').onclick = function () {
-    if (!confirm('전체 SKU를 요일에 자동 분배합니다. 기존 배정이 해당 로직에 따라 바뀔 수 있습니다. 계속할까요?')) return;
-    fetch(API_BASE + '/collect-schedule', {
-      method: 'POST',
-      headers: JSON_H,
-      body: JSON.stringify({ action: 'auto_distribute' })
-    }).then(function (r) { return r.json(); }).then(function (j) {
-      if (j.ok) loadSkuPage();
-      else alert(j.error || '실패');
-    }).catch(function (e) { alert(e.message); });
-  };
+  document.getElementById('btn-sku-csv-dl').addEventListener('click', btnSkuCsvDl);
 
-  document.getElementById('btn-manual-add').onclick = openManualModal;
-  document.getElementById('manual-add-cancel').onclick = function () {
-    document.getElementById('modal-manual-bg').classList.remove('show');
-  };
-  document.getElementById('manual-url-cancel').onclick = function () {
-    document.getElementById('modal-manual-bg').classList.remove('show');
-  };
-  document.getElementById('manual-tab-a').onclick = function () {
-    document.getElementById('manual-pane-a').style.display = 'block';
-    document.getElementById('manual-pane-b').style.display = 'none';
-    document.getElementById('manual-tab-a').classList.add('on');
-    document.getElementById('manual-tab-b').classList.remove('on');
-  };
-  document.getElementById('manual-tab-b').onclick = function () {
-    document.getElementById('manual-pane-a').style.display = 'none';
-    document.getElementById('manual-pane-b').style.display = 'block';
-    document.getElementById('manual-tab-b').classList.add('on');
-    document.getElementById('manual-tab-a').classList.remove('on');
-  };
-  document.getElementById('pick-brand').onchange = renderSkuPicker;
-  document.getElementById('pick-search').oninput = function () { renderSkuPicker(); };
-  document.getElementById('pick-select-all').onchange = function () {
-    var on = document.getElementById('pick-select-all').checked;
-    document.querySelectorAll('#tbl-sku-pick .pick-cb').forEach(function (cb) { cb.checked = on; });
-  };
-  document.getElementById('manual-add-sku').onclick = function () {
-    var ids = [];
-    document.querySelectorAll('#tbl-sku-pick .pick-cb:checked').forEach(function (cb) {
-      ids.push(cb.getAttribute('data-sku-id'));
-    });
-    if (!ids.length) { alert('SKU를 선택하세요.'); return; }
-    fetch(API_BASE + '/collect-queue', {
-      method: 'POST',
-      headers: JSON_H,
-      body: JSON.stringify({ sku_ids: ids })
-    }).then(function (r) { return r.json(); }).then(function (j) {
-      if (j.ok) {
-        document.getElementById('modal-manual-bg').classList.remove('show');
-        loadQueueDashboard();
-      } else alert(j.error || '추가 실패');
-    }).catch(function (e) { alert(e.message); });
-  };
-  document.getElementById('manual-add-url').onclick = function () {
-    var raw = document.getElementById('manual-urls').value || '';
-    var lines = raw.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
-    if (!lines.length) { alert('URL을 입력하세요.'); return; }
-    var items = lines.map(function (u) { return { product_url: u, sku_name: '직접입력' }; });
-    fetch(API_BASE + '/collect-queue', {
-      method: 'POST',
-      headers: JSON_H,
-      body: JSON.stringify({ items: items })
-    }).then(function (r) { return r.json(); }).then(function (j) {
-      if (j.ok) {
-        document.getElementById('manual-urls').value = '';
-        document.getElementById('modal-manual-bg').classList.remove('show');
-        loadQueueDashboard();
-      } else alert(j.error || '추가 실패');
-    }).catch(function (e) { alert(e.message); });
-  };
-  document.getElementById('btn-manual-start-hint').onclick = function () {
-    alert('확장프로그램 팝업에서 \'수동 수집\'을 시작하세요.');
-  };
-  document.getElementById('btn-queue-clear').onclick = function () {
-    if (!confirm('완료·실패 항목을 큐에서 삭제할까요?')) return;
-    fetch(API_BASE + '/collect-queue', {
-      method: 'DELETE',
-      headers: JSON_H,
-      body: JSON.stringify({ action: 'clear_done' })
-    }).then(function (r) { return r.json(); }).then(function (j) {
-      if (j.ok) loadQueueDashboard();
-      else alert(j.error || '실패');
-    }).catch(function (e) { alert(e.message); });
-  };
+  document.getElementById('btn-auto-dist').addEventListener('click', function () {
+    if (!confirm('SKU를 요일에 자동 분배할까요?')) return;
+    apiFetch('POST', '/collect-schedule', { action: 'auto_distribute' })
+      .then(function () {
+        return loadSkuTable();
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
+      });
+  });
 
-  tickClock();
-  setInterval(tickClock, 60000);
-  refreshCollectStatus();
-  loadTodayTable();
-  loadAlerts();
-  loadQueueDashboard();
+  document.getElementById('btn-today-csv').addEventListener('click', btnTodayCsvClick);
+
+  document.addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (t.getAttribute('data-close')) {
+      closeModal(t.getAttribute('data-close'));
+    }
+    var ab = t.getAttribute('data-ab');
+    if (ab != null) {
+      state.alertBrand = ab;
+      renderAlertFilters();
+      renderAlertTable();
+    }
+    var ad = t.getAttribute('data-ad');
+    if (ad != null) {
+      state.alertDir = ad;
+      renderAlertFilters();
+      renderAlertTable();
+    }
+    var sb = t.getAttribute('data-sb');
+    if (sb != null) {
+      state.skuBrand = sb;
+      loadSkuTable();
+    }
+    var del = t.getAttribute('data-del-sku');
+    if (del != null) {
+      if (!confirm('이 SKU를 삭제할까요?')) return;
+      apiFetch('DELETE', '/sku-delete', { sku_id: del })
+        .then(function () {
+          return loadSkuTable();
+        })
+        .catch(function (e) {
+          console.error(e);
+          alert(e.message || String(e));
+        });
+    }
+  });
+
+  (function () {
+    var modals = document.querySelectorAll('.modal-bg');
+    for (var mi = 0; mi < modals.length; mi++) {
+      (function (bg) {
+        bg.addEventListener('click', function (ev) {
+          if (ev.target === bg) bg.classList.remove('show');
+        });
+      })(modals[mi]);
+    }
+  })();
+
+  updateClock();
+  state.clockTimer = setInterval(updateClock, 1000);
+  refreshDashboard();
 })();
   </script>
 </body>
