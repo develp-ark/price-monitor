@@ -111,7 +111,8 @@ module.exports = async (req, res) => {
     )
     .eq('is_active', true)
     .order('brand')
-    .order('sku_id');
+    .order('sku_id')
+    .range(0, 4999);
 
   if (aErr) return json(res, 500, { ok: false, error: aErr.message });
 
@@ -119,7 +120,8 @@ module.exports = async (req, res) => {
     .from('sku_list')
     .select(
       'sku_id, brand, flag, is_active, last_collected, collect_cycle'
-    );
+    )
+    .range(0, 4999);
 
   if (allErr) return json(res, 500, { ok: false, error: allErr.message });
 

@@ -486,7 +486,7 @@
                 <th class="num">등록가</th>
                 <th class="num">현재가</th>
                 <th class="num">변동률</th>
-                <th>수집여부</th>
+                <th>수집시간</th>
               </tr>
             </thead>
             <tbody id="today-tbody"></tbody>
@@ -959,8 +959,8 @@
         badge.textContent = st;
 
         var btnStop = document.getElementById('btn-stop-collect');
-        btnStop.disabled = st !== 'running';
-        setStartTodayButtonState(st === 'running');
+        btnStop.disabled = !(st === 'running' || st === 'stopping');
+        setStartTodayButtonState(st === 'running' || st === 'stopping');
 
         var progWrap = document.getElementById('collect-progress-wrap');
         var progBar = document.getElementById('collect-progress-bar');
@@ -968,30 +968,60 @@
         var detail = document.getElementById('collect-detail');
 
         if (st === 'running' || st === 'stopping') {
-          progWrap.style.display = '';
+          progWrap.style.display = 'block';
           runText.style.display = '';
           var total = Number(d.total) || 0;
           var cur = Number(d.current) || 0;
           var pct = total > 0 ? Math.min(100, Math.round((cur / total) * 100)) : 0;
           progBar.style.width = pct + '%';
           var skuName = d.current_sku_name ? String(d.current_sku_name) : '';
-          if (st === 'stopping') {
-            runText.textContent = cur + '/' + total + ' 중지 중' + (skuName ? ' (' + skuName + ')' : '');
-          } else {
-            runText.textContent = cur + '/' + total + ' 수집 중' + (skuName ? ' (' + skuName + ')' : '');
+          var elapsed = '';
+          if (d.started_at) {
+            var startTime = new Date(d.started_at).getTime();
+            var now = Date.now();
+            var diffSec = Math.floor((now - startTime) / 1000);
+            if (diffSec < 0) diffSec = 0;
+            var h = Math.floor(diffSec / 3600);
+            var m = Math.floor((diffSec % 3600) / 60);
+            var s = diffSec % 60;
+            if (h > 0) elapsed = h + '시간 ' + m + '분 ' + s + '초';
+            else if (m > 0) elapsed = m + '분 ' + s + '초';
+            else elapsed = s + '초';
           }
+          var lineText = cur + '/' + total + (st === 'stopping' ? ' 중지 중' : ' 수집 중');
+          lineText += skuName ? ' (' + skuName + ')' : '';
+          lineText += ' · 성공 ' + (d.success || 0) + ' / 실패 ' + (d.fail || 0);
+          if (elapsed) lineText += ' · 경과 ' + elapsed;
+          runText.textContent = lineText;
+          detail.style.display = 'none';
           detail.textContent = '';
         } else {
           progWrap.style.display = 'none';
           runText.style.display = 'none';
+          detail.style.display = '';
         }
 
         if (st === 'done') {
-          var total2 = Number(d.total) || 0;
+          var total2 = Number(d.current || d.total) || 0;
           var succ = Number(d.success) || 0;
           var fail = Number(d.fail) || 0;
           var fin = d.finished_at ? formatKstDateTimeShort(d.finished_at) : '—';
-          detail.textContent = total2 + '/' + total2 + ' 완료 (성공 ' + succ + ' / 실패 ' + fail + ') · 완료: ' + fin;
+          var duration = '';
+          if (d.started_at && d.finished_at) {
+            var durSec = Math.floor((new Date(d.finished_at).getTime() - new Date(d.started_at).getTime()) / 1000);
+            if (durSec < 0) durSec = 0;
+            var dh = Math.floor(durSec / 3600);
+            var dm = Math.floor((durSec % 3600) / 60);
+            var ds = durSec % 60;
+            if (dh > 0) duration = dh + '시간 ' + dm + '분 ' + ds + '초';
+            else if (dm > 0) duration = dm + '분 ' + ds + '초';
+            else duration = ds + '초';
+          }
+          var doneText = total2 + '/' + (Number(d.total) || 0) + ' 완료';
+          doneText += ' (성공 ' + succ + ' / 실패 ' + fail + ')';
+          if (d.finished_at) doneText += ' · 완료: ' + fin;
+          if (duration) doneText += ' · 소요 ' + duration;
+          detail.textContent = doneText;
         } else if (st === 'idle' || st === 'error') {
           detail.textContent = st === 'error' ? '오류가 발생했습니다.' : '대기 중입니다.';
         } else if (st !== 'running') {
@@ -1104,15 +1134,37 @@
           var r = merged[i];
           var schedRow = scheduleRows[i];
           var pu = r.product_url || (schedRow && schedRow.product_url) || '';
-          var lc = r.last_collected ? String(r.last_collected).slice(0, 10) : '';
-          var okToday = lc === todayYmd;
+          var lcRaw = r.last_collected ? String(r.last_collected) : '';
+          var lc = lcRaw ? lcRaw.slice(0, 10) : '';
+          var collectTime = '<span class="muted">미수집</span>';
+          if (lcRaw && lc === todayYmd) {
+            if (/^\d{4}-\d{2}-\d{2}$/.test(lcRaw)) {
+              collectTime = '✅';
+            } else {
+              try {
+                var dt = new Date(lcRaw);
+                if (!isNaN(dt.getTime())) {
+                  collectTime = dt.toLocaleTimeString('ko-KR', {
+                    timeZone: 'Asia/Seoul',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                  });
+                } else {
+                  collectTime = '✅';
+                }
+              } catch (e) {
+                collectTime = '✅';
+              }
+            }
+          }
           h += '<tr>';
           h += '<td>' + productNameLinkHtml(r.sku_name, pu) + '</td>';
           h += '<td>' + escapeHtml(r.brand || '') + '</td>';
           h += '<td class="num">' + escapeHtml(formatMoney(r.registered_price)) + '</td>';
           h += '<td class="num">' + escapeHtml(formatMoney(r.current_price)) + '</td>';
           h += '<td class="num">' + formatChangeCellHtml(r.change_pct) + '</td>';
-          h += '<td>' + (okToday ? '✅' : '⏳') + '</td>';
+          h += '<td>' + collectTime + '</td>';
           h += '</tr>';
         }
         tbody.innerHTML = h;
@@ -1851,7 +1903,32 @@
           },
           '*'
         );
-        loadCollectStatus();
+        var badge = document.getElementById('collect-badge');
+        if (badge) {
+          badge.className = 'badge running';
+          badge.textContent = 'running';
+        }
+        var pw = document.getElementById('collect-progress-wrap');
+        if (pw) pw.style.display = 'block';
+        var doneEl = document.getElementById('collect-detail');
+        if (doneEl) doneEl.style.display = 'none';
+        var line = document.getElementById('collect-running-text');
+        if (line) {
+          line.style.display = '';
+          line.textContent = '0/' + list.length + ' 시작 중...';
+        }
+        var bar = document.getElementById('collect-progress-bar');
+        if (bar) bar.style.width = '0%';
+        var stopBtn = document.getElementById('btn-stop-collect');
+        if (stopBtn) stopBtn.disabled = false;
+        if (!state.collectPollTimer) {
+          state.collectPollTimer = setInterval(function () {
+            loadCollectStatus();
+          }, 5000);
+        }
+        setTimeout(function () {
+          loadCollectStatus();
+        }, 2000);
       })
       .catch(function (e) {
         console.error(e);
