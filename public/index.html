@@ -125,19 +125,30 @@
       font-size: 13px;
     }
     table.data th, table.data td {
-      padding: 10px 10px;
       text-align: left;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid #e5e8eb;
     }
     table.data thead th {
-      background: var(--thead);
-      color: var(--muted);
-      font-weight: 600;
+      background: #f1f3f5;
+      color: #555;
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      padding: 12px 10px;
+      border-bottom: 2px solid #d5d8db;
       position: sticky;
       top: 0;
-      z-index: 1;
+      z-index: 2;
     }
+    table.data td {
+      padding: 12px 10px;
+    }
+    table.data tbody tr {
+      border-bottom: 1px solid #eef0f2;
+    }
+    table.data tbody tr:nth-child(even) { background: #fafbfc; }
     table.data tbody tr:hover { background: #f0f4ff; }
+    table.data td.num { padding-left: 14px; padding-right: 14px; }
     .num { text-align: right !important; font-variant-numeric: tabular-nums; }
     .up { color: var(--danger); font-weight: 600; }
     .down { color: var(--success); font-weight: 600; }
@@ -298,6 +309,31 @@
       color: #999;
       margin-top: 8px;
     }
+    .cell-schedule {
+      cursor: pointer;
+      color: #3182F6;
+      font-size: 12px;
+    }
+    .cell-schedule:hover { text-decoration: underline; }
+    .schedule-popover {
+      position: fixed;
+      background: #fff;
+      border: 1px solid #e5e8eb;
+      border-radius: 10px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.12);
+      padding: 12px;
+      z-index: 500;
+      min-width: 140px;
+    }
+    .schedule-popover label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .schedule-popover label:hover { color: #3182F6; }
   </style>
 </head>
 <body>
@@ -423,14 +459,13 @@
           <table class="data">
             <thead>
               <tr>
+                <th>브랜드</th>
                 <th>SKU ID</th>
                 <th>상품명</th>
-                <th>브랜드</th>
                 <th class="num">등록가</th>
                 <th class="num">현재가</th>
                 <th class="num">변동률</th>
                 <th>구분</th>
-                <th class="num">수집주기</th>
                 <th>최근수집일</th>
                 <th>수집요일</th>
                 <th>수집</th>
@@ -447,6 +482,7 @@
         </div>
       </div>
     </div>
+    <div id="schedule-popover" class="schedule-popover" style="display:none;" aria-hidden="true"></div>
   </div>
 
   <div class="modal-bg" id="modal-sku-add">
@@ -614,7 +650,8 @@
     alertRaw: [],
     alertSkuUrlMap: {},
     queueSkuSelected: {},
-    queueSkuListFiltered: []
+    queueSkuListFiltered: [],
+    schedulePopoverSkuId: null
   };
 
   var extensionReady = false;
@@ -659,7 +696,7 @@
     if (v === null || v === undefined || v === '') return '';
     var n = Number(v);
     if (isNaN(n)) return '';
-    return n.toLocaleString('ko-KR') + '원';
+    return n.toLocaleString('ko-KR');
   }
 
   function kstYmd() {
@@ -686,6 +723,24 @@
     var da = parseInt(p[2], 10);
     if (isNaN(mo) || isNaN(da)) return '—';
     return mo + '/' + da;
+  }
+
+  function fmtCollectedAt(s) {
+    if (!s) return '—';
+    try {
+      var d = new Date(s);
+      if (isNaN(d.getTime())) return '—';
+      return d.toLocaleString('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+    } catch (e) {
+      return String(s);
+    }
   }
 
   function formatKstDateTimeShort(isoStr) {
@@ -1107,14 +1162,95 @@
       });
   }
 
-  function scheduleDaysLabel(skuId) {
+  function skuRowChangePctHtml(r) {
+    var chPct = '';
+    var chClass = 'muted';
+    if (r.registered_price && r.current_price && r.registered_price > 0) {
+      var diff = r.current_price - r.registered_price;
+      var pct = (diff / r.registered_price * 100).toFixed(1);
+      if (Number(pct) === 0) {
+        chPct = '—';
+        chClass = 'muted';
+      } else if (Number(pct) > 0) {
+        chPct = '▲' + Math.abs(Number(pct)) + '%';
+        chClass = 'up';
+      } else {
+        chPct = '▼' + Math.abs(Number(pct)) + '%';
+        chClass = 'down';
+      }
+    } else {
+      chPct = '—';
+      chClass = 'muted';
+    }
+    if (chClass === 'muted') return '<span class="muted">' + escapeHtml(chPct) + '</span>';
+    return '<span class="' + chClass + '">' + escapeHtml(chPct) + '</span>';
+  }
+
+  function scheduleCellInnerHtml(skuId) {
     var days = state.skuScheduleMap[String(skuId)];
-    if (!days || !days.length) return '—';
+    if (!days || !days.length) return '<span class="muted">미배정</span>';
     var parts = [];
     for (var i = 0; i < days.length; i++) {
       parts.push(DAY_NAMES[days[i]]);
     }
-    return parts.join(',');
+    return escapeHtml(parts.join(','));
+  }
+
+  function updateSkuScheduleLocal(skuId, dayNum, add) {
+    var sid = String(skuId);
+    if (!state.skuScheduleMap[sid]) state.skuScheduleMap[sid] = [];
+    var arr = state.skuScheduleMap[sid];
+    if (add) {
+      if (arr.indexOf(dayNum) === -1) arr.push(dayNum);
+      arr.sort(function (a, b) { return a - b; });
+    } else {
+      var ix = arr.indexOf(dayNum);
+      if (ix >= 0) arr.splice(ix, 1);
+    }
+  }
+
+  function updateScheduleCellDisplay(skuId) {
+    var sel = '.cell-schedule[data-sku-schedule="' + String(skuId).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"]';
+    var cell = document.querySelector(sel);
+    if (!cell) return;
+    cell.innerHTML = scheduleCellInnerHtml(skuId);
+  }
+
+  function hideSchedulePopover() {
+    var pop = document.getElementById('schedule-popover');
+    if (pop) {
+      pop.style.display = 'none';
+      pop.setAttribute('aria-hidden', 'true');
+    }
+    state.schedulePopoverSkuId = null;
+  }
+
+  function showSchedulePopover(skuId, anchorEl) {
+    state.schedulePopoverSkuId = skuId;
+    var pop = document.getElementById('schedule-popover');
+    var days = state.skuScheduleMap[String(skuId)] || [];
+    var inner = '';
+    for (var d = 0; d < 7; d++) {
+      var chk = days.indexOf(d) >= 0 ? ' checked' : '';
+      inner +=
+        '<label><input type="checkbox" data-day="' +
+        d +
+        '"' +
+        chk +
+        ' /><span>' +
+        escapeHtml(DAY_NAMES[d]) +
+        '</span></label>';
+    }
+    pop.innerHTML = inner;
+    var rect = anchorEl.getBoundingClientRect();
+    pop.style.display = 'block';
+    pop.setAttribute('aria-hidden', 'false');
+    pop.style.left = Math.min(Math.max(8, rect.left), window.innerWidth - 160) + 'px';
+    pop.style.top = rect.bottom + 4 + 'px';
+    var popRect = pop.getBoundingClientRect();
+    if (popRect.bottom > window.innerHeight - 8) {
+      pop.style.top = Math.max(8, rect.top - popRect.height - 4) + 'px';
+    }
   }
 
   function countByBrand(rows) {
@@ -1177,16 +1313,20 @@
       var r = slice[k];
       var url = r.product_url || '#';
       h += '<tr>';
+      h += '<td>' + escapeHtml(r.brand || '') + '</td>';
       h += '<td>' + escapeHtml(String(r.sku_id)) + '</td>';
       h += '<td><a class="link" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(r.sku_name || '') + '</a></td>';
-      h += '<td>' + escapeHtml(r.brand || '') + '</td>';
       h += '<td class="num">' + escapeHtml(formatMoney(r.registered_price)) + '</td>';
       h += '<td class="num cell-current-price">' + escapeHtml(formatMoney(r.current_price)) + '</td>';
-      h += '<td class="num">' + formatChangeCellHtml(r.change_pct) + '</td>';
+      h += '<td class="num">' + skuRowChangePctHtml(r) + '</td>';
       h += '<td>' + (r.flag ? '<span class="flag-badge">' + escapeHtml(r.flag) + '</span>' : '—') + '</td>';
-      h += '<td class="num">' + escapeHtml(r.collect_cycle != null ? String(r.collect_cycle) : '') + '</td>';
-      h += '<td class="cell-last-collected">' + escapeHtml(formatMdFromYmd(r.last_collected)) + '</td>';
-      h += '<td>' + escapeHtml(scheduleDaysLabel(r.sku_id)) + '</td>';
+      h += '<td class="cell-last-collected">' + escapeHtml(fmtCollectedAt(r.last_collected)) + '</td>';
+      h +=
+        '<td class="cell-schedule" data-sku-schedule="' +
+        escapeHtml(String(r.sku_id)) +
+        '">' +
+        scheduleCellInnerHtml(r.sku_id) +
+        '</td>';
       h += '<td><button type="button" class="btn-icon btn-collect" data-collect-sku="' + escapeHtml(String(r.sku_id)) + '" data-sku-id="' + escapeHtml(String(r.sku_id)) + '" title="즉시 수집">▶</button></td>';
       h += '<td><button type="button" class="btn-icon" data-edit-sku="' + escapeHtml(String(r.sku_id)) + '" title="수정">✏️</button></td>';
       h += '<td><button type="button" class="btn-icon" data-del-sku="' + escapeHtml(String(r.sku_id)) + '" title="삭제">🗑</button></td>';
@@ -1296,12 +1436,11 @@
       btn.textContent = '✅';
       var priceCell = tr ? tr.querySelector('.cell-current-price') : null;
       if (priceCell && data.price != null && data.price !== '') {
-        priceCell.textContent = Number(data.price).toLocaleString('ko-KR') + '원';
+        priceCell.textContent = Number(data.price).toLocaleString('ko-KR');
       }
       var dateCell = tr ? tr.querySelector('.cell-last-collected') : null;
       if (dateCell) {
-        var now = new Date();
-        dateCell.textContent = (now.getMonth() + 1) + '/' + now.getDate();
+        dateCell.textContent = fmtCollectedAt(new Date().toISOString());
       }
     } else {
       btn.textContent = '❌';
@@ -1699,8 +1838,55 @@
 
   document.getElementById('btn-today-csv').addEventListener('click', btnTodayCsvClick);
 
+  document.getElementById('schedule-popover').addEventListener('change', function (ev) {
+    var t = ev.target;
+    if (t.type !== 'checkbox') return;
+    var dayNum = parseInt(t.getAttribute('data-day'), 10);
+    var skuId = state.schedulePopoverSkuId;
+    if (skuId == null || isNaN(dayNum)) return;
+    var checked = t.checked;
+    var req = checked
+      ? apiFetch('POST', '/collect-schedule', { day_of_week: dayNum, sku_ids: [String(skuId)] })
+      : apiFetch('DELETE', '/collect-schedule', { day_of_week: dayNum, sku_id: String(skuId) });
+    req
+      .then(function () {
+        updateSkuScheduleLocal(skuId, dayNum, checked);
+        updateScheduleCellDisplay(skuId);
+      })
+      .catch(function (e) {
+        console.error(e);
+        t.checked = !checked;
+        alert(e.message || String(e));
+      });
+  });
+
+  document.addEventListener('mousedown', function (ev) {
+    var pop = document.getElementById('schedule-popover');
+    if (!pop || pop.style.display === 'none') return;
+    if (pop.contains(ev.target)) return;
+    var schedCell = ev.target.closest && ev.target.closest('.cell-schedule');
+    if (schedCell) return;
+    hideSchedulePopover();
+  });
+
   document.addEventListener('click', function (ev) {
     var t = ev.target;
+    var schedEl = t.closest && t.closest('.cell-schedule');
+    if (schedEl) {
+      ev.stopPropagation();
+      var sid = schedEl.getAttribute('data-sku-schedule');
+      var popEl = document.getElementById('schedule-popover');
+      if (
+        popEl.style.display === 'block' &&
+        state.schedulePopoverSkuId != null &&
+        String(state.schedulePopoverSkuId) === String(sid)
+      ) {
+        hideSchedulePopover();
+      } else {
+        showSchedulePopover(sid, schedEl);
+      }
+      return;
+    }
     if (t.getAttribute('data-close')) {
       closeModal(t.getAttribute('data-close'));
     }
