@@ -309,64 +309,51 @@
       color: #999;
       margin-top: 8px;
     }
-    .schedule-grid {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 12px;
-    }
-    .schedule-col {
-      background: #fff;
+    .brand-pill {
+      display: inline-block;
+      padding: 3px 10px;
       border-radius: 12px;
-      box-shadow: 0 1px 3px rgba(0,0,0,.08);
-      overflow: hidden;
-      border: 1px solid #e5e8eb;
-    }
-    .schedule-col-header {
-      padding: 14px 16px;
-      background: #f8f9fa;
-      font-weight: 700;
-      font-size: 14px;
-      border-bottom: 1px solid #e5e8eb;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .schedule-col-header .count {
-      background: #3182F6;
-      color: #fff;
-      border-radius: 12px;
-      padding: 2px 10px;
+      background: #eef2ff;
+      color: #3182F6;
       font-size: 12px;
+      font-weight: 600;
+      margin: 2px 4px 2px 0;
     }
-    .schedule-col-body {
-      max-height: 400px;
-      overflow-y: auto;
-      padding: 8px 0;
+    .schedule-summary-row { cursor: pointer; }
+    .schedule-summary-row:hover { background: #f0f4ff !important; }
+    .btn-toggle-detail { font-size: 12px; padding: 4px 10px; }
+    .schedule-detail-wrap {
+      padding: 16px 20px;
+      background: #f8f9fb;
+      border-top: 1px solid #e5e8eb;
+    }
+    .schedule-toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      align-items: center;
     }
     .schedule-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 8px 16px;
-      font-size: 13px;
-      border-bottom: 1px solid #f1f3f5;
       gap: 8px;
     }
-    .schedule-item:hover { background: #f8f9fb; }
     .schedule-item .brand-tag {
       font-size: 11px;
       color: #999;
       margin-right: 6px;
     }
     .schedule-item .name {
-      max-width: 220px;
+      max-width: 360px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
       display: inline-block;
       vertical-align: middle;
     }
-    .schedule-item .remove-btn {
+    .schedule-remove {
       background: none;
       border: none;
       color: #ccc;
@@ -374,7 +361,7 @@
       font-size: 16px;
       padding: 0 4px;
     }
-    .schedule-item .remove-btn:hover { color: #F04452; }
+    .schedule-remove:hover { color: #F04452; }
     .btn-day {
       padding: 4px 8px;
       border: 1px solid #e5e8eb;
@@ -387,6 +374,13 @@
       background: #3182F6;
       color: #fff;
       border-color: #3182F6;
+    }
+    .form-select {
+      padding: 8px 12px;
+      border: 1px solid #e5e8eb;
+      border-radius: 8px;
+      font-size: 13px;
+      background: #fff;
     }
     .cell-schedule {
       cursor: pointer;
@@ -522,50 +516,70 @@
     <div id="panel-schedule" class="panel">
       <div style="display:flex;gap:16px;margin-bottom:20px">
         <div class="card" style="flex:1;text-align:center">
-          <div style="font-size:28px;font-weight:700;color:#3182F6" id="sch-total">0</div>
-          <div style="font-size:12px;color:#999">전체 활성 SKU</div>
+          <div style="font-size:32px;font-weight:700;color:#3182F6" id="sch-total">0</div>
+          <div style="font-size:13px;color:#999">전체 활성 SKU</div>
         </div>
         <div class="card" style="flex:1;text-align:center">
-          <div style="font-size:28px;font-weight:700;color:#00B493" id="sch-assigned">0</div>
-          <div style="font-size:12px;color:#999">배정 완료</div>
+          <div style="font-size:32px;font-weight:700;color:#00B493" id="sch-assigned">0</div>
+          <div style="font-size:13px;color:#999">배정 완료</div>
         </div>
         <div class="card" style="flex:1;text-align:center">
-          <div style="font-size:28px;font-weight:700;color:#F04452" id="sch-unassigned">0</div>
-          <div style="font-size:12px;color:#999">미배정</div>
+          <div style="font-size:32px;font-weight:700;color:#F04452" id="sch-unassigned">0</div>
+          <div style="font-size:13px;color:#999">미배정</div>
         </div>
       </div>
-      <div class="card" style="margin-bottom:16px;">
-        <div class="card-head" style="margin-bottom:0;">
-          <h2>요일별 분배 현황</h2>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head">
+          <h2>수집 스케줄 도구</h2>
           <button type="button" class="btn btn-ghost" id="btn-sch-auto-dist">자동 분배</button>
         </div>
+        <p class="hint">자동 분배: 활성 SKU를 월~금에 균등 배분합니다</p>
       </div>
-      <div class="schedule-grid" id="schedule-grid">
-        <div class="schedule-col">
-          <div class="schedule-col-header"><span>월요일</span><span class="count" id="sch-count-1">0</span></div>
-          <div class="schedule-col-body" id="sch-body-1"></div>
-        </div>
-        <div class="schedule-col">
-          <div class="schedule-col-header"><span>화요일</span><span class="count" id="sch-count-2">0</span></div>
-          <div class="schedule-col-body" id="sch-body-2"></div>
-        </div>
-        <div class="schedule-col">
-          <div class="schedule-col-header"><span>수요일</span><span class="count" id="sch-count-3">0</span></div>
-          <div class="schedule-col-body" id="sch-body-3"></div>
-        </div>
-        <div class="schedule-col">
-          <div class="schedule-col-header"><span>목요일</span><span class="count" id="sch-count-4">0</span></div>
-          <div class="schedule-col-body" id="sch-body-4"></div>
-        </div>
-        <div class="schedule-col">
-          <div class="schedule-col-header"><span>금요일</span><span class="count" id="sch-count-5">0</span></div>
-          <div class="schedule-col-body" id="sch-body-5"></div>
-        </div>
+      <div class="card">
+        <h2 style="margin-bottom:16px">요일별 분배 현황</h2>
+        <table class="data" id="tbl-schedule-summary">
+          <thead>
+            <tr>
+              <th style="width:80px">요일</th>
+              <th>SKU 수</th>
+              <th>브랜드별 내역</th>
+              <th style="width:100px"></th>
+            </tr>
+          </thead>
+          <tbody id="schedule-summary-tbody"></tbody>
+        </table>
       </div>
       <div class="card" style="margin-top:16px" id="unassigned-card">
-        <h2>미배정 SKU</h2>
-        <p class="hint" style="margin-bottom:12px">아래 SKU는 어떤 요일에도 배정되지 않았습니다. 요일 버튼을 클릭하여 배정하세요.</p>
-        <div id="unassigned-list"></div>
+        <div class="toolbar">
+          <h2>미배정 SKU <span class="muted" id="unassigned-count-label">(0개)</span></h2>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="assign-day-select" class="form-select">
+              <option value="">요일 선택</option>
+              <option value="1">월요일</option>
+              <option value="2">화요일</option>
+              <option value="3">수요일</option>
+              <option value="4">목요일</option>
+              <option value="5">금요일</option>
+            </select>
+            <button type="button" class="btn btn-primary" id="btn-assign-selected">선택 배정</button>
+          </div>
+        </div>
+        <div class="schedule-toolbar" id="unassigned-toolbar"></div>
+        <div style="overflow:auto;">
+          <table class="data">
+            <thead>
+              <tr>
+                <th style="width:40px"><input type="checkbox" id="unassigned-check-all" /></th>
+                <th>브랜드</th>
+                <th>SKU ID</th>
+                <th>상품명</th>
+              </tr>
+            </thead>
+            <tbody id="unassigned-tbody"></tbody>
+          </table>
+        </div>
+        <div class="page-info" id="unassigned-page-info"></div>
+        <div class="pagination" id="unassigned-pagination"></div>
       </div>
     </div>
 
@@ -786,6 +800,8 @@
     queueSkuListFiltered: [],
     skuCache: null,
     skuCacheTime: 0,
+    scheduleTabData: null,
+    scheduleOpenDays: {},
     schedulePopoverSkuId: null
   };
 
@@ -1715,6 +1731,403 @@
     loadAlerts();
   }
 
+  function scheduleFmtMoney(v) {
+    if (v === null || v === undefined || v === '') return '';
+    var n = Number(v);
+    if (isNaN(n)) return '';
+    return n.toLocaleString('ko-KR');
+  }
+
+  function scheduleBuildState(allSkus, scheduleData) {
+    var dayMap = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+    var assignedIds = {};
+    var skuMap = {};
+    var i;
+    for (i = 0; i < allSkus.length; i++) {
+      var s = allSkus[i];
+      skuMap[String(s.sku_id)] = s;
+    }
+    for (i = 0; i < scheduleData.length; i++) {
+      var row = scheduleData[i] || {};
+      var d = Number(row.day_of_week);
+      var sid = String(row.sku_id || '');
+      if (!sid) continue;
+      if (d >= 1 && d <= 5) {
+        if (dayMap[d].indexOf(sid) === -1) dayMap[d].push(sid);
+        assignedIds[sid] = true;
+      }
+    }
+    return { dayMap: dayMap, assignedIds: assignedIds, skuMap: skuMap };
+  }
+
+  function renderDayDetail(day, skuIds, skuMap) {
+    var container = document.querySelector('#schedule-detail-' + day + ' td');
+    if (!container) return;
+    container.innerHTML = '';
+
+    var wrapper = document.createElement('div');
+    wrapper.className = 'schedule-detail-wrap';
+    var toolbar = document.createElement('div');
+    toolbar.className = 'schedule-toolbar';
+
+    var brandsMap = {};
+    for (var i = 0; i < skuIds.length; i++) {
+      var s = skuMap[skuIds[i]];
+      var b = s && s.brand ? s.brand : '미분류';
+      brandsMap[b] = true;
+    }
+    var brands = Object.keys(brandsMap).sort();
+
+    var filterBrand = '__all__';
+    var filterText = '';
+    var page = 1;
+    var PAGE_SIZE = 30;
+
+    var brandWrap = document.createElement('div');
+    brandWrap.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap';
+    function renderBrandButtons() {
+      var bh = '<button type="button" class="btn btn-ghost btn-toggle-detail" data-b="__all__"' + (filterBrand === '__all__' ? ' style="background:#eef2ff;border-color:#3182F6;color:#3182F6"' : '') + '>전체</button>';
+      for (var bi = 0; bi < brands.length; bi++) {
+        var b = brands[bi];
+        bh += '<button type="button" class="btn btn-ghost btn-toggle-detail" data-b="' + escapeHtml(b) + '"' + (filterBrand === b ? ' style="background:#eef2ff;border-color:#3182F6;color:#3182F6"' : '') + '>' + escapeHtml(b) + '</button>';
+      }
+      brandWrap.innerHTML = bh;
+      var bs = brandWrap.querySelectorAll('[data-b]');
+      for (var k = 0; k < bs.length; k++) {
+        bs[k].onclick = function () {
+          filterBrand = this.getAttribute('data-b');
+          page = 1;
+          renderBrandButtons();
+          renderRows();
+        };
+      }
+    }
+
+    var searchInput = document.createElement('input');
+    searchInput.type = 'search';
+    searchInput.placeholder = '상품명 또는 SKU ID 검색';
+    searchInput.className = 'form-select';
+    searchInput.style.minWidth = '220px';
+    searchInput.oninput = function () {
+      filterText = String(this.value || '').toLowerCase();
+      page = 1;
+      renderRows();
+    };
+
+    toolbar.appendChild(brandWrap);
+    toolbar.appendChild(searchInput);
+
+    var table = document.createElement('table');
+    table.className = 'data';
+    table.innerHTML = '<thead><tr><th style="width:40px">#</th><th>브랜드</th><th>SKU ID</th><th>상품명</th><th class="num">현재가</th><th style="width:40px"></th></tr></thead><tbody></tbody>';
+    var tbody = table.querySelector('tbody');
+
+    var pageInfo = document.createElement('div');
+    pageInfo.className = 'page-info';
+    var pag = document.createElement('div');
+    pag.className = 'pagination';
+
+    function getFiltered() {
+      var out = [];
+      for (var i2 = 0; i2 < skuIds.length; i2++) {
+        var sid = skuIds[i2];
+        var si = skuMap[sid];
+        if (!si) continue;
+        var sb = si.brand || '미분류';
+        if (filterBrand !== '__all__' && sb !== filterBrand) continue;
+        if (filterText) {
+          var sn = String(si.sku_name || '').toLowerCase();
+          var ssid = String(si.sku_id || '').toLowerCase();
+          if (sn.indexOf(filterText) === -1 && ssid.indexOf(filterText) === -1) continue;
+        }
+        out.push(si);
+      }
+      return out;
+    }
+
+    function renderRows() {
+      var rows = getFiltered();
+      var total = rows.length;
+      var totalPages = total === 0 ? 1 : Math.ceil(total / PAGE_SIZE);
+      if (page > totalPages) page = totalPages;
+      if (page < 1) page = 1;
+      var startIdx = (page - 1) * PAGE_SIZE;
+      var view = rows.slice(startIdx, startIdx + PAGE_SIZE);
+
+      var h = '';
+      for (var ri = 0; ri < view.length; ri++) {
+        var r = view[ri];
+        h += '<tr>';
+        h += '<td class="num">' + (startIdx + ri + 1) + '</td>';
+        h += '<td>' + escapeHtml(r.brand || '미분류') + '</td>';
+        h += '<td>' + escapeHtml(String(r.sku_id || '')) + '</td>';
+        h += '<td>' + escapeHtml(r.sku_name || '') + '</td>';
+        h += '<td class="num">' + escapeHtml(scheduleFmtMoney(r.current_price)) + '</td>';
+        h += '<td><button type="button" class="schedule-remove" data-sch-remove-day="' + day + '" data-sch-remove-sku="' + escapeHtml(String(r.sku_id)) + '">×</button></td>';
+        h += '</tr>';
+      }
+      if (!h) h = '<tr><td colspan="6" class="muted">표시할 데이터가 없습니다.</td></tr>';
+      tbody.innerHTML = h;
+      pageInfo.textContent = '전체 ' + total + '개 중 ' + (total ? (startIdx + 1) + '-' + Math.min(startIdx + PAGE_SIZE, total) : '0-0');
+
+      var ph = '<button type="button"' + (page <= 1 ? ' disabled' : '') + ' data-p="prev">◀ 이전</button>';
+      for (var pi = 1; pi <= totalPages; pi++) {
+        ph += '<button type="button" data-p="' + pi + '" class="' + (pi === page ? 'active' : '') + '">' + pi + '</button>';
+      }
+      ph += '<button type="button"' + (page >= totalPages ? ' disabled' : '') + ' data-p="next">다음 ▶</button>';
+      pag.innerHTML = ph;
+      var pbs = pag.querySelectorAll('[data-p]');
+      for (var qi = 0; qi < pbs.length; qi++) {
+        pbs[qi].onclick = function () {
+          var v = this.getAttribute('data-p');
+          if (v === 'prev') page--;
+          else if (v === 'next') page++;
+          else page = Number(v);
+          renderRows();
+        };
+      }
+    }
+
+    renderBrandButtons();
+    renderRows();
+    wrapper.appendChild(toolbar);
+    wrapper.appendChild(table);
+    wrapper.appendChild(pageInfo);
+    wrapper.appendChild(pag);
+    container.appendChild(wrapper);
+  }
+
+  function renderScheduleSummary(dayMap, skuMap) {
+    var tbody = document.getElementById('schedule-summary-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    var dayNames = { 1: '월요일', 2: '화요일', 3: '수요일', 4: '목요일', 5: '금요일' };
+    var days = [1, 2, 3, 4, 5];
+    for (var i = 0; i < days.length; i++) {
+      var d = days[i];
+      var skus = dayMap[d] || [];
+      var brandCount = {};
+      for (var j = 0; j < skus.length; j++) {
+        var info = skuMap[skus[j]];
+        if (!info) continue;
+        var b = info.brand || '미분류';
+        brandCount[b] = (brandCount[b] || 0) + 1;
+      }
+      var keys = Object.keys(brandCount).sort();
+      var brandBadges = '';
+      for (var k = 0; k < keys.length; k++) {
+        brandBadges += '<span class="brand-pill">' + escapeHtml(keys[k]) + ' ' + brandCount[keys[k]] + '</span>';
+      }
+      var tr = document.createElement('tr');
+      tr.className = 'schedule-summary-row';
+      tr.setAttribute('data-day', d);
+      var isOpen = !!state.scheduleOpenDays[d];
+      tr.innerHTML =
+        '<td style="font-weight:700">' + dayNames[d] + '</td>' +
+        '<td><span style="font-size:18px;font-weight:700;color:#3182F6">' + skus.length + '</span>개</td>' +
+        '<td>' + (brandBadges || '<span class="muted">배정 없음</span>') + '</td>' +
+        '<td><button type="button" class="btn btn-ghost btn-toggle-detail" data-day="' + d + '">상세 ' + (isOpen ? '▲' : '▼') + '</button></td>';
+      tbody.appendChild(tr);
+      var detailTr = document.createElement('tr');
+      detailTr.id = 'schedule-detail-' + d;
+      detailTr.style.display = isOpen ? '' : 'none';
+      detailTr.innerHTML = '<td colspan="4" style="padding:0"></td>';
+      tbody.appendChild(detailTr);
+      if (isOpen) renderDayDetail(d, skus, skuMap);
+    }
+  }
+
+  function renderUnassigned(allSkus, assignedIds, skuMap) {
+    var card = document.getElementById('unassigned-card');
+    var list = [];
+    for (var i = 0; i < allSkus.length; i++) {
+      var sid = String(allSkus[i].sku_id);
+      if (!assignedIds[sid]) list.push(allSkus[i]);
+    }
+    document.getElementById('unassigned-count-label').textContent = '(' + list.length + '개)';
+    if (!list.length) {
+      card.style.display = 'none';
+      return;
+    }
+    card.style.display = '';
+
+    var selected = {};
+    var filterBrand = '__all__';
+    var filterText = '';
+    var page = 1;
+    var PAGE_SIZE = 30;
+
+    var toolbar = document.getElementById('unassigned-toolbar');
+    var tbody = document.getElementById('unassigned-tbody');
+    var pageInfo = document.getElementById('unassigned-page-info');
+    var pag = document.getElementById('unassigned-pagination');
+    var allCheck = document.getElementById('unassigned-check-all');
+
+    var brandMap = {};
+    for (var bi = 0; bi < list.length; bi++) {
+      var bb = list[bi].brand || '미분류';
+      brandMap[bb] = true;
+    }
+    var brands = Object.keys(brandMap).sort();
+
+    function renderToolbar() {
+      var h = '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+      h += '<button type="button" class="btn btn-ghost btn-toggle-detail" data-ub="__all__"' + (filterBrand === '__all__' ? ' style="background:#eef2ff;border-color:#3182F6;color:#3182F6"' : '') + '>전체</button>';
+      for (var i2 = 0; i2 < brands.length; i2++) {
+        var b = brands[i2];
+        h += '<button type="button" class="btn btn-ghost btn-toggle-detail" data-ub="' + escapeHtml(b) + '"' + (filterBrand === b ? ' style="background:#eef2ff;border-color:#3182F6;color:#3182F6"' : '') + '>' + escapeHtml(b) + '</button>';
+      }
+      h += '</div>';
+      h += '<input type="search" id="unassigned-search" class="form-select" style="min-width:220px" placeholder="상품명 또는 SKU ID 검색" />';
+      toolbar.innerHTML = h;
+      var bs = toolbar.querySelectorAll('[data-ub]');
+      for (var k = 0; k < bs.length; k++) {
+        bs[k].onclick = function () {
+          filterBrand = this.getAttribute('data-ub');
+          page = 1;
+          renderToolbar();
+          renderRows();
+        };
+      }
+      var us = document.getElementById('unassigned-search');
+      us.value = filterText;
+      us.oninput = function () {
+        filterText = String(this.value || '').toLowerCase();
+        page = 1;
+        renderRows();
+      };
+    }
+
+    function getFiltered() {
+      var out = [];
+      for (var i3 = 0; i3 < list.length; i3++) {
+        var r = list[i3];
+        var b = r.brand || '미분류';
+        if (filterBrand !== '__all__' && b !== filterBrand) continue;
+        if (filterText) {
+          var sn = String(r.sku_name || '').toLowerCase();
+          var sid = String(r.sku_id || '').toLowerCase();
+          if (sn.indexOf(filterText) === -1 && sid.indexOf(filterText) === -1) continue;
+        }
+        out.push(r);
+      }
+      return out;
+    }
+
+    function renderRows() {
+      var rows = getFiltered();
+      var total = rows.length;
+      var totalPages = total === 0 ? 1 : Math.ceil(total / PAGE_SIZE);
+      if (page > totalPages) page = totalPages;
+      if (page < 1) page = 1;
+      var startIdx = (page - 1) * PAGE_SIZE;
+      var view = rows.slice(startIdx, startIdx + PAGE_SIZE);
+
+      var h = '';
+      for (var i4 = 0; i4 < view.length; i4++) {
+        var r = view[i4];
+        var sid2 = String(r.sku_id);
+        h += '<tr>';
+        h += '<td><input type="checkbox" class="ua-cb" data-sid="' + escapeHtml(sid2) + '"' + (selected[sid2] ? ' checked' : '') + ' /></td>';
+        h += '<td>' + escapeHtml(r.brand || '미분류') + '</td>';
+        h += '<td>' + escapeHtml(sid2) + '</td>';
+        h += '<td>' + escapeHtml(r.sku_name || '') + '</td>';
+        h += '</tr>';
+      }
+      if (!h) h = '<tr><td colspan="4" class="muted">미배정 SKU가 없습니다.</td></tr>';
+      tbody.innerHTML = h;
+      var cbs = tbody.querySelectorAll('.ua-cb');
+      for (var j2 = 0; j2 < cbs.length; j2++) {
+        cbs[j2].onchange = function () {
+          selected[this.getAttribute('data-sid')] = this.checked;
+        };
+      }
+
+      pageInfo.textContent = '전체 ' + total + '개 중 ' + (total ? (startIdx + 1) + '-' + Math.min(startIdx + PAGE_SIZE, total) : '0-0');
+      var ph = '<button type="button"' + (page <= 1 ? ' disabled' : '') + ' data-up="prev">◀ 이전</button>';
+      for (var pi = 1; pi <= totalPages; pi++) {
+        ph += '<button type="button" data-up="' + pi + '" class="' + (pi === page ? 'active' : '') + '">' + pi + '</button>';
+      }
+      ph += '<button type="button"' + (page >= totalPages ? ' disabled' : '') + ' data-up="next">다음 ▶</button>';
+      pag.innerHTML = ph;
+      var pbs = pag.querySelectorAll('[data-up]');
+      for (var q = 0; q < pbs.length; q++) {
+        pbs[q].onclick = function () {
+          var v = this.getAttribute('data-up');
+          if (v === 'prev') page--;
+          else if (v === 'next') page++;
+          else page = Number(v);
+          renderRows();
+        };
+      }
+    }
+
+    allCheck.checked = false;
+    allCheck.onchange = function () {
+      var on = this.checked;
+      var rows = getFiltered();
+      for (var i5 = 0; i5 < rows.length; i5++) {
+        selected[String(rows[i5].sku_id)] = on;
+      }
+      renderRows();
+    };
+
+    renderToolbar();
+    renderRows();
+
+    document.getElementById('btn-assign-selected').onclick = function () {
+      var day = Number(document.getElementById('assign-day-select').value);
+      if (!day) {
+        alert('요일을 선택하세요.');
+        return;
+      }
+      var ids = [];
+      for (var key in selected) {
+        if (Object.prototype.hasOwnProperty.call(selected, key) && selected[key]) ids.push(key);
+      }
+      if (!ids.length) {
+        alert('선택된 SKU가 없습니다.');
+        return;
+      }
+      apiFetch('POST', '/collect-schedule', { day_of_week: day, sku_ids: ids })
+        .then(function () {
+          invalidateSkuCache();
+          return loadScheduleTab();
+        })
+        .catch(function (e) {
+          console.error(e);
+          alert(e.message || String(e));
+        });
+    };
+  }
+
+  function scheduleRecomputeCounters() {
+    if (!state.scheduleTabData) return;
+    var dayMap = state.scheduleTabData.dayMap;
+    var allSkus = state.scheduleTabData.allSkus;
+    var assignedIds = {};
+    var days = [1, 2, 3, 4, 5];
+    for (var i = 0; i < days.length; i++) {
+      var ids = dayMap[days[i]] || [];
+      for (var j = 0; j < ids.length; j++) assignedIds[ids[j]] = true;
+    }
+    state.scheduleTabData.assignedIds = assignedIds;
+    document.getElementById('sch-total').textContent = allSkus.length;
+    document.getElementById('sch-assigned').textContent = Object.keys(assignedIds).length;
+    document.getElementById('sch-unassigned').textContent = allSkus.length - Object.keys(assignedIds).length;
+  }
+
+  function scheduleRemoveLocal(dayNum, skuId) {
+    if (!state.scheduleTabData) return;
+    var ids = state.scheduleTabData.dayMap[dayNum] || [];
+    var sid = String(skuId);
+    var ix = ids.indexOf(sid);
+    if (ix >= 0) ids.splice(ix, 1);
+    scheduleRecomputeCounters();
+    renderScheduleSummary(state.scheduleTabData.dayMap, state.scheduleTabData.skuMap);
+    renderUnassigned(state.scheduleTabData.allSkus, state.scheduleTabData.assignedIds, state.scheduleTabData.skuMap);
+  }
+
   function loadScheduleTab() {
     return Promise.all([
       apiFetch('GET', '/sku-detail', null),
@@ -1723,76 +2136,26 @@
       .then(function (results) {
         var allSkus = (results[0] && results[0].data) || [];
         var scheduleData = (results[1] && results[1].data) || [];
-        var dayMap = { 1: [], 2: [], 3: [], 4: [], 5: [] };
-        var assignedMap = {};
-        var skuMap = {};
-        var i;
-        for (i = 0; i < allSkus.length; i++) {
-          skuMap[String(allSkus[i].sku_id)] = allSkus[i];
-        }
-        for (i = 0; i < scheduleData.length; i++) {
-          var row = scheduleData[i] || {};
-          var d = Number(row.day_of_week);
-          var sid = String(row.sku_id || '');
-          if (!sid) continue;
-          if (d >= 1 && d <= 5) {
-            dayMap[d].push(sid);
-            assignedMap[sid] = true;
-          }
-        }
+        var built = scheduleBuildState(allSkus, scheduleData);
+        var dayMap = built.dayMap;
+        var assignedIds = built.assignedIds;
+        var skuMap = built.skuMap;
+        state.scheduleTabData = {
+          allSkus: allSkus,
+          dayMap: dayMap,
+          assignedIds: assignedIds,
+          skuMap: skuMap
+        };
+        if (!state.scheduleOpenDays) state.scheduleOpenDays = {};
 
         var totalActive = allSkus.length;
-        var assignedCount = Object.keys(assignedMap).length;
-        document.getElementById('sch-total').textContent = String(totalActive);
-        document.getElementById('sch-assigned').textContent = String(assignedCount);
-        document.getElementById('sch-unassigned').textContent = String(totalActive - assignedCount);
+        var assignedCount = Object.keys(assignedIds).length;
+        document.getElementById('sch-total').textContent = totalActive;
+        document.getElementById('sch-assigned').textContent = assignedCount;
+        document.getElementById('sch-unassigned').textContent = totalActive - assignedCount;
 
-        for (var day = 1; day <= 5; day++) {
-          var ids = dayMap[day] || [];
-          document.getElementById('sch-count-' + day).textContent = String(ids.length);
-          var body = document.getElementById('sch-body-' + day);
-          var h = '';
-          for (var j = 0; j < ids.length; j++) {
-            var sid2 = ids[j];
-            var s = skuMap[sid2];
-            if (!s) continue;
-            h += '<div class="schedule-item">';
-            h += '<div>';
-            h += '<span class="brand-tag">' + escapeHtml(s.brand || '') + '</span>';
-            h += '<span class="name">' + escapeHtml(s.sku_name || '') + '</span>';
-            h += '</div>';
-            h += '<button type="button" class="remove-btn" data-sch-remove-day="' + day + '" data-sch-remove-sku="' + escapeHtml(sid2) + '" title="삭제">×</button>';
-            h += '</div>';
-          }
-          if (!h) h = '<div class="schedule-item"><span class="muted">배정 없음</span></div>';
-          body.innerHTML = h;
-        }
-
-        var ua = [];
-        for (i = 0; i < allSkus.length; i++) {
-          var sid3 = String(allSkus[i].sku_id);
-          if (!assignedMap[sid3]) ua.push(allSkus[i]);
-        }
-        var ul = document.getElementById('unassigned-list');
-        var uh = '';
-        for (i = 0; i < ua.length; i++) {
-          var s2 = ua[i];
-          uh += '<div class="schedule-item">';
-          uh += '<div>';
-          uh += '<span class="brand-tag">' + escapeHtml(s2.brand || '') + '</span>';
-          uh += '<span class="name">' + escapeHtml(s2.sku_name || '') + '</span>';
-          uh += '</div>';
-          uh += '<div style="display:flex;gap:4px">';
-          uh += '<button type="button" class="btn-day" data-sch-add-day="1" data-sch-add-sku="' + escapeHtml(String(s2.sku_id)) + '">월</button>';
-          uh += '<button type="button" class="btn-day" data-sch-add-day="2" data-sch-add-sku="' + escapeHtml(String(s2.sku_id)) + '">화</button>';
-          uh += '<button type="button" class="btn-day" data-sch-add-day="3" data-sch-add-sku="' + escapeHtml(String(s2.sku_id)) + '">수</button>';
-          uh += '<button type="button" class="btn-day" data-sch-add-day="4" data-sch-add-sku="' + escapeHtml(String(s2.sku_id)) + '">목</button>';
-          uh += '<button type="button" class="btn-day" data-sch-add-day="5" data-sch-add-sku="' + escapeHtml(String(s2.sku_id)) + '">금</button>';
-          uh += '</div>';
-          uh += '</div>';
-        }
-        if (!uh) uh = '<div class="schedule-item"><span class="muted">미배정 SKU가 없습니다.</span></div>';
-        ul.innerHTML = uh;
+        renderScheduleSummary(dayMap, skuMap);
+        renderUnassigned(allSkus, assignedIds, skuMap);
       })
       .catch(function (e) {
         console.error(e);
@@ -2324,6 +2687,28 @@
       renderAlertFilters();
       renderAlertTable();
     }
+    var toggleDetailBtn = t.classList && t.classList.contains('btn-toggle-detail') ? t : null;
+    if (toggleDetailBtn && toggleDetailBtn.getAttribute('data-day')) {
+      var dayBtn = Number(toggleDetailBtn.getAttribute('data-day'));
+      if (!isNaN(dayBtn)) {
+        state.scheduleOpenDays[dayBtn] = !state.scheduleOpenDays[dayBtn];
+        if (state.scheduleTabData) {
+          renderScheduleSummary(state.scheduleTabData.dayMap, state.scheduleTabData.skuMap);
+        }
+      }
+      return;
+    }
+    var summaryRow = t.closest ? t.closest('.schedule-summary-row') : null;
+    if (summaryRow) {
+      var dayRow = Number(summaryRow.getAttribute('data-day'));
+      if (!isNaN(dayRow)) {
+        state.scheduleOpenDays[dayRow] = !state.scheduleOpenDays[dayRow];
+        if (state.scheduleTabData) {
+          renderScheduleSummary(state.scheduleTabData.dayMap, state.scheduleTabData.skuMap);
+        }
+      }
+      return;
+    }
     var sb = t.getAttribute('data-sb');
     if (sb != null) {
       state.skuBrand = sb;
@@ -2397,23 +2782,7 @@
       })
         .then(function () {
           invalidateSkuCache();
-          return loadScheduleTab();
-        })
-        .catch(function (e) {
-          console.error(e);
-          alert(e.message || String(e));
-        });
-    }
-    var schAddDay = t.getAttribute('data-sch-add-day');
-    var schAddSku = t.getAttribute('data-sch-add-sku');
-    if (schAddDay != null && schAddSku != null) {
-      apiFetch('POST', '/collect-schedule', {
-        day_of_week: Number(schAddDay),
-        sku_ids: [String(schAddSku)]
-      })
-        .then(function () {
-          invalidateSkuCache();
-          return loadScheduleTab();
+          scheduleRemoveLocal(Number(schDelDay), String(schDelSku));
         })
         .catch(function (e) {
           console.error(e);
