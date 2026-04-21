@@ -124,15 +124,30 @@ module.exports = async (req, res) => {
     .eq('sku_id', sku_id);
 
   let changed = false;
-  if (prev_price != null && prev_price !== newPrice) {
+  let comparePrice = prev_price;
+
+  if (comparePrice == null) {
+    const { data: skuRow, error: skuErr } = await client
+      .from('sku_list')
+      .select('registered_price')
+      .eq('sku_id', sku_id)
+      .maybeSingle();
+    if (skuErr) return json(res, 500, { ok: false, error: skuErr.message });
+    comparePrice =
+      skuRow && skuRow.registered_price != null
+        ? Math.round(Number(skuRow.registered_price))
+        : null;
+  }
+
+  if (comparePrice != null && comparePrice !== newPrice) {
     const change_pct =
-      prev_price === 0
+      comparePrice === 0
         ? 0
-        : Number((((newPrice - prev_price) / prev_price) * 100).toFixed(2));
+        : Number((((newPrice - comparePrice) / comparePrice) * 100).toFixed(2));
 
     const { error: alErr } = await client.from('price_alert').insert({
       sku_id,
-      prev_price,
+      prev_price: comparePrice,
       new_price: newPrice,
       change_pct,
     });
