@@ -1593,11 +1593,10 @@
       var alertUrl = state.alertSkuUrlMap[String(r.sku_id)];
       var br = String(r.brand || '');
       var groupStart = i > 0 && br !== prevBrand;
-      var showBrand = i === 0 || br !== prevBrand;
       prevBrand = br;
       h += '<tr' + (groupStart ? ' class="alert-row-group-start"' : '') + '>';
       h += '<td>' + productNameLinkHtml(r.sku_name, alertUrl) + '</td>';
-      h += '<td>' + (showBrand ? escapeHtml(br) : '') + '</td>';
+      h += '<td>' + escapeHtml(br) + '</td>';
       h += '<td class="num">' + escapeHtml(formatMoney(r.prev_price)) + '</td>';
       h += '<td class="num">' + escapeHtml(formatMoney(r.new_price)) + '</td>';
       h += '<td class="num">' + formatAlertChangePctHtml(r.change_pct) + '</td>';
