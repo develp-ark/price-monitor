@@ -1,7 +1,5 @@
 const { getSupabase } = require('../lib/supabase');
 const { json, handleOptions } = require('../lib/cors');
-const { todayUtcYmd } = require('../lib/sku-due');
-
 module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return handleOptions(res);
 
@@ -124,14 +122,6 @@ module.exports = async (req, res) => {
       last_collected: new Date().toISOString(),
     })
     .eq('sku_id', sku_id);
-
-  const today = todayUtcYmd();
-  const { error: upErr } = await client
-    .from('sku_list')
-    .update({ last_collected: today })
-    .eq('sku_id', sku_id);
-
-  if (upErr) return json(res, 500, { ok: false, error: upErr.message });
 
   let changed = false;
   if (prev_price != null && prev_price !== newPrice) {
