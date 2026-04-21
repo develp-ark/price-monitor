@@ -465,6 +465,24 @@
     #alert-table-wrap table.data tbody tr.alert-row-group-start td {
       border-top: 2px solid #e5e8eb;
     }
+    .badge-pg {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 16px;
+      font-size: 11px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .badge-pg-a {
+      background: #fee2e2;
+      color: #F04452;
+    }
+    .badge-pg-b {
+      background: #f1f3f5;
+      color: #555;
+    }
   </style>
 </head>
 <body>
@@ -490,7 +508,8 @@
             <div id="collect-running-text" class="hint" style="display:none;"></div>
           </div>
           <div class="actions">
-            <button type="button" class="btn btn-primary" id="btn-start-today">▶ 오늘 수집 시작</button>
+            <button type="button" class="btn btn-primary" id="btn-collect-group-a">▶ A그룹 수집 (매일)</button>
+            <button type="button" class="btn btn-primary" id="btn-collect-group-b">▶ B그룹 수집 (오늘분)</button>
             <button type="button" class="btn btn-danger" id="btn-stop-collect" disabled>■ 중지</button>
           </div>
         </div>
@@ -614,6 +633,7 @@
       <div class="toolbar">
         <div class="sku-toolbar-left">
           <div class="brand-tabs" id="sku-brand-tabs"></div>
+          <div class="filter-btns" id="sku-group-filter" style="margin-top:8px;"></div>
           <div class="sku-search-row">
             <input type="search" id="sku-search" placeholder="상품명 또는 SKU ID 검색" autocomplete="off" />
             <button type="button" id="sku-search-clear" title="검색어 지우기">×</button>
@@ -622,6 +642,8 @@
         <div class="toolbar-actions">
           <button type="button" class="btn btn-primary" id="btn-sku-add">SKU 추가</button>
           <button type="button" class="btn btn-primary" id="btn-manual-collect">수동 수집 추가</button>
+          <button type="button" class="btn btn-ghost" id="btn-bulk-group-a">A그룹으로 일괄 변경</button>
+          <button type="button" class="btn btn-ghost" id="btn-bulk-group-b">B그룹으로 일괄 변경</button>
           <button type="button" class="btn btn-ghost" id="btn-csv-upload">CSV 업로드</button>
           <input type="file" id="csv-file" accept=".csv,text/csv" />
           <button type="button" class="btn btn-ghost" id="btn-sku-csv-dl">CSV 다운로드</button>
@@ -634,6 +656,7 @@
           <table class="data">
             <thead>
               <tr>
+                <th style="width:36px;"><input type="checkbox" id="sku-check-all" title="현재 페이지 전체" /></th>
                 <th>브랜드</th>
                 <th>SKU ID</th>
                 <th>상품명</th>
@@ -641,6 +664,7 @@
                 <th class="num">현재가</th>
                 <th class="num">변동률</th>
                 <th>구분</th>
+                <th>그룹</th>
                 <th>최근수집일</th>
                 <th>수집요일</th>
                 <th>수집</th>
@@ -776,6 +800,13 @@
         <input type="text" id="e-flag" placeholder="예: TOP(3월)" autocomplete="off" />
       </div>
       <div class="form-row">
+        <label for="e-priority-group">수집 그룹</label>
+        <select id="e-priority-group">
+          <option value="A">A그룹 (매일 수집)</option>
+          <option value="B">B그룹 (주 1회 · 오늘 분만)</option>
+        </select>
+      </div>
+      <div class="form-row">
         <label for="e-memo">메모</label>
         <textarea id="e-memo"></textarea>
       </div>
@@ -844,8 +875,10 @@
     alertBrand: '__all__',
     alertDir: 'all',
     skuBrand: '__all__',
+    skuGroupFilter: '__all__',
     skuPage: 1,
     skuSearch: '',
+    skuChecked: {},
     skuDetailList: [],
     skuScheduleMap: {},
     alertRaw: [],
@@ -1139,11 +1172,19 @@
     }, 5000);
   }
 
-  function setStartTodayButtonState(isRunning) {
-    var btn = document.getElementById('btn-start-today');
-    if (!btn) return;
-    btn.disabled = !!isRunning;
-    btn.textContent = isRunning ? '수집 중...' : '▶ 오늘 수집 시작';
+  function setCollectStartButtonsState(isRunning) {
+    var labelA = '▶ A그룹 수집 (매일)';
+    var labelB = '▶ B그룹 수집 (오늘분)';
+    var btnA = document.getElementById('btn-collect-group-a');
+    var btnB = document.getElementById('btn-collect-group-b');
+    if (btnA) {
+      btnA.disabled = !!isRunning;
+      btnA.textContent = isRunning ? '수집 중...' : labelA;
+    }
+    if (btnB) {
+      btnB.disabled = !!isRunning;
+      btnB.textContent = isRunning ? '수집 중...' : labelB;
+    }
   }
 
   function loadCollectStatus() {
@@ -1157,7 +1198,7 @@
 
         var btnStop = document.getElementById('btn-stop-collect');
         btnStop.disabled = !(st === 'running' || st === 'stopping');
-        setStartTodayButtonState(st === 'running' || st === 'stopping');
+        setCollectStartButtonsState(st === 'running' || st === 'stopping');
 
         var progWrap = document.getElementById('collect-progress-wrap');
         var progBar = document.getElementById('collect-progress-bar');
@@ -1694,6 +1735,39 @@
     return m;
   }
 
+  function normalizePriorityGroup(v) {
+    var u = String(v || '')
+      .trim()
+      .toUpperCase();
+    if (u === 'A') return 'A';
+    if (u === 'B') return 'B';
+    return null;
+  }
+
+  function skuGroupBadgeHtml(r) {
+    var pg = normalizePriorityGroup(r.priority_group);
+    var isA = pg === 'A';
+    var sid = escapeHtml(String(r.sku_id));
+    return (
+      '<button type="button" class="badge-pg ' +
+      (isA ? 'badge-pg-a' : 'badge-pg-b') +
+      '" data-pg-toggle="' +
+      sid +
+      '">' +
+      (isA ? 'A 매일' : 'B 주1회') +
+      '</button>'
+    );
+  }
+
+  function getSelectedSkuIds() {
+    var ids = [];
+    for (var k in state.skuChecked) {
+      if (Object.prototype.hasOwnProperty.call(state.skuChecked, k) && state.skuChecked[k])
+        ids.push(k);
+    }
+    return ids;
+  }
+
   var SKU_PAGE_SIZE = 30;
   var SKU_CACHE_TTL = 60000;
 
@@ -1709,6 +1783,12 @@
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
       if (state.skuBrand !== '__all__' && String(r.brand) !== state.skuBrand) continue;
+      var pg = normalizePriorityGroup(r.priority_group);
+      if (state.skuGroupFilter === 'A') {
+        if (pg !== 'A') continue;
+      } else if (state.skuGroupFilter === 'B') {
+        if (pg === 'A') continue;
+      }
       if (q) {
         var sid = String(r.sku_id != null ? r.sku_id : '').toLowerCase();
         var sn = String(r.sku_name || '').toLowerCase();
@@ -1717,6 +1797,17 @@
       out.push(r);
     }
     return out;
+  }
+
+  function getCurrentSkuPageSlice() {
+    var filtered = getFilteredSkuRows();
+    var total = filtered.length;
+    var totalPages = total === 0 ? 1 : Math.ceil(total / SKU_PAGE_SIZE);
+    var sp = state.skuPage;
+    if (sp > totalPages) sp = totalPages;
+    if (sp < 1) sp = 1;
+    var startIdx = (sp - 1) * SKU_PAGE_SIZE;
+    return filtered.slice(startIdx, startIdx + SKU_PAGE_SIZE);
   }
 
   function renderSkuBrandTabs() {
@@ -1733,7 +1824,28 @@
     tabs.innerHTML = th;
   }
 
+  function renderSkuGroupFilter() {
+    var el = document.getElementById('sku-group-filter');
+    if (!el) return;
+    var g = state.skuGroupFilter || '__all__';
+    var h = '';
+    h +=
+      '<button type="button" data-sg-filter="__all__" class="' +
+      (g === '__all__' ? 'on' : '') +
+      '">전체</button>';
+    h +=
+      '<button type="button" data-sg-filter="A" class="' +
+      (g === 'A' ? 'on' : '') +
+      '">A그룹(매일)</button>';
+    h +=
+      '<button type="button" data-sg-filter="B" class="' +
+      (g === 'B' ? 'on' : '') +
+      '">B그룹(주1회)</button>';
+    el.innerHTML = h;
+  }
+
   function renderSkuTablePage() {
+    renderSkuGroupFilter();
     var filtered = getFilteredSkuRows();
     var total = filtered.length;
     var totalPages = total === 0 ? 1 : Math.ceil(total / SKU_PAGE_SIZE);
@@ -1749,24 +1861,38 @@
     for (var k = 0; k < slice.length; k++) {
       var r = slice[k];
       var url = r.product_url || '#';
+      var sidStr = escapeHtml(String(r.sku_id));
+      var checked = state.skuChecked[String(r.sku_id)] ? ' checked' : '';
       h += '<tr>';
+      h +=
+        '<td><input type="checkbox" class="sku-row-cb" data-sku-cb="' +
+        sidStr +
+        '"' +
+        checked +
+        ' /></td>';
       h += '<td>' + escapeHtml(r.brand || '') + '</td>';
-      h += '<td>' + escapeHtml(String(r.sku_id)) + '</td>';
+      h += '<td>' + sidStr + '</td>';
       h += '<td><a class="link" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(r.sku_name || '') + '</a></td>';
       h += '<td class="num">' + escapeHtml(formatMoney(r.registered_price)) + '</td>';
       h += '<td class="num cell-current-price">' + escapeHtml(formatMoney(r.current_price)) + '</td>';
       h += '<td class="num">' + skuRowChangePctHtml(r) + '</td>';
       h += '<td>' + (r.flag ? '<span class="flag-badge">' + escapeHtml(r.flag) + '</span>' : '—') + '</td>';
+      h += '<td>' + skuGroupBadgeHtml(r) + '</td>';
       h += '<td class="cell-last-collected">' + escapeHtml(fmtCollectedAt(r.last_collected)) + '</td>';
       h +=
         '<td class="cell-schedule" data-sku-schedule="' +
-        escapeHtml(String(r.sku_id)) +
+        sidStr +
         '">' +
         scheduleCellInnerHtml(r.sku_id) +
         '</td>';
-      h += '<td><button type="button" class="btn-icon btn-collect" data-collect-sku="' + escapeHtml(String(r.sku_id)) + '" data-sku-id="' + escapeHtml(String(r.sku_id)) + '" title="즉시 수집">▶</button></td>';
-      h += '<td><button type="button" class="btn-icon" data-edit-sku="' + escapeHtml(String(r.sku_id)) + '" title="수정">✏️</button></td>';
-      h += '<td><button type="button" class="btn-icon" data-del-sku="' + escapeHtml(String(r.sku_id)) + '" title="삭제">🗑</button></td>';
+      h +=
+        '<td><button type="button" class="btn-icon btn-collect" data-collect-sku="' +
+        sidStr +
+        '" data-sku-id="' +
+        sidStr +
+        '" title="즉시 수집">▶</button></td>';
+      h += '<td><button type="button" class="btn-icon" data-edit-sku="' + sidStr + '" title="수정">✏️</button></td>';
+      h += '<td><button type="button" class="btn-icon" data-del-sku="' + sidStr + '" title="삭제">🗑</button></td>';
       h += '</tr>';
     }
     tbody.innerHTML = h;
@@ -1803,6 +1929,16 @@
       if (sb === state.skuBrand) btn.classList.add('on');
       else btn.classList.remove('on');
     }
+
+    var allOn = slice.length > 0;
+    for (var ac = 0; ac < slice.length; ac++) {
+      if (!state.skuChecked[String(slice[ac].sku_id)]) {
+        allOn = false;
+        break;
+      }
+    }
+    var ca = document.getElementById('sku-check-all');
+    if (ca) ca.checked = allOn && slice.length > 0;
   }
 
   function loadSkuPage(forceRefresh) {
@@ -1873,6 +2009,8 @@
     document.getElementById('e-reg-price').value = row.registered_price != null ? String(row.registered_price) : '';
     document.getElementById('e-cycle').value = row.collect_cycle != null ? String(row.collect_cycle) : '7';
     document.getElementById('e-flag').value = row.flag || '';
+    document.getElementById('e-priority-group').value =
+      normalizePriorityGroup(row.priority_group) === 'A' ? 'A' : 'B';
     document.getElementById('e-memo').value = row.memo || '';
     openModal('modal-sku-edit');
   }
@@ -2434,6 +2572,110 @@
     activateTab('sku');
   });
 
+  function beginDashboardCollect(list) {
+    window.postMessage(
+      {
+        type: 'SCHEDULE_COLLECT_START',
+        skuList: list.map(function (r) {
+          return {
+            sku_id: r.sku_id,
+            sku_name: r.sku_name,
+            brand: r.brand,
+            product_url: r.product_url
+          };
+        })
+      },
+      '*'
+    );
+    var badge = document.getElementById('collect-badge');
+    if (badge) {
+      badge.className = 'badge running';
+      badge.textContent = 'running';
+    }
+    var pw = document.getElementById('collect-progress-wrap');
+    if (pw) pw.style.display = 'block';
+    var doneEl = document.getElementById('collect-detail');
+    if (doneEl) doneEl.style.display = 'none';
+    var line = document.getElementById('collect-running-text');
+    if (line) {
+      line.style.display = '';
+      line.textContent = '0/' + list.length + ' 시작 중...';
+    }
+    var bar = document.getElementById('collect-progress-bar');
+    if (bar) bar.style.width = '0%';
+    var stopBtn = document.getElementById('btn-stop-collect');
+    if (stopBtn) stopBtn.disabled = false;
+    setCollectStartButtonsState(true);
+    if (!state.collectPollTimer) {
+      state.collectPollTimer = setInterval(function () {
+        loadCollectStatus();
+      }, 5000);
+    }
+    setTimeout(function () {
+      loadCollectStatus();
+    }, 2000);
+  }
+
+  document.getElementById('btn-collect-group-a').addEventListener('click', function () {
+    if (!extensionReady) {
+      alert('Chrome 확장프로그램이 감지되지 않습니다.\n이 페이지에서 확장프로그램이 로드되었는지 확인하세요.');
+      return;
+    }
+    apiFetch('GET', '/sku-detail', null)
+      .then(function (json) {
+        var rows = (json && json.data) || [];
+        var list = [];
+        for (var i = 0; i < rows.length; i++) {
+          var r = rows[i];
+          if (r.is_active === false) continue;
+          if (normalizePriorityGroup(r.priority_group) !== 'A') continue;
+          if (!r.product_url || String(r.product_url).trim() === '') continue;
+          list.push(r);
+        }
+        if (!list.length) {
+          alert('A그룹 수집 대상(활성·URL 있음)이 없습니다.');
+          return;
+        }
+        if (!confirm('A그룹 ' + list.length + '개 상품을 수집할까요?')) return;
+        beginDashboardCollect(list);
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
+        setCollectStartButtonsState(false);
+      });
+  });
+
+  document.getElementById('btn-collect-group-b').addEventListener('click', function () {
+    if (!extensionReady) {
+      alert('Chrome 확장프로그램이 감지되지 않습니다.\n이 페이지에서 확장프로그램이 로드되었는지 확인하세요.');
+      return;
+    }
+    apiFetch('GET', '/collect-schedule?day=today', null)
+      .then(function (j) {
+        var rows = (j && j.data) || [];
+        var list = [];
+        for (var i = 0; i < rows.length; i++) {
+          var r = rows[i];
+          if (r.is_active === false) continue;
+          if (normalizePriorityGroup(r.priority_group) === 'A') continue;
+          if (!r.product_url || String(r.product_url).trim() === '') continue;
+          list.push(r);
+        }
+        if (!list.length) {
+          alert('오늘 B그룹 수집 대상이 없습니다.');
+          return;
+        }
+        if (!confirm('오늘 분 B그룹 ' + list.length + '개 상품을 수집할까요?')) return;
+        beginDashboardCollect(list);
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
+        setCollectStartButtonsState(false);
+      });
+  });
+
   document.getElementById('btn-stop-collect').addEventListener('click', function () {
     if (!confirm('수집을 중지할까요?')) return;
     apiFetch('POST', '/collect-status', { action: 'stop' })
@@ -2446,76 +2688,83 @@
       });
   });
 
-  document.getElementById('btn-start-today').addEventListener('click', function () {
-    var btn = this;
-    if (!extensionReady) {
-      alert('Chrome 확장프로그램이 감지되지 않습니다.\n이 페이지에서 확장프로그램이 로드되었는지 확인하세요.');
+  document.getElementById('btn-bulk-group-a').addEventListener('click', function () {
+    var ids = getSelectedSkuIds();
+    if (!ids.length) {
+      alert('선택한 SKU가 없습니다.');
       return;
     }
-    apiFetch('GET', '/collect-schedule?day=today', null)
-      .then(function (j) {
-        var rows = (j && j.data) || [];
-        if (!rows.length) {
-          alert('오늘 수집 대상이 없습니다.');
-          return;
-        }
-        var list = [];
-        for (var i = 0; i < rows.length; i++) {
-          if (rows[i].is_active !== false) list.push(rows[i]);
-        }
-        if (!list.length) {
-          alert('오늘 수집 대상 중 활성 SKU가 없습니다.');
-          return;
-        }
-        if (!confirm('오늘 수집 대상 ' + list.length + '개 상품을 수집하시겠습니까?')) return;
-        btn.disabled = true;
-        btn.textContent = '수집 중...';
-        window.postMessage(
-          {
-            type: 'SCHEDULE_COLLECT_START',
-            skuList: list.map(function (r) {
-              return {
-                sku_id: r.sku_id,
-                sku_name: r.sku_name,
-                brand: r.brand,
-                product_url: r.product_url
-              };
-            })
-          },
-          '*'
-        );
-        var badge = document.getElementById('collect-badge');
-        if (badge) {
-          badge.className = 'badge running';
-          badge.textContent = 'running';
-        }
-        var pw = document.getElementById('collect-progress-wrap');
-        if (pw) pw.style.display = 'block';
-        var doneEl = document.getElementById('collect-detail');
-        if (doneEl) doneEl.style.display = 'none';
-        var line = document.getElementById('collect-running-text');
-        if (line) {
-          line.style.display = '';
-          line.textContent = '0/' + list.length + ' 시작 중...';
-        }
-        var bar = document.getElementById('collect-progress-bar');
-        if (bar) bar.style.width = '0%';
-        var stopBtn = document.getElementById('btn-stop-collect');
-        if (stopBtn) stopBtn.disabled = false;
-        if (!state.collectPollTimer) {
-          state.collectPollTimer = setInterval(function () {
-            loadCollectStatus();
-          }, 5000);
-        }
-        setTimeout(function () {
-          loadCollectStatus();
-        }, 2000);
-      })
-      .catch(function (e) {
-        console.error(e);
-        alert(e.message || String(e));
-        setStartTodayButtonState(false);
-      });
+    var ix = 0;
+    function runNext() {
+      if (ix >= ids.length) {
+        state.skuChecked = {};
+        invalidateSkuCache();
+        loadSkuPage(true);
+        return;
+      }
+      apiFetch('PATCH', '/sku-update', { sku_id: ids[ix], priority_group: 'A' })
+        .then(function () {
+          ix++;
+          runNext();
+        })
+        .catch(function (e) {
+          console.error(e);
+          alert(e.message || String(e));
+        });
+    }
+    runNext();
+  });
+  document.getElementById('btn-bulk-group-b').addEventListener('click', function () {
+    var ids = getSelectedSkuIds();
+    if (!ids.length) {
+      alert('선택한 SKU가 없습니다.');
+      return;
+    }
+    var jx = 0;
+    function runNextB() {
+      if (jx >= ids.length) {
+        state.skuChecked = {};
+        invalidateSkuCache();
+        loadSkuPage(true);
+        return;
+      }
+      apiFetch('PATCH', '/sku-update', { sku_id: ids[jx], priority_group: 'B' })
+        .then(function () {
+          jx++;
+          runNextB();
+        })
+        .catch(function (e) {
+          console.error(e);
+          alert(e.message || String(e));
+        });
+    }
+    runNextB();
+  });
+
+  document.getElementById('sku-check-all').addEventListener('change', function (ev) {
+    var on = ev.target.checked;
+    var slice = getCurrentSkuPageSlice();
+    for (var i = 0; i < slice.length; i++) {
+      state.skuChecked[String(slice[i].sku_id)] = on;
+    }
+    renderSkuTablePage();
+  });
+
+  document.getElementById('panel-sku').addEventListener('change', function (ev) {
+    var t = ev.target;
+    if (!t.classList || !t.classList.contains('sku-row-cb')) return;
+    var id = t.getAttribute('data-sku-cb');
+    state.skuChecked[id] = t.checked;
+    var slice = getCurrentSkuPageSlice();
+    var allOn = slice.length > 0;
+    for (var z = 0; z < slice.length; z++) {
+      if (!state.skuChecked[String(slice[z].sku_id)]) {
+        allOn = false;
+        break;
+      }
+    }
+    var ca = document.getElementById('sku-check-all');
+    if (ca) ca.checked = allOn && slice.length > 0;
   });
 
   document.getElementById('btn-queue-clear').addEventListener('click', function () {
@@ -2766,7 +3015,8 @@
       collect_cycle: cycle,
       registered_price: reg !== '' ? Number(reg) : null,
       flag: flag || null,
-      memo: memo || null
+      memo: memo || null,
+      priority_group: document.getElementById('e-priority-group').value
     };
     apiFetch('PATCH', '/sku-update', payload)
       .then(function () {
@@ -2892,6 +3142,31 @@
     }
     if (t.getAttribute('data-close')) {
       closeModal(t.getAttribute('data-close'));
+    }
+    var sgfEl = t.closest && t.closest('[data-sg-filter]');
+    var sgFilter = sgfEl ? sgfEl.getAttribute('data-sg-filter') : null;
+    if (sgFilter != null) {
+      state.skuGroupFilter = sgFilter;
+      state.skuPage = 1;
+      renderSkuTablePage();
+      return;
+    }
+    var pgtEl = t.closest && t.closest('[data-pg-toggle]');
+    if (pgtEl) {
+      ev.preventDefault();
+      var sid = pgtEl.getAttribute('data-pg-toggle');
+      var rowPg = findSkuRowById(sid);
+      var nxt = rowPg && normalizePriorityGroup(rowPg.priority_group) === 'A' ? 'B' : 'A';
+      apiFetch('PATCH', '/sku-update', { sku_id: sid, priority_group: nxt })
+        .then(function () {
+          invalidateSkuCache();
+          return loadSkuPage(true);
+        })
+        .catch(function (e) {
+          console.error(e);
+          alert(e.message || String(e));
+        });
+      return;
     }
     var sortNode = t;
     var askSort = null;

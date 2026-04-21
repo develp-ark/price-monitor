@@ -55,6 +55,14 @@ module.exports = async (req, res) => {
         ? String(b.memo).trim()
         : null;
   }
+  if (b.priority_group !== undefined) {
+    if (b.priority_group === null || b.priority_group === '') {
+      updates.priority_group = null;
+    } else {
+      const pg = String(b.priority_group).trim().toUpperCase();
+      if (pg === 'A' || pg === 'B') updates.priority_group = pg;
+    }
+  }
 
   if (Object.keys(updates).length === 0) {
     return json(res, 400, { ok: false, error: '수정할 항목 없음' });

@@ -25,7 +25,7 @@ async function fetchAllRows(client) {
     const { data, error } = await client
       .from('sku_list')
       .select(
-        'sku_id, brand, sku_name, registered_price, current_price, memo, last_collected, collect_cycle, flag, is_active, product_url'
+        'sku_id, brand, sku_name, registered_price, current_price, memo, last_collected, collect_cycle, flag, is_active, product_url, priority_group'
       )
       .eq('is_active', true)
       .order('brand')
@@ -161,6 +161,12 @@ module.exports = async (req, res) => {
       collect_cycle: r.collect_cycle,
       flag: flagKey(r.flag) || null,
       product_url: r.product_url,
+      priority_group: (function (v) {
+        var u = String(v || '')
+          .trim()
+          .toUpperCase();
+        return u === 'A' || u === 'B' ? u : null;
+      })(r.priority_group),
     };
   });
 

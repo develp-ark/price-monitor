@@ -35,7 +35,7 @@ async function loadDayRows(client, day) {
   const { data: skuRows, error: skuErr } = await client
     .from('sku_list')
     .select(
-      'sku_id, brand, sku_name, product_url, last_collected, is_active, current_price, registered_price'
+      'sku_id, brand, sku_name, product_url, last_collected, is_active, current_price, registered_price, priority_group'
     )
     .in('sku_id', ids);
   if (skuErr) throw new Error(skuErr.message);
@@ -53,6 +53,12 @@ async function loadDayRows(client, day) {
       last_collected: r.last_collected || null,
       current_price: r.current_price || null,
       registered_price: r.registered_price || null,
+      priority_group: (function (v) {
+        var u = String(v || '')
+          .trim()
+          .toUpperCase();
+        return u === 'A' || u === 'B' ? u : null;
+      })(r.priority_group),
     }));
 }
 
