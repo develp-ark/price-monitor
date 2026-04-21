@@ -11,40 +11,6 @@ function nextDueYmd(lastCollected, collectCycle) {
   return d.toISOString().slice(0, 10);
 }
 
-async function fetchLatestPricesMap(client, skuIds) {
-  const map = new Map();
-  if (!skuIds.length) return map;
-
-  const { data: rpcData, error: rpcErr } = await client.rpc('fn_sku_latest_prices');
-  if (!rpcErr && Array.isArray(rpcData)) {
-    for (const row of rpcData) {
-      if (row.sku_id != null) map.set(row.sku_id, row.price);
-    }
-    return map;
-  }
-
-  const CHUNK = 30;
-  for (let i = 0; i < skuIds.length; i += CHUNK) {
-    const part = skuIds.slice(i, i + CHUNK);
-    const results = await Promise.all(
-      part.map((sku_id) =>
-        client
-          .from('price_history')
-          .select('price')
-          .eq('sku_id', sku_id)
-          .order('collected_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-      )
-    );
-    for (let j = 0; j < part.length; j++) {
-      const r = results[j];
-      if (!r.error && r.data?.price != null) map.set(part[j], r.data.price);
-    }
-  }
-  return map;
-}
-
 function flagKey(flag) {
   if (flag == null || String(flag).trim() === '') return '';
   return String(flag).trim();
@@ -107,7 +73,7 @@ module.exports = async (req, res) => {
   const { data: activeRows, error: aErr } = await client
     .from('sku_list')
     .select(
-      'sku_id, brand, sku_name, registered_price, memo, last_collected, collect_cycle, flag, is_active, product_url'
+      'sku_id, brand, sku_name, registered_price, current_price, memo, last_collected, collect_cycle, flag, is_active, product_url'
     )
     .eq('is_active', true)
     .order('brand')
@@ -126,16 +92,9 @@ module.exports = async (req, res) => {
   if (allErr) return json(res, 500, { ok: false, error: allErr.message });
 
   const list = activeRows || [];
-  const skuIds = list.map((r) => r.sku_id);
-  let priceMap;
-  try {
-    priceMap = await fetchLatestPricesMap(client, skuIds);
-  } catch (e) {
-    return json(res, 500, { ok: false, error: e.message || 'price lookup failed' });
-  }
 
   const data = list.map((r) => {
-    const current_price = priceMap.get(r.sku_id) ?? null;
+    const current_price = r.current_price ?? null;
     const reg = r.registered_price;
     let change_pct = null;
     if (
