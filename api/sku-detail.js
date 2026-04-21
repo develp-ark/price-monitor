@@ -16,6 +16,59 @@ function flagKey(flag) {
   return String(flag).trim();
 }
 
+async function fetchAllRows(client) {
+  const allRows = [];
+  const pageSize = 1000;
+  let from = 0;
+
+  for (;;) {
+    const { data, error } = await client
+      .from('sku_list')
+      .select(
+        'sku_id, brand, sku_name, registered_price, current_price, memo, last_collected, collect_cycle, flag, is_active, product_url'
+      )
+      .eq('is_active', true)
+      .order('brand')
+      .order('sku_id')
+      .range(from, from + pageSize - 1);
+
+    if (error) return { data: null, error };
+    if (!data || data.length === 0) break;
+
+    allRows.push(...data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return { data: allRows, error: null };
+}
+
+async function fetchAllSkuListForSchedule(client) {
+  const allRows = [];
+  const pageSize = 1000;
+  let from = 0;
+
+  for (;;) {
+    const { data, error } = await client
+      .from('sku_list')
+      .select(
+        'sku_id, brand, flag, is_active, last_collected, collect_cycle'
+      )
+      .order('brand')
+      .order('sku_id')
+      .range(from, from + pageSize - 1);
+
+    if (error) return { data: null, error };
+    if (!data || data.length === 0) break;
+
+    allRows.push(...data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return { data: allRows, error: null };
+}
+
 function aggregateScheduleGroups(allRows) {
   const groups = new Map();
   for (const r of allRows) {
@@ -70,24 +123,12 @@ module.exports = async (req, res) => {
   const { client, error: envErr } = getSupabase();
   if (envErr) return json(res, 500, { ok: false, error: envErr });
 
-  const { data: activeRows, error: aErr } = await client
-    .from('sku_list')
-    .select(
-      'sku_id, brand, sku_name, registered_price, current_price, memo, last_collected, collect_cycle, flag, is_active, product_url'
-    )
-    .eq('is_active', true)
-    .order('brand')
-    .order('sku_id')
-    .range(0, 4999);
+  const { data: activeRows, error: aErr } = await fetchAllRows(client);
 
   if (aErr) return json(res, 500, { ok: false, error: aErr.message });
 
-  const { data: allRows, error: allErr } = await client
-    .from('sku_list')
-    .select(
-      'sku_id, brand, flag, is_active, last_collected, collect_cycle'
-    )
-    .range(0, 4999);
+  const { data: allRows, error: allErr } =
+    await fetchAllSkuListForSchedule(client);
 
   if (allErr) return json(res, 500, { ok: false, error: allErr.message });
 
