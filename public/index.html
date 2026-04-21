@@ -351,8 +351,9 @@
       margin-top: 16px;
     }
     .pagination button {
-      min-width: 36px;
-      height: 36px;
+      width: 32px;
+      min-width: 32px;
+      height: 32px;
       border-radius: 8px;
       border: 1px solid #e5e8eb;
       background: #fff;
@@ -360,6 +361,7 @@
       font-size: 13px;
       font-weight: 600;
     }
+    .pagination button:hover { background: #f5f6f8; }
     .pagination button.active {
       background: #3182F6;
       color: #fff;
@@ -368,6 +370,14 @@
     .pagination button:disabled {
       opacity: 0.4;
       cursor: not-allowed;
+    }
+    .pagination .page-ellipsis {
+      min-width: 32px;
+      text-align: center;
+      color: #999;
+      font-size: 13px;
+      line-height: 32px;
+      user-select: none;
     }
     .page-info {
       font-size: 12px;
@@ -1986,19 +1996,50 @@
 
     var pag = document.getElementById('sku-pagination');
     var ph = '';
+    function pushPage(arr, n) {
+      if (n < 1 || n > totalPages) return;
+      if (arr.indexOf(n) >= 0) return;
+      arr.push(n);
+    }
+    function sortNumAsc(arr) {
+      arr.sort(function (a, b) { return a - b; });
+      return arr;
+    }
+    function appendPageBtn(n) {
+      ph +=
+        '<button type="button" data-sku-page="num" data-sku-pn="' +
+        n +
+        '" class="' +
+        (n === state.skuPage ? 'active' : '') +
+        '">' +
+        n +
+        '</button>';
+    }
     ph +=
       '<button type="button" data-sku-page="prev"' +
       (state.skuPage <= 1 ? ' disabled' : '') +
       '>◀ 이전</button>';
-    for (var p = 1; p <= totalPages; p++) {
-      ph +=
-        '<button type="button" data-sku-page="num" data-sku-pn="' +
-        p +
-        '" class="' +
-        (p === state.skuPage ? 'active' : '') +
-        '">' +
-        p +
-        '</button>';
+    if (totalPages <= 7) {
+      for (var p = 1; p <= totalPages; p++) appendPageBtn(p);
+    } else {
+      var pages = [];
+      pushPage(pages, 1);
+      pushPage(pages, totalPages);
+      pushPage(pages, state.skuPage - 2);
+      pushPage(pages, state.skuPage - 1);
+      pushPage(pages, state.skuPage);
+      pushPage(pages, state.skuPage + 1);
+      pushPage(pages, state.skuPage + 2);
+      sortNumAsc(pages);
+      var prevPage = null;
+      for (var pi = 0; pi < pages.length; pi++) {
+        var pn = pages[pi];
+        if (prevPage != null && pn - prevPage > 1) {
+          ph += '<span class="page-ellipsis">…</span>';
+        }
+        appendPageBtn(pn);
+        prevPage = pn;
+      }
     }
     ph +=
       '<button type="button" data-sku-page="next"' +
