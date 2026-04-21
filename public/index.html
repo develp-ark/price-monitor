@@ -566,6 +566,29 @@
     </div>
 
     <div id="panel-dash" class="panel active">
+      <div class="card" id="card-dash-schedule">
+        <div class="card-head">
+          <h2>스케줄 현황 (주간 분배)</h2>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+          <span class="badge idle">전체 <span id="dash-sch-total">0</span></span>
+          <span class="badge done">배정 <span id="dash-sch-assigned">0</span></span>
+          <span class="badge error">미배정 <span id="dash-sch-unassigned">0</span></span>
+        </div>
+        <div style="overflow:auto;">
+          <table class="data">
+            <thead>
+              <tr>
+                <th style="width:80px">요일</th>
+                <th>SKU 수</th>
+                <th>브랜드별 내역</th>
+              </tr>
+            </thead>
+            <tbody id="dash-schedule-summary-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="card" id="card-collect">
         <div class="collect-top">
           <div>
@@ -591,7 +614,7 @@
         </div>
         <div class="filter-btns" id="alert-brand-filters" style="margin-bottom:8px;"></div>
         <div class="filter-btns" id="alert-dir-filters" style="margin-bottom:12px;"></div>
-        <div id="alert-empty" class="empty">알림이 없습니다.</div>
+        <div id="alert-empty" class="empty">오늘 가격 변동 내역이 없습니다</div>
         <div id="alert-table-wrap" style="display:none;">
           <table class="data">
             <thead id="alert-thead">
@@ -2221,10 +2244,71 @@
   }
 
   function refreshDashboard() {
+    loadScheduleSummary();
     loadCollectStatus();
     loadQueue();
     loadTodaySection();
     loadAlerts();
+  }
+
+  function loadScheduleSummary() {
+    return Promise.all([
+      apiFetch('GET', '/sku-detail', null),
+      apiFetch('GET', '/collect-schedule?day=all', null)
+    ])
+      .then(function (results) {
+        var allSkus = (results[0] && results[0].data) || [];
+        var scheduleData = (results[1] && results[1].data) || [];
+        var built = scheduleBuildState(allSkus, scheduleData);
+        var dayMap = built.dayMap;
+        var assignedIds = built.assignedIds;
+        var totalActive = allSkus.length;
+        var assignedCount = Object.keys(assignedIds).length;
+        var unassignedCount = totalActive - assignedCount;
+
+        var totalEl = document.getElementById('dash-sch-total');
+        var asgEl = document.getElementById('dash-sch-assigned');
+        var unEl = document.getElementById('dash-sch-unassigned');
+        if (totalEl) totalEl.textContent = String(totalActive);
+        if (asgEl) asgEl.textContent = String(assignedCount);
+        if (unEl) unEl.textContent = String(unassignedCount);
+
+        var tbody = document.getElementById('dash-schedule-summary-tbody');
+        if (!tbody) return;
+        var h = '';
+        for (var d = 1; d <= 5; d++) {
+          var ids = dayMap[d] || [];
+          var brandCount = {};
+          for (var i = 0; i < ids.length; i++) {
+            var sid = String(ids[i]);
+            var sku = built.skuMap[sid];
+            var bk = sku && sku.brand ? String(sku.brand) : '(없음)';
+            brandCount[bk] = (brandCount[bk] || 0) + 1;
+          }
+          var brands = Object.keys(brandCount).sort();
+          var brandText = '';
+          if (!brands.length) {
+            brandText = '<span class="muted">—</span>';
+          } else {
+            var parts = [];
+            for (var bi = 0; bi < brands.length; bi++) {
+              parts.push(
+                escapeHtml(brands[bi]) + ' ' + escapeHtml(String(brandCount[brands[bi]]))
+              );
+            }
+            brandText = parts.join(' · ');
+          }
+          h += '<tr>';
+          h += '<td>' + escapeHtml(DAY_NAMES[d]) + '</td>';
+          h += '<td class="num">' + escapeHtml(String(ids.length)) + '</td>';
+          h += '<td>' + brandText + '</td>';
+          h += '</tr>';
+        }
+        tbody.innerHTML = h;
+      })
+      .catch(function (e) {
+        console.error(e);
+      });
   }
 
   function scheduleFmtMoney(v) {
