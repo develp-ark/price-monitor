@@ -1237,7 +1237,7 @@
     if (status !== 'running' && status !== 'stopping') return;
     state.collectPollTimer = setInterval(function () {
       loadCollectStatus();
-    }, 5000);
+    }, 3000);
   }
 
   function setCollectStartButtonsState(isRunning) {
@@ -1336,6 +1336,8 @@
           if (duration) doneText += ' · 소요 ' + duration;
           detail.textContent = doneText;
           loadTodaySection();
+          loadScheduleTab();
+          stopCollectPolling();
         } else if (st === 'idle' || st === 'error') {
           detail.textContent = st === 'error' ? '오류가 발생했습니다.' : '대기 중입니다.';
         } else if (st !== 'running') {
@@ -2712,6 +2714,7 @@
   });
 
   function beginDashboardCollect(list) {
+    lastTableRefresh = 0;
     window.postMessage(
       {
         type: 'SCHEDULE_COLLECT_START',
@@ -2748,11 +2751,9 @@
     if (!state.collectPollTimer) {
       state.collectPollTimer = setInterval(function () {
         loadCollectStatus();
-      }, 5000);
+      }, 3000);
     }
-    setTimeout(function () {
-      loadCollectStatus();
-    }, 2000);
+    loadCollectStatus();
   }
 
   document.getElementById('btn-collect-group-a').addEventListener('click', function () {
