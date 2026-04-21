@@ -807,6 +807,10 @@
 
   var extensionReady = false;
 
+  /** 오늘 수집 현황 테이블: 수집 중(running)일 때 주기적 갱신용 */
+  var lastTableRefresh = 0;
+  var TABLE_REFRESH_INTERVAL = 30000; // 30초
+
   window.addEventListener('message', function (event) {
     if (event.source !== window) return;
     if (!event.data) return;
@@ -1011,6 +1015,13 @@
           runText.textContent = lineText;
           detail.style.display = 'none';
           detail.textContent = '';
+          if (st === 'running') {
+            var nowMs = Date.now();
+            if (nowMs - lastTableRefresh > TABLE_REFRESH_INTERVAL) {
+              lastTableRefresh = nowMs;
+              loadTodaySection();
+            }
+          }
         } else {
           progWrap.style.display = 'none';
           runText.style.display = 'none';
@@ -1038,6 +1049,7 @@
           if (d.finished_at) doneText += ' · 완료: ' + fin;
           if (duration) doneText += ' · 소요 ' + duration;
           detail.textContent = doneText;
+          loadTodaySection();
         } else if (st === 'idle' || st === 'error') {
           detail.textContent = st === 'error' ? '오류가 발생했습니다.' : '대기 중입니다.';
         } else if (st !== 'running') {
