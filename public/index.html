@@ -415,6 +415,56 @@
       cursor: pointer;
     }
     .schedule-popover label:hover { color: #3182F6; }
+    #alert-table-wrap table.data thead th.alert-sort-th {
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    #alert-table-wrap table.data thead th.alert-sort-th:hover {
+      background: #f0f4ff;
+    }
+    #alert-table-wrap .alert-sort-arrow {
+      font-size: 10px;
+      font-weight: 600;
+      color: #666;
+      margin-left: 4px;
+      vertical-align: middle;
+    }
+    #alert-table-wrap .alert-pct-strong .up,
+    #alert-table-wrap .alert-pct-strong .down {
+      font-weight: 600;
+    }
+    #alert-table-wrap .alert-pct-hi-up {
+      display: inline-block;
+      padding: 2px 4px;
+      border-radius: 4px;
+      background: #fff0f0;
+    }
+    #alert-table-wrap .alert-pct-hi-down {
+      display: inline-block;
+      padding: 2px 4px;
+      border-radius: 4px;
+      background: #f0fff4;
+    }
+    #alert-table-wrap .alert-pct-hi-up .up,
+    #alert-table-wrap .alert-pct-hi-down .down {
+      font-weight: 600;
+    }
+    .filter-btns .badge.alert-brand-count {
+      font-size: 11px;
+      padding: 2px 8px;
+      margin-left: 4px;
+      vertical-align: middle;
+      background: #eef2ff;
+      color: #3182F6;
+    }
+    #alert-brand-filters button.on .badge.alert-brand-count {
+      background: rgba(255,255,255,0.25);
+      color: #fff;
+    }
+    #alert-table-wrap table.data tbody tr.alert-row-group-start td {
+      border-top: 2px solid #e5e8eb;
+    }
   </style>
 </head>
 <body>
@@ -458,15 +508,8 @@
         <div id="alert-empty" class="empty">알림이 없습니다.</div>
         <div id="alert-table-wrap" style="display:none;">
           <table class="data">
-            <thead>
-              <tr>
-                <th>상품명</th>
-                <th>브랜드</th>
-                <th class="num">이전가</th>
-                <th class="num">현재가</th>
-                <th class="num">변동률</th>
-                <th>감지일시</th>
-              </tr>
+            <thead id="alert-thead">
+              <tr></tr>
             </thead>
             <tbody id="alert-tbody"></tbody>
           </table>
@@ -813,7 +856,9 @@
     skuCacheTime: 0,
     scheduleTabData: null,
     scheduleOpenDays: {},
-    schedulePopoverSkuId: null
+    schedulePopoverSkuId: null,
+    alertSortKey: 'pct_abs',
+    alertSortAsc: false
   };
 
   var extensionReady = false;
@@ -939,6 +984,127 @@
     var absStr = Math.abs(n).toFixed(2).replace(/\.?0+$/, '');
     if (n > 0) return '<span class="up">▲' + escapeHtml(absStr) + '%</span>';
     return '<span class="down">▼' + escapeHtml(absStr) + '%</span>';
+  }
+
+  function formatAlertChangePctHtml(pct) {
+    var inner = formatChangeCellHtml(pct);
+    var n = Number(pct);
+    if (pct === null || pct === undefined || pct === '' || isNaN(n) || n === 0) {
+      return inner;
+    }
+    var absv = Math.abs(n);
+    var wrapCls = 'alert-pct-wrap';
+    if (absv >= 10) {
+      wrapCls += n > 0 ? ' alert-pct-hi-up' : ' alert-pct-hi-down';
+    } else if (absv >= 5) {
+      wrapCls += ' alert-pct-strong';
+    }
+    return '<span class="' + wrapCls + '">' + inner + '</span>';
+  }
+
+  function alertCmpLocale(a, b) {
+    return String(a || '').localeCompare(String(b || ''), 'ko');
+  }
+
+  function alertPassesDirFilter(a) {
+    var ch = Number(a.change_pct);
+    if (state.alertDir === 'up' && !(ch > 0)) return false;
+    if (state.alertDir === 'down' && !(ch < 0)) return false;
+    return true;
+  }
+
+  function alertBrandDirCounts() {
+    var counts = { __all__: 0 };
+    var list = state.alertRaw || [];
+    for (var i = 0; i < list.length; i++) {
+      var a = list[i];
+      if (!alertPassesDirFilter(a)) continue;
+      counts.__all__ += 1;
+      var b = String(a.brand || '');
+      counts[b] = (counts[b] || 0) + 1;
+    }
+    return counts;
+  }
+
+  function defaultAscForAlertSortKey(key) {
+    if (key === 'sku_name' || key === 'brand') return true;
+    return false;
+  }
+
+  function sortAlertRows(rows) {
+    var key = state.alertSortKey || 'pct_abs';
+    var asc = !!state.alertSortAsc;
+    var num = function (x) {
+      var v = Number(x);
+      return isNaN(v) ? 0 : v;
+    };
+    rows.sort(function (a, b) {
+      var c = 0;
+      if (key === 'pct_abs') {
+        c = Math.abs(num(a.change_pct)) - Math.abs(num(b.change_pct));
+      } else if (key === 'sku_name') {
+        c = alertCmpLocale(a.sku_name, b.sku_name);
+      } else if (key === 'brand') {
+        c = alertCmpLocale(a.brand, b.brand);
+      } else if (key === 'prev_price') {
+        c = num(a.prev_price) - num(b.prev_price);
+      } else if (key === 'new_price') {
+        c = num(a.new_price) - num(b.new_price);
+      } else if (key === 'change_pct') {
+        c = num(a.change_pct) - num(b.change_pct);
+      } else if (key === 'detected_at') {
+        c =
+          new Date(a.detected_at || 0).getTime() -
+          new Date(b.detected_at || 0).getTime();
+      } else {
+        c = Math.abs(num(a.change_pct)) - Math.abs(num(b.change_pct));
+      }
+      if (c !== 0) return asc ? c : -c;
+      return alertCmpLocale(a.sku_name, b.sku_name);
+    });
+    return rows;
+  }
+
+  function renderAlertSortArrow(colKey) {
+    if (state.alertSortKey !== colKey) {
+      return '<span class="alert-sort-arrow" style="visibility:hidden">▼</span>';
+    }
+    return (
+      '<span class="alert-sort-arrow">' +
+      (state.alertSortAsc ? '▲' : '▼') +
+      '</span>'
+    );
+  }
+
+  function renderAlertThead() {
+    var thead = document.querySelector('#alert-thead tr');
+    if (!thead) return;
+    var h = '';
+    h +=
+      '<th class="alert-sort-th" data-alert-sort="sku_name">상품명' +
+      renderAlertSortArrow('sku_name') +
+      '</th>';
+    h +=
+      '<th class="alert-sort-th" data-alert-sort="brand">브랜드' +
+      renderAlertSortArrow('brand') +
+      '</th>';
+    h +=
+      '<th class="num alert-sort-th" data-alert-sort="prev_price">이전가' +
+      renderAlertSortArrow('prev_price') +
+      '</th>';
+    h +=
+      '<th class="num alert-sort-th" data-alert-sort="new_price">현재가' +
+      renderAlertSortArrow('new_price') +
+      '</th>';
+    h +=
+      '<th class="num alert-sort-th" data-alert-sort="pct_abs">변동률' +
+      renderAlertSortArrow('pct_abs') +
+      '</th>';
+    h +=
+      '<th class="alert-sort-th" data-alert-sort="detected_at">감지일시' +
+      renderAlertSortArrow('detected_at') +
+      '</th>';
+    thead.innerHTML = h;
   }
 
   function apiFetch(method, path, bodyObj) {
@@ -1302,11 +1468,27 @@
 
   function renderAlertFilters() {
     var brands = uniqueBrandsFromAlerts(state.alertRaw);
+    var counts = alertBrandDirCounts();
     var fb = document.getElementById('alert-brand-filters');
-    var h = '<button type="button" data-ab="__all__" class="' + (state.alertBrand === '__all__' ? 'on' : '') + '">전체</button>';
+    var h =
+      '<button type="button" data-ab="__all__" class="' +
+      (state.alertBrand === '__all__' ? 'on' : '') +
+      '">전체 <span class="badge alert-brand-count">' +
+      (counts.__all__ || 0) +
+      '</span></button>';
     for (var i = 0; i < brands.length; i++) {
       var b = brands[i];
-      h += '<button type="button" data-ab="' + escapeHtml(b) + '" class="' + (state.alertBrand === b ? 'on' : '') + '">' + escapeHtml(b) + '</button>';
+      var cnt = counts[b] != null ? counts[b] : 0;
+      h +=
+        '<button type="button" data-ab="' +
+        escapeHtml(b) +
+        '" class="' +
+        (state.alertBrand === b ? 'on' : '') +
+        '">' +
+        escapeHtml(b) +
+        ' <span class="badge alert-brand-count">' +
+        cnt +
+        '</span></button>';
     }
     fb.innerHTML = h;
 
@@ -1326,11 +1508,6 @@
 
   function filterAlerts() {
     var list = state.alertRaw.slice();
-    list.sort(function (a, b) {
-      var ta = new Date(a.detected_at || 0).getTime();
-      var tb = new Date(b.detected_at || 0).getTime();
-      return tb - ta;
-    });
     var out = [];
     for (var i = 0; i < list.length; i++) {
       var a = list[i];
@@ -1344,7 +1521,8 @@
   }
 
   function renderAlertTable() {
-    var rows = filterAlerts();
+    var rows = filterAlerts().slice();
+    sortAlertRows(rows);
     var badge = document.getElementById('alert-count-badge');
     if (badge) {
       if (rows.length > 0) {
@@ -1358,6 +1536,7 @@
     var empty = document.getElementById('alert-empty');
     var wrap = document.getElementById('alert-table-wrap');
     var tbody = document.getElementById('alert-tbody');
+    renderAlertThead();
     if (!rows.length) {
       empty.style.display = '';
       wrap.style.display = 'none';
@@ -1367,15 +1546,20 @@
     empty.style.display = 'none';
     wrap.style.display = '';
     var h = '';
+    var prevBrand = null;
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
       var alertUrl = state.alertSkuUrlMap[String(r.sku_id)];
-      h += '<tr>';
+      var br = String(r.brand || '');
+      var groupStart = i > 0 && br !== prevBrand;
+      var showBrand = i === 0 || br !== prevBrand;
+      prevBrand = br;
+      h += '<tr' + (groupStart ? ' class="alert-row-group-start"' : '') + '>';
       h += '<td>' + productNameLinkHtml(r.sku_name, alertUrl) + '</td>';
-      h += '<td>' + escapeHtml(r.brand || '') + '</td>';
+      h += '<td>' + (showBrand ? escapeHtml(br) : '') + '</td>';
       h += '<td class="num">' + escapeHtml(formatMoney(r.prev_price)) + '</td>';
       h += '<td class="num">' + escapeHtml(formatMoney(r.new_price)) + '</td>';
-      h += '<td class="num">' + formatChangeCellHtml(r.change_pct) + '</td>';
+      h += '<td class="num">' + formatAlertChangePctHtml(r.change_pct) + '</td>';
       h += '<td>' + escapeHtml(formatKstDateTimeShort(r.detected_at)) + '</td>';
       h += '</tr>';
     }
@@ -2709,13 +2893,34 @@
     if (t.getAttribute('data-close')) {
       closeModal(t.getAttribute('data-close'));
     }
-    var ab = t.getAttribute('data-ab');
+    var sortNode = t;
+    var askSort = null;
+    while (sortNode && sortNode !== document.body) {
+      if (sortNode.getAttribute && sortNode.getAttribute('data-alert-sort') != null) {
+        askSort = sortNode.getAttribute('data-alert-sort');
+        break;
+      }
+      sortNode = sortNode.parentElement;
+    }
+    if (askSort != null) {
+      if (state.alertSortKey === askSort) {
+        state.alertSortAsc = !state.alertSortAsc;
+      } else {
+        state.alertSortKey = askSort;
+        state.alertSortAsc = defaultAscForAlertSortKey(askSort);
+      }
+      renderAlertTable();
+      return;
+    }
+    var abEl = t.closest && t.closest('[data-ab]');
+    var ab = abEl ? abEl.getAttribute('data-ab') : t.getAttribute('data-ab');
     if (ab != null) {
       state.alertBrand = ab;
       renderAlertFilters();
       renderAlertTable();
     }
-    var ad = t.getAttribute('data-ad');
+    var adEl = t.closest && t.closest('[data-ad]');
+    var ad = adEl ? adEl.getAttribute('data-ad') : t.getAttribute('data-ad');
     if (ad != null) {
       state.alertDir = ad;
       renderAlertFilters();
