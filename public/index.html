@@ -95,6 +95,14 @@
     .badge.q-collecting { background: #fff3e0; color: #e65100; }
     .badge.q-done { background: #e8f5e9; color: #2e7d32; }
     .badge.q-failed { background: #ffebee; color: #c62828; }
+    .badge.badge-danger {
+      background: #fee2e2;
+      color: #F04452;
+      font-weight: 700;
+    }
+    .card.card-alert-emphasis {
+      border-top: 3px solid #F04452;
+    }
     .progress-bar {
       height: 10px;
       background: #e5e8eb;
@@ -438,34 +446,34 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card card-alert-emphasis" id="card-price-alerts">
         <div class="card-head">
-          <h2>수동 수집 큐</h2>
-          <div class="actions">
-            <button type="button" class="btn btn-primary" id="btn-queue-add">수집 추가</button>
-            <button type="button" class="btn btn-ghost" id="btn-queue-clear">큐 비우기</button>
-          </div>
+          <h2 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0;">
+            가격 변동 알림
+            <span id="alert-count-badge" class="badge badge-danger" style="display:none;"></span>
+          </h2>
         </div>
-        <p id="queue-pending-hint" class="hint" style="display:none;">확장프로그램에서 수동 수집을 시작하세요</p>
-        <div id="queue-empty" class="empty">수동 수집 대기 항목이 없습니다.</div>
-        <div id="queue-table-wrap" style="display:none;">
+        <div class="filter-btns" id="alert-brand-filters" style="margin-bottom:8px;"></div>
+        <div class="filter-btns" id="alert-dir-filters" style="margin-bottom:12px;"></div>
+        <div id="alert-empty" class="empty">알림이 없습니다.</div>
+        <div id="alert-table-wrap" style="display:none;">
           <table class="data">
             <thead>
               <tr>
-                <th class="num">#</th>
                 <th>상품명</th>
                 <th>브랜드</th>
-                <th>상태</th>
-                <th class="num">수집가격</th>
-                <th>등록시간</th>
+                <th class="num">이전가</th>
+                <th class="num">현재가</th>
+                <th class="num">변동률</th>
+                <th>감지일시</th>
               </tr>
             </thead>
-            <tbody id="queue-tbody"></tbody>
+            <tbody id="alert-tbody"></tbody>
           </table>
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="card-today-collect">
         <div class="card-head">
           <h2>오늘 수집 현황</h2>
           <button type="button" class="btn btn-ghost" id="btn-today-csv">CSV 다운로드</button>
@@ -484,30 +492,6 @@
               </tr>
             </thead>
             <tbody id="today-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-head">
-          <h2>가격 변동 알림</h2>
-        </div>
-        <div class="filter-btns" id="alert-brand-filters" style="margin-bottom:8px;"></div>
-        <div class="filter-btns" id="alert-dir-filters" style="margin-bottom:12px;"></div>
-        <div id="alert-empty" class="empty">알림이 없습니다.</div>
-        <div id="alert-table-wrap" style="display:none;">
-          <table class="data">
-            <thead>
-              <tr>
-                <th>상품명</th>
-                <th>브랜드</th>
-                <th class="num">이전가</th>
-                <th class="num">현재가</th>
-                <th class="num">변동률</th>
-                <th>감지일시</th>
-              </tr>
-            </thead>
-            <tbody id="alert-tbody"></tbody>
           </table>
         </div>
       </div>
@@ -594,6 +578,7 @@
         </div>
         <div class="toolbar-actions">
           <button type="button" class="btn btn-primary" id="btn-sku-add">SKU 추가</button>
+          <button type="button" class="btn btn-primary" id="btn-manual-collect">수동 수집 추가</button>
           <button type="button" class="btn btn-ghost" id="btn-csv-upload">CSV 업로드</button>
           <input type="file" id="csv-file" accept=".csv,text/csv" />
           <button type="button" class="btn btn-ghost" id="btn-sku-csv-dl">CSV 다운로드</button>
@@ -626,6 +611,32 @@
         <div style="padding: 0 16px 16px;">
           <div class="page-info" id="sku-page-info"></div>
           <div class="pagination" id="sku-pagination"></div>
+        </div>
+      </div>
+
+      <div class="card" id="card-manual-queue">
+        <div class="card-head">
+          <h2>수동 수집 큐</h2>
+          <div class="actions">
+            <button type="button" class="btn btn-ghost" id="btn-queue-clear">완료 삭제</button>
+          </div>
+        </div>
+        <p id="queue-pending-hint" class="hint" style="display:none;">확장프로그램에서 수동 수집을 시작하세요</p>
+        <div id="queue-empty" class="empty">수동 수집 대기 항목이 없습니다.</div>
+        <div id="queue-table-wrap" style="display:none;">
+          <table class="data">
+            <thead>
+              <tr>
+                <th class="num">#</th>
+                <th>상품명</th>
+                <th>브랜드</th>
+                <th>상태</th>
+                <th class="num">수집가격</th>
+                <th>등록시간</th>
+              </tr>
+            </thead>
+            <tbody id="queue-tbody"></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -1334,6 +1345,16 @@
 
   function renderAlertTable() {
     var rows = filterAlerts();
+    var badge = document.getElementById('alert-count-badge');
+    if (badge) {
+      if (rows.length > 0) {
+        badge.style.display = 'inline-block';
+        badge.textContent = String(rows.length);
+      } else {
+        badge.style.display = 'none';
+        badge.textContent = '';
+      }
+    }
     var empty = document.getElementById('alert-empty');
     var wrap = document.getElementById('alert-table-wrap');
     var tbody = document.getElementById('alert-tbody');
@@ -2214,6 +2235,7 @@
     document.getElementById('tab-sku').classList.add('active');
     document.getElementById('panel-sku').classList.add('active');
     loadSkuPage(false);
+    loadQueue();
   }
 
   document.getElementById('tab-dash').addEventListener('click', function () {
@@ -2324,7 +2346,7 @@
       });
   });
 
-  document.getElementById('btn-queue-add').addEventListener('click', function () {
+  document.getElementById('btn-manual-collect').addEventListener('click', function () {
     state.queueSkuSelected = {};
     openModal('modal-queue-add');
     document.getElementById('qtab-sku').classList.add('on');
