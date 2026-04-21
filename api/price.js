@@ -117,6 +117,14 @@ module.exports = async (req, res) => {
 
   if (insErr) return json(res, 500, { ok: false, error: insErr.message });
 
+  await client
+    .from('sku_list')
+    .update({
+      current_price: newPrice,
+      last_collected: new Date().toISOString(),
+    })
+    .eq('sku_id', sku_id);
+
   const today = todayUtcYmd();
   const { error: upErr } = await client
     .from('sku_list')
