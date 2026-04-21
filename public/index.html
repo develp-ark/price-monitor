@@ -7,16 +7,16 @@
   <style>
     :root {
       --primary: #3182F6;
-      --success: #00B493;
+      --success: #10B981;
       --danger: #F04452;
-      --warning: #FF9500;
-      --text: #1a1a1a;
-      --muted: #666;
-      --muted2: #999;
-      --border: #e5e8eb;
-      --bg: #f5f6f8;
-      --card: #ffffff;
-      --thead: #f8f9fa;
+      --warning: #F04452;
+      --text: #1A1A1A;
+      --muted: #6B7280;
+      --muted2: #9CA3AF;
+      --border: #E5E8EB;
+      --bg: #F9FAFB;
+      --card: #FFFFFF;
+      --thead: #F8F9FA;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -37,26 +37,33 @@
     }
     header h1 { font-size: 20px; font-weight: 700; color: var(--text); }
     .header-meta { font-size: 12px; color: var(--muted); }
-    .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .tabs { display: flex; gap: 2px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
     .tabs button {
-      padding: 10px 18px;
+      padding: 12px 20px;
       border: none;
-      border-radius: 10px;
-      font-size: 13px;
-      font-weight: 600;
+      border-bottom: 2px solid transparent;
+      border-radius: 0;
+      font-size: 14px;
+      font-weight: 500;
       cursor: pointer;
-      background: var(--card);
+      background: transparent;
       color: var(--muted);
-      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+      box-shadow: none;
     }
-    .tabs button.active { background: var(--primary); color: #fff; }
+    .tabs button:hover { color: var(--text); }
+    .tabs button.active {
+      background: transparent;
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+      font-weight: 600;
+    }
     .panel { display: none; }
     .panel.active { display: block; }
     .card {
       background: var(--card);
-      border-radius: 16px;
-      box-shadow: 0 1px 3px rgba(0,0,0,.08);
-      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.04);
+      padding: 20px;
       margin-bottom: 16px;
       border: 1px solid var(--border);
     }
@@ -66,9 +73,11 @@
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      margin-bottom: 16px;
+      margin: -20px -20px 16px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
     }
-    .card-head h2 { font-size: 15px; font-weight: 700; color: var(--text); }
+    .card-head h2 { font-size: 15px; font-weight: 600; color: var(--text); }
     .card-head .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     .section-title { font-size: 15px; font-weight: 700; margin-bottom: 12px; color: var(--text); }
     .hint { font-size: 12px; color: var(--muted2); margin-top: 10px; line-height: 1.5; }
@@ -122,11 +131,13 @@
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
+      transition: filter .15s;
     }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .btn-primary { background: var(--primary); color: #fff; }
     .btn-danger { background: var(--danger); color: #fff; }
     .btn-ghost { background: #fff; border: 1px solid var(--border); color: var(--text); }
+    .btn:hover { filter: brightness(0.95); }
     table.data {
       width: 100%;
       border-collapse: collapse;
@@ -134,28 +145,30 @@
     }
     table.data th, table.data td {
       text-align: left;
-      border-bottom: 1px solid #e5e8eb;
+      border-bottom: 1px solid #F3F4F6;
     }
     table.data thead th {
-      background: #f1f3f5;
-      color: #555;
+      background: #F8F9FA;
+      color: #6B7280;
       font-weight: 700;
       font-size: 12px;
       text-transform: uppercase;
-      padding: 12px 10px;
-      border-bottom: 2px solid #d5d8db;
+      letter-spacing: .5px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
       position: sticky;
       top: 0;
       z-index: 2;
     }
     table.data td {
-      padding: 12px 10px;
+      padding: 10px 12px;
+      font-size: 13px;
     }
     table.data tbody tr {
-      border-bottom: 1px solid #eef0f2;
+      border-bottom: 1px solid #F3F4F6;
     }
     table.data tbody tr:nth-child(even) { background: #fafbfc; }
-    table.data tbody tr:hover { background: #f0f4ff; }
+    table.data tbody tr:hover { background: #F9FAFB; }
     table.data td.num { padding-left: 14px; padding-right: 14px; }
     .num { text-align: right !important; font-variant-numeric: tabular-nums; }
     .up { color: var(--danger); font-weight: 600; }
@@ -184,14 +197,16 @@
     .filter-btns { display: flex; flex-wrap: wrap; gap: 6px; }
     .filter-btns button {
       padding: 6px 12px;
-      border-radius: 16px;
-      border: 1px solid var(--border);
-      background: #fff;
+      border-radius: 6px;
+      border: 1px solid #E5E8EB;
+      background: #F3F4F6;
       cursor: pointer;
       font-size: 12px;
       font-weight: 600;
+      color: #6B7280;
     }
-    .filter-btns button.on { background: #eef6ff; border-color: var(--primary); color: var(--primary); }
+    .filter-btns button:hover { background: #E5E8EB; }
+    .filter-btns button.on { background: var(--primary); border-color: var(--primary); color: #fff; }
     .flag-badge {
       display: inline-block;
       padding: 4px 8px;
@@ -216,7 +231,7 @@
       border-radius: 16px;
       padding: 24px;
       width: 100%;
-      max-width: 520px;
+      max-width: 500px;
       max-height: 90vh;
       overflow-y: auto;
       box-shadow: 0 1px 3px rgba(0,0,0,.08);
@@ -560,7 +575,8 @@
     .manual-queue-body.open { display: block; }
     .toast {
       position: fixed;
-      right: 20px;
+      left: 50%;
+      transform: translateX(-50%);
       bottom: 20px;
       background: #111827;
       color: #fff;
@@ -570,9 +586,17 @@
       z-index: 2000;
       opacity: 0;
       pointer-events: none;
-      transition: opacity .2s;
+      transition: opacity .3s;
     }
     .toast.show { opacity: 1; }
+    @media (max-width: 768px) {
+      .wrap { padding: 12px; }
+      .card { padding: 14px; }
+      .card-head { margin: -14px -14px 12px; padding: 12px 14px; }
+      .toolbar-actions .btn { width: 100%; }
+      .toolbar-actions { width: 100%; }
+      table.data { min-width: 760px; }
+    }
   </style>
 </head>
 <body>
@@ -1358,7 +1382,8 @@
           if (duration) doneText += ' · 소요 ' + duration;
           detail.textContent = doneText;
           loadTodaySection();
-          loadScheduleTab();
+          loadScheduleSummary();
+          loadAlerts();
           stopCollectPolling();
         } else if (st === 'idle' || st === 'error') {
           detail.textContent = st === 'error' ? '오류가 발생했습니다.' : '대기 중입니다.';
