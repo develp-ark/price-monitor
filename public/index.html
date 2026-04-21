@@ -2199,6 +2199,8 @@
     if (!data || data.sku_id == null) return;
     var btn = document.querySelector('.btn-collect[data-sku-id="' + String(data.sku_id) + '"]');
     if (!btn) return;
+    var row = findSkuRowById(data.sku_id);
+    var skuName = row && row.sku_name ? String(row.sku_name) : String(data.sku_id);
 
     if (btn._timeout) {
       clearTimeout(btn._timeout);
@@ -2214,11 +2216,13 @@
       }
       var dateCell = tr ? tr.querySelector('.cell-last-collected') : null;
       if (dateCell) {
-        dateCell.textContent = fmtCollectedAt(new Date().toISOString());
+        dateCell.textContent = fmtRecentShort(new Date().toISOString());
       }
+      showManualToast(skuName + ' 수집 완료');
     } else {
       btn.textContent = '❌';
       console.error('[PM] 수집 실패:', data.sku_id, data.error);
+      showManualToast(skuName + ' 수집 실패');
     }
 
     btn.disabled = false;
@@ -3434,25 +3438,25 @@
     }
     var cs = t.getAttribute('data-collect-sku');
     if (cs != null) {
+      if (!extensionReady) {
+        alert('Chrome 확장프로그램이 감지되지 않습니다.\nprice-monitor 페이지에서 확장프로그램이 설치되어 있는지 확인하세요.');
+        return;
+      }
+      var rowC = findSkuRowById(cs);
       var btnCollect = t;
       btnCollect.textContent = '⏳';
       btnCollect.disabled = true;
-      apiFetch('POST', '/collect-queue', { sku_ids: [cs] })
-        .then(function () {
-          btnCollect.textContent = '✅';
-          showManualToast('수동 수집 큐에 추가되었습니다');
-          return loadQueue().then(function () {
-            btnCollect.disabled = false;
-            setTimeout(function () { btnCollect.textContent = '▶'; }, 1200);
-          });
-        })
-        .catch(function (e) {
-          console.error(e);
-          btnCollect.textContent = '❌';
-          btnCollect.disabled = false;
-          setTimeout(function () { btnCollect.textContent = '▶'; }, 1200);
-          alert(e.message || String(e));
-        });
+      window.postMessage(
+        {
+          type: 'PRICE_COLLECT_REQUEST',
+          sku: {
+            sku_id: rowC && rowC.sku_id != null ? rowC.sku_id : cs,
+            product_url: rowC && rowC.product_url ? rowC.product_url : '',
+            sku_name: rowC && rowC.sku_name ? rowC.sku_name : ''
+          }
+        },
+        '*'
+      );
       return;
     }
     var es = t.getAttribute('data-edit-sku');
