@@ -550,6 +550,29 @@
       background: #f1f3f5;
       color: #555;
     }
+    .manual-queue-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+    }
+    .manual-queue-body { display: none; margin-top: 10px; }
+    .manual-queue-body.open { display: block; }
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      background: #111827;
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      z-index: 2000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s;
+    }
+    .toast.show { opacity: 1; }
   </style>
 </head>
 <body>
@@ -732,7 +755,7 @@
         <div class="sku-toolbar-row sku-toolbar-row-bottom">
           <div class="toolbar-actions sku-actions-left">
             <button type="button" class="btn btn-primary btn-sm" id="btn-sku-add">+ SKU 추가</button>
-            <button type="button" class="btn btn-primary btn-sm" id="btn-manual-collect">수동 수집 추가</button>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-manual-collect">수동 수집</button>
             <button type="button" class="btn btn-ghost btn-sm" id="btn-bulk-group-a" style="display:none;">A그룹으로</button>
             <button type="button" class="btn btn-ghost btn-sm" id="btn-bulk-group-b" style="display:none;">B그룹으로</button>
           </div>
@@ -771,28 +794,28 @@
       </div>
 
       <div class="card" id="card-manual-queue">
-        <div class="card-head">
+        <div class="manual-queue-head" id="btn-toggle-queue">
           <h2>수동 수집 큐</h2>
-          <div class="actions">
-            <button type="button" class="btn btn-ghost" id="btn-queue-clear">완료 삭제</button>
-          </div>
+          <span class="muted" id="manual-queue-toggle-icon">▼</span>
         </div>
-        <p id="queue-pending-hint" class="hint" style="display:none;">확장프로그램에서 수동 수집을 시작하세요</p>
-        <div id="queue-empty" class="empty">수동 수집 대기 항목이 없습니다.</div>
-        <div id="queue-table-wrap" style="display:none;">
-          <table class="data">
-            <thead>
-              <tr>
-                <th class="num">#</th>
-                <th>상품명</th>
-                <th>브랜드</th>
-                <th>상태</th>
-                <th class="num">수집가격</th>
-                <th>등록시간</th>
-              </tr>
-            </thead>
-            <tbody id="queue-tbody"></tbody>
-          </table>
+        <div id="manual-queue-body" class="manual-queue-body">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+            <button type="button" class="btn btn-ghost" id="btn-queue-clear">완료 항목 삭제</button>
+          </div>
+          <div id="queue-empty" class="empty">수동 수집 대기 항목이 없습니다.</div>
+          <div id="queue-table-wrap" style="display:none;">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th class="num">#</th>
+                  <th>SKU명</th>
+                  <th>URL</th>
+                  <th>상태</th>
+                </tr>
+              </thead>
+              <tbody id="queue-tbody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -907,51 +930,27 @@
   </div>
 
   <div class="modal-bg" id="modal-queue-add">
-    <div class="modal wide">
-      <h3>수동 수집 추가</h3>
-      <div class="sub-tabs">
-        <button type="button" class="on" id="qtab-sku">SKU 선택</button>
-        <button type="button" id="qtab-url">URL 직접입력</button>
+    <div class="modal">
+      <h3>수동 수집</h3>
+      <div class="form-row">
+        <label for="manual-sku-search">SKU 검색</label>
+        <input type="search" id="manual-sku-search" placeholder="상품명 또는 SKU ID 검색" autocomplete="off" />
       </div>
-      <div id="queue-panel-sku">
-        <div class="queue-add-tools">
-          <select id="queue-brand-sel"></select>
-          <input type="search" id="queue-sku-search" placeholder="상품명 검색" />
-          <label style="font-size:12px; display:flex; align-items:center; gap:6px;">
-            <input type="checkbox" id="queue-check-all" /> 전체 선택
-          </label>
-        </div>
-        <div class="scroll-box">
-          <table class="data">
-            <thead>
-              <tr>
-                <th style="width:36px;"></th>
-                <th>SKU ID</th>
-                <th>상품명</th>
-                <th>브랜드</th>
-                <th class="num">현재가</th>
-              </tr>
-            </thead>
-            <tbody id="queue-sku-tbody"></tbody>
-          </table>
-        </div>
-        <div class="modal-actions" style="margin-top:12px;">
-          <button type="button" class="btn btn-ghost" data-close="modal-queue-add">닫기</button>
-          <button type="button" class="btn btn-primary" id="btn-queue-sku-submit">추가</button>
-        </div>
+      <div class="form-row">
+        <label for="manual-sku-select">SKU 선택</label>
+        <select id="manual-sku-select"></select>
       </div>
-      <div id="queue-panel-url" style="display:none;">
-        <div class="form-row">
-          <label for="queue-url-ta">URL (줄바꿈으로 구분)</label>
-          <textarea id="queue-url-ta" placeholder="https://www.coupang.com/..."></textarea>
-        </div>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-ghost" data-close="modal-queue-add">닫기</button>
-          <button type="button" class="btn btn-primary" id="btn-queue-url-submit">추가</button>
-        </div>
+      <div class="form-row">
+        <label for="manual-url-input">URL 입력 (선택)</label>
+        <input type="url" id="manual-url-input" placeholder="https://www.coupang.com/..." autocomplete="off" />
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-close="modal-queue-add">닫기</button>
+        <button type="button" class="btn btn-primary" id="btn-manual-queue-add">수집 추가</button>
       </div>
     </div>
   </div>
+  <div id="manual-toast" class="toast"></div>
 
   <script>
 (function () {
@@ -1391,16 +1390,7 @@
         var rows = json.data || [];
         var wrap = document.getElementById('queue-table-wrap');
         var empty = document.getElementById('queue-empty');
-        var hint = document.getElementById('queue-pending-hint');
         var tbody = document.getElementById('queue-tbody');
-        var hasPending = false;
-        for (var i = 0; i < rows.length; i++) {
-          if (String(rows[i].status).toLowerCase() === 'pending') {
-            hasPending = true;
-            break;
-          }
-        }
-        hint.style.display = hasPending ? '' : 'none';
 
         if (!rows.length) {
           empty.style.display = '';
@@ -1413,13 +1403,12 @@
         var h = '';
         for (var j = 0; j < rows.length; j++) {
           var r = rows[j];
+          var qUrl = r.product_url || r.url || '';
           h += '<tr>';
           h += '<td class="num">' + escapeHtml(String(j + 1)) + '</td>';
           h += '<td>' + escapeHtml(r.sku_name || '') + '</td>';
-          h += '<td>' + escapeHtml(r.brand || '') + '</td>';
+          h += '<td>' + (qUrl ? '<a class="link" href="' + escapeHtml(qUrl) + '" target="_blank" rel="noopener">' + escapeHtml(qUrl) + '</a>' : '<span class="muted">—</span>') + '</td>';
           h += '<td>' + mapQueueStatusBadge(r.status) + '</td>';
-          h += '<td class="num">' + escapeHtml(formatMoney(r.result_price)) + '</td>';
-          h += '<td>' + escapeHtml(formatKstDateTimeShort(r.created_at)) + '</td>';
           h += '</tr>';
         }
         tbody.innerHTML = h;
@@ -3010,115 +2999,63 @@
   });
 
   document.getElementById('btn-manual-collect').addEventListener('click', function () {
-    state.queueSkuSelected = {};
     openModal('modal-queue-add');
-    document.getElementById('qtab-sku').classList.add('on');
-    document.getElementById('qtab-url').classList.remove('on');
-    document.getElementById('queue-panel-sku').style.display = '';
-    document.getElementById('queue-panel-url').style.display = 'none';
-    apiFetch('GET', '/sku-detail', null)
-      .then(function (json) {
-        var rows = json.data || [];
-        var brands = countByBrand(rows);
-        var bk = Object.keys(brands);
-        bk.sort();
-        var sel = document.getElementById('queue-brand-sel');
-        var opts = '<option value="__all__">전체 브랜드</option>';
-        for (var i = 0; i < bk.length; i++) {
-          opts += '<option value="' + escapeHtml(bk[i]) + '">' + escapeHtml(bk[i]) + '</option>';
-        }
-        sel.innerHTML = opts;
-        window.__queueSkuAll = rows;
-        renderQueueSkuTable();
-      })
-      .catch(function (e) {
-        console.error(e);
-        alert(e.message || String(e));
-      });
+    document.getElementById('manual-sku-search').value = '';
+    document.getElementById('manual-url-input').value = '';
+    renderManualSkuSelect('');
   });
 
-  function getQueueFilteredList() {
-    var rows = window.__queueSkuAll || [];
-    var brand = document.getElementById('queue-brand-sel').value;
-    var q = (document.getElementById('queue-sku-search').value || '').toLowerCase();
-    var out = [];
+  function renderManualSkuSelect(keyword) {
+    var rows = state.skuDetailList || [];
+    var q = String(keyword || '').trim().toLowerCase();
+    var sel = document.getElementById('manual-sku-select');
+    if (!sel) return;
+    var h = '<option value="">선택 안함</option>';
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
-      if (brand !== '__all__' && String(r.brand) !== brand) continue;
-      var name = (r.sku_name || '').toLowerCase();
-      if (q && name.indexOf(q) === -1) continue;
-      out.push(r);
+      var sid = String(r.sku_id || '');
+      var name = String(r.sku_name || '');
+      var key = (sid + ' ' + name).toLowerCase();
+      if (q && key.indexOf(q) === -1) continue;
+      h +=
+        '<option value="' +
+        escapeHtml(sid) +
+        '">' +
+        escapeHtml(name + ' (' + sid + ')') +
+        '</option>';
     }
-    return out;
+    sel.innerHTML = h;
   }
 
-  function renderQueueSkuTable() {
-    var rows = getQueueFilteredList();
-    state.queueSkuListFiltered = rows;
-    var tbody = document.getElementById('queue-sku-tbody');
-    var h = '';
-    for (var i = 0; i < rows.length; i++) {
-      var r = rows[i];
-      var sid = String(r.sku_id);
-      var checked = state.queueSkuSelected[sid] ? ' checked' : '';
-      h += '<tr>';
-      h += '<td><input type="checkbox" class="queue-sku-cb" data-sid="' + escapeHtml(sid) + '"' + checked + ' /></td>';
-      h += '<td>' + escapeHtml(sid) + '</td>';
-      h += '<td>' + escapeHtml(r.sku_name || '') + '</td>';
-      h += '<td>' + escapeHtml(r.brand || '') + '</td>';
-      h += '<td class="num">' + escapeHtml(formatMoney(r.current_price)) + '</td>';
-      h += '</tr>';
-    }
-    tbody.innerHTML = h;
-    var cbs = tbody.querySelectorAll('.queue-sku-cb');
-    for (var j = 0; j < cbs.length; j++) {
-      cbs[j].addEventListener('change', function (ev) {
-        var sid = ev.target.getAttribute('data-sid');
-        state.queueSkuSelected[sid] = ev.target.checked;
-      });
-    }
+  function showManualToast(msg) {
+    var el = document.getElementById('manual-toast');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(function () {
+      el.classList.remove('show');
+    }, 1800);
   }
 
-  document.getElementById('queue-brand-sel').addEventListener('change', renderQueueSkuTable);
-  document.getElementById('queue-sku-search').addEventListener('input', renderQueueSkuTable);
-
-  document.getElementById('queue-check-all').addEventListener('change', function (ev) {
-    var on = ev.target.checked;
-    var rows = state.queueSkuListFiltered || [];
-    for (var i = 0; i < rows.length; i++) {
-      state.queueSkuSelected[String(rows[i].sku_id)] = on;
-    }
-    renderQueueSkuTable();
+  document.getElementById('manual-sku-search').addEventListener('input', function () {
+    renderManualSkuSelect(this.value);
   });
 
-  document.getElementById('qtab-sku').addEventListener('click', function () {
-    document.getElementById('qtab-sku').classList.add('on');
-    document.getElementById('qtab-url').classList.remove('on');
-    document.getElementById('queue-panel-sku').style.display = '';
-    document.getElementById('queue-panel-url').style.display = 'none';
-  });
-  document.getElementById('qtab-url').addEventListener('click', function () {
-    document.getElementById('qtab-url').classList.add('on');
-    document.getElementById('qtab-sku').classList.remove('on');
-    document.getElementById('queue-panel-url').style.display = '';
-    document.getElementById('queue-panel-sku').style.display = 'none';
-  });
-
-  document.getElementById('btn-queue-sku-submit').addEventListener('click', function () {
-    var ids = [];
-    for (var k in state.queueSkuSelected) {
-      if (Object.prototype.hasOwnProperty.call(state.queueSkuSelected, k) && state.queueSkuSelected[k]) {
-        ids.push(k);
-      }
-    }
-    if (!ids.length) {
-      alert('선택된 SKU가 없습니다.');
+  document.getElementById('btn-manual-queue-add').addEventListener('click', function () {
+    var sid = document.getElementById('manual-sku-select').value;
+    var url = document.getElementById('manual-url-input').value.trim();
+    var reqs = [];
+    if (sid) reqs.push(apiFetch('POST', '/collect-queue', { sku_ids: [sid] }));
+    if (url) reqs.push(apiFetch('POST', '/collect-queue', { items: [{ product_url: url }] }));
+    if (!reqs.length) {
+      alert('SKU 또는 URL을 입력하세요.');
       return;
     }
-    apiFetch('POST', '/collect-queue', { sku_ids: ids })
+    Promise.all(reqs)
       .then(function () {
         closeModal('modal-queue-add');
-        return loadQueue();
+        showManualToast('수동 수집 큐에 추가되었습니다');
+        loadQueue();
       })
       .catch(function (e) {
         console.error(e);
@@ -3126,29 +3063,18 @@
       });
   });
 
-  document.getElementById('btn-queue-url-submit').addEventListener('click', function () {
-    var ta = document.getElementById('queue-url-ta').value || '';
-    var lines = ta.split(/\r?\n/);
-    var items = [];
-    for (var i = 0; i < lines.length; i++) {
-      var line = lines[i].trim();
-      if (!line) continue;
-      items.push({ product_url: line });
+  document.getElementById('btn-toggle-queue').addEventListener('click', function () {
+    var body = document.getElementById('manual-queue-body');
+    var icon = document.getElementById('manual-queue-toggle-icon');
+    var isOpen = body.classList.contains('open');
+    if (isOpen) {
+      body.classList.remove('open');
+      icon.textContent = '▼';
+    } else {
+      body.classList.add('open');
+      icon.textContent = '▲';
+      loadQueue();
     }
-    if (!items.length) {
-      alert('URL을 입력하세요.');
-      return;
-    }
-    apiFetch('POST', '/collect-queue', { items: items })
-      .then(function () {
-        document.getElementById('queue-url-ta').value = '';
-        closeModal('modal-queue-add');
-        return loadQueue();
-      })
-      .catch(function (e) {
-        console.error(e);
-        alert(e.message || String(e));
-      });
   });
 
   document.getElementById('btn-sku-add').addEventListener('click', function () {
@@ -3481,30 +3407,26 @@
     }
     var cs = t.getAttribute('data-collect-sku');
     if (cs != null) {
-      if (!extensionReady) {
-        alert('Chrome 확장프로그램이 감지되지 않습니다.\nprice-monitor 페이지에서 확장프로그램이 설치되어 있는지 확인하세요.');
-        return;
-      }
-      var rowC = findSkuRowById(cs);
       var btnCollect = t;
-      var skuData = {
-        sku_id: rowC && rowC.sku_id != null ? rowC.sku_id : cs,
-        sku_name: rowC && rowC.sku_name ? rowC.sku_name : '',
-        brand: rowC && rowC.brand ? rowC.brand : '',
-        product_url: rowC && rowC.product_url ? rowC.product_url : ''
-      };
       btnCollect.textContent = '⏳';
       btnCollect.disabled = true;
-      if (btnCollect._timeout) clearTimeout(btnCollect._timeout);
-      btnCollect._timeout = setTimeout(function () {
-        btnCollect.textContent = '❌';
-        btnCollect.disabled = false;
-        setTimeout(function () { btnCollect.textContent = '▶'; }, 3000);
-      }, 60000);
-      window.postMessage({
-        type: 'PRICE_COLLECT_REQUEST',
-        sku: skuData
-      }, '*');
+      apiFetch('POST', '/collect-queue', { sku_ids: [cs] })
+        .then(function () {
+          btnCollect.textContent = '✅';
+          showManualToast('수동 수집 큐에 추가되었습니다');
+          return loadQueue().then(function () {
+            btnCollect.disabled = false;
+            setTimeout(function () { btnCollect.textContent = '▶'; }, 1200);
+          });
+        })
+        .catch(function (e) {
+          console.error(e);
+          btnCollect.textContent = '❌';
+          btnCollect.disabled = false;
+          setTimeout(function () { btnCollect.textContent = '▶'; }, 1200);
+          alert(e.message || String(e));
+        });
+      return;
     }
     var es = t.getAttribute('data-edit-sku');
     if (es != null) {
