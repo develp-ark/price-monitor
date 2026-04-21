@@ -261,7 +261,18 @@
     .empty { color: var(--muted2); font-size: 13px; padding: 16px 0; }
     .collect-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; }
     .sku-toolbar-left { flex: 1; min-width: 0; }
-    .sku-search-row { margin-top: 10px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .sku-toolbar-card { padding: 14px 16px; }
+    .sku-toolbar-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .sku-toolbar-row-bottom { margin-top: 10px; }
+    .sku-actions-left, .sku-actions-right { display: flex; gap: 6px; flex-wrap: wrap; }
+    .btn-sm { padding: 6px 10px; font-size: 12px; border-radius: 7px; }
+    .sku-search-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-left: auto; }
     #sku-search {
       width: 240px;
       padding: 8px 12px;
@@ -281,6 +292,52 @@
       line-height: 1;
       color: #666;
     }
+    #sku-table-wrap .sku-name-link {
+      display: inline-block;
+      max-width: 320px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      vertical-align: middle;
+    }
+    .sku-id-sub {
+      font-size: 11px;
+      color: #999;
+      margin-top: 2px;
+    }
+    .sku-brand-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    #sku-table-wrap.sku-theme-all table.data thead th {
+      background: #f8f9fa;
+      color: #1a1a1a;
+    }
+    #sku-table-wrap.sku-theme-all table.data tbody tr:hover { background: #f0f4ff; }
+    #sku-table-wrap.sku-theme-kunwoo table.data thead th {
+      background: #F06060;
+      color: #fff;
+    }
+    #sku-table-wrap.sku-theme-kunwoo table.data tbody tr:hover { background: #FFF0EE; }
+    #sku-table-wrap.sku-theme-arico table.data thead th {
+      background: #4A90D9;
+      color: #fff;
+    }
+    #sku-table-wrap.sku-theme-arico table.data tbody tr:hover { background: #EBF3FF; }
+    #sku-table-wrap.sku-theme-yoom table.data thead th {
+      background: #2BC48A;
+      color: #fff;
+    }
+    #sku-table-wrap.sku-theme-yoom table.data tbody tr:hover { background: #E8FFF5; }
+    .sku-brand-kunwoo { background: #FFF0EE; color: #EF4444; }
+    .sku-brand-arico { background: #EBF3FF; color: #3B82F6; }
+    .sku-brand-yoom { background: #E8FFF5; color: #10B981; }
+    .sku-brand-default { background: #f3f4f6; color: #666; }
+    .sku-actions-inline { display: flex; gap: 4px; align-items: center; }
+    .sku-actions-inline .btn-icon { padding: 2px 6px; }
     .form-row input[readonly], .form-row textarea[readonly] {
       background: #f8f9fa;
       color: #666;
@@ -630,46 +687,45 @@
     </div>
 
     <div id="panel-sku" class="panel">
-      <div class="toolbar">
-        <div class="sku-toolbar-left">
+      <div class="card sku-toolbar-card">
+        <div class="sku-toolbar-row sku-toolbar-row-top">
           <div class="brand-tabs" id="sku-brand-tabs"></div>
-          <div class="filter-btns" id="sku-group-filter" style="margin-top:8px;"></div>
+          <div class="filter-btns" id="sku-group-filter"></div>
           <div class="sku-search-row">
             <input type="search" id="sku-search" placeholder="상품명 또는 SKU ID 검색" autocomplete="off" />
             <button type="button" id="sku-search-clear" title="검색어 지우기">×</button>
           </div>
         </div>
-        <div class="toolbar-actions">
-          <button type="button" class="btn btn-primary" id="btn-sku-add">SKU 추가</button>
-          <button type="button" class="btn btn-primary" id="btn-manual-collect">수동 수집 추가</button>
-          <button type="button" class="btn btn-ghost" id="btn-bulk-group-a">A그룹으로 일괄 변경</button>
-          <button type="button" class="btn btn-ghost" id="btn-bulk-group-b">B그룹으로 일괄 변경</button>
-          <button type="button" class="btn btn-ghost" id="btn-csv-upload">CSV 업로드</button>
-          <input type="file" id="csv-file" accept=".csv,text/csv" />
-          <button type="button" class="btn btn-ghost" id="btn-sku-csv-dl">CSV 다운로드</button>
-          <button type="button" class="btn btn-ghost" id="btn-auto-dist">자동 분배</button>
-          <button type="button" class="btn btn-ghost" id="btn-sku-refresh">🔄 새로고침</button>
+        <div class="sku-toolbar-row sku-toolbar-row-bottom">
+          <div class="toolbar-actions sku-actions-left">
+            <button type="button" class="btn btn-primary btn-sm" id="btn-sku-add">+ SKU 추가</button>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-manual-collect">수동 수집 추가</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-bulk-group-a" style="display:none;">A그룹으로</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-bulk-group-b" style="display:none;">B그룹으로</button>
+          </div>
+          <div class="toolbar-actions sku-actions-right">
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-csv-upload">CSV ↑</button>
+            <input type="file" id="csv-file" accept=".csv,text/csv" />
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-sku-csv-dl">CSV ↓</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-auto-dist">자동분배</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-sku-refresh">새로고침</button>
+          </div>
         </div>
       </div>
       <div class="card" style="padding:0; overflow:hidden;">
-        <div style="overflow:auto; max-height:70vh;">
+        <div id="sku-table-wrap" class="sku-theme-all" style="overflow:auto; max-height:70vh;">
           <table class="data">
             <thead>
               <tr>
                 <th style="width:36px;"><input type="checkbox" id="sku-check-all" title="현재 페이지 전체" /></th>
                 <th>브랜드</th>
-                <th>SKU ID</th>
                 <th>상품명</th>
                 <th class="num">등록가</th>
                 <th class="num">현재가</th>
                 <th class="num">변동률</th>
-                <th>구분</th>
                 <th>그룹</th>
-                <th>최근수집일</th>
-                <th>수집요일</th>
-                <th>수집</th>
-                <th>수정</th>
-                <th>삭제</th>
+                <th>최근수집</th>
+                <th>액션</th>
               </tr>
             </thead>
             <tbody id="sku-tbody"></tbody>
@@ -880,6 +936,7 @@
     skuSearch: '',
     skuChecked: {},
     skuDetailList: [],
+    filteredSkuList: [],
     skuScheduleMap: {},
     alertRaw: [],
     alertSkuUrlMap: {},
@@ -891,7 +948,8 @@
     scheduleOpenDays: {},
     schedulePopoverSkuId: null,
     alertSortKey: 'pct_abs',
-    alertSortAsc: false
+    alertSortAsc: false,
+    skuPgLoading: {}
   };
 
   var extensionReady = false;
@@ -1634,27 +1692,26 @@
   }
 
   function skuRowChangePctHtml(r) {
-    var chPct = '';
-    var chClass = 'muted';
     if (r.registered_price && r.current_price && r.registered_price > 0) {
       var diff = r.current_price - r.registered_price;
-      var pct = (diff / r.registered_price * 100).toFixed(1);
-      if (Number(pct) === 0) {
-        chPct = '—';
-        chClass = 'muted';
-      } else if (Number(pct) > 0) {
-        chPct = '▲' + Math.abs(Number(pct)) + '%';
-        chClass = 'up';
-      } else {
-        chPct = '▼' + Math.abs(Number(pct)) + '%';
-        chClass = 'down';
+      var pctNum = Number(((diff / r.registered_price) * 100).toFixed(2));
+      if (!isNaN(pctNum) && pctNum !== 0) {
+        var sign = pctNum > 0 ? '▲' : '▼';
+        var color = pctNum > 0 ? '#EF4444' : '#3B82F6';
+        var fw = Math.abs(pctNum) >= 5 ? 'font-weight:600;' : '';
+        var txt = sign + Math.abs(pctNum).toFixed(2).replace(/\.?0+$/, '') + '%';
+        return (
+          '<span style="color:' +
+          color +
+          ';' +
+          fw +
+          '">' +
+          escapeHtml(txt) +
+          '</span>'
+        );
       }
-    } else {
-      chPct = '—';
-      chClass = 'muted';
     }
-    if (chClass === 'muted') return '<span class="muted">' + escapeHtml(chPct) + '</span>';
-    return '<span class="' + chClass + '">' + escapeHtml(chPct) + '</span>';
+    return '<span class="muted">—</span>';
   }
 
   function scheduleCellInnerHtml(skuId) {
@@ -1747,15 +1804,49 @@
     var pg = normalizePriorityGroup(r.priority_group);
     var isA = pg === 'A';
     var sid = escapeHtml(String(r.sku_id));
+    var loading = !!state.skuPgLoading[String(r.sku_id)];
     return (
       '<button type="button" class="badge-pg ' +
       (isA ? 'badge-pg-a' : 'badge-pg-b') +
       '" data-pg-toggle="' +
       sid +
+      '"' +
+      (loading ? ' disabled' : '') +
+      ' title="그룹 전환"' +
       '">' +
-      (isA ? 'A 매일' : 'B 주1회') +
+      (loading ? '…' : isA ? 'A' : 'B') +
       '</button>'
     );
+  }
+
+  function skuThemeClass(brandKey) {
+    if (brandKey === '건우코리아') return 'sku-theme-kunwoo';
+    if (brandKey === '아리코') return 'sku-theme-arico';
+    if (brandKey === '윰') return 'sku-theme-yoom';
+    return 'sku-theme-all';
+  }
+
+  function skuBrandBadgeHtml(brand) {
+    var b = String(brand || '');
+    var cls = 'sku-brand-default';
+    if (b === '건우코리아') cls = 'sku-brand-kunwoo';
+    else if (b === '아리코') cls = 'sku-brand-arico';
+    else if (b === '윰') cls = 'sku-brand-yoom';
+    return '<span class="sku-brand-badge ' + cls + '">' + escapeHtml(b || '—') + '</span>';
+  }
+
+  function fmtRecentShort(s) {
+    if (!s) return '—';
+    var d = new Date(s);
+    if (isNaN(d.getTime())) return '—';
+    return new Intl.DateTimeFormat('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).format(d);
   }
 
   function getSelectedSkuIds() {
@@ -1795,6 +1886,7 @@
       }
       out.push(r);
     }
+    state.filteredSkuList = out.slice();
     return out;
   }
 
@@ -1812,13 +1904,12 @@
   function renderSkuBrandTabs() {
     var rows = state.skuDetailList || [];
     var counts = countByBrand(rows);
-    var brands = Object.keys(counts);
-    brands.sort();
+    var brands = ['건우코리아', '아리코', '윰'];
     var tabs = document.getElementById('sku-brand-tabs');
-    var th = '<button type="button" data-sb="__all__" class="' + (state.skuBrand === '__all__' ? 'on' : '') + '">전체(' + rows.length + ')</button>';
+    var th = '<button type="button" data-sb="__all__" class="' + (state.skuBrand === '__all__' ? 'on' : '') + '">전체</button>';
     for (var i = 0; i < brands.length; i++) {
       var br = brands[i];
-      th += '<button type="button" data-sb="' + escapeHtml(br) + '" class="' + (state.skuBrand === br ? 'on' : '') + '">' + escapeHtml(br) + '(' + counts[br] + ')</button>';
+      th += '<button type="button" data-sb="' + escapeHtml(br) + '" class="' + (state.skuBrand === br ? 'on' : '') + '">' + escapeHtml(br) + '</button>';
     }
     tabs.innerHTML = th;
   }
@@ -1835,11 +1926,11 @@
     h +=
       '<button type="button" data-sg-filter="A" class="' +
       (g === 'A' ? 'on' : '') +
-      '">A그룹(매일)</button>';
+      '">A그룹</button>';
     h +=
       '<button type="button" data-sg-filter="B" class="' +
       (g === 'B' ? 'on' : '') +
-      '">B그룹(주1회)</button>';
+      '">B그룹</button>';
     el.innerHTML = h;
   }
 
@@ -1869,29 +1960,23 @@
         '"' +
         checked +
         ' /></td>';
-      h += '<td>' + escapeHtml(r.brand || '') + '</td>';
-      h += '<td>' + sidStr + '</td>';
-      h += '<td><a class="link" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(r.sku_name || '') + '</a></td>';
+      h += '<td>' + skuBrandBadgeHtml(r.brand) + '</td>';
+      h += '<td><a class="link sku-name-link" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(r.sku_name || '') + '</a><div class="sku-id-sub">' + sidStr + '</div></td>';
       h += '<td class="num">' + escapeHtml(formatMoney(r.registered_price)) + '</td>';
       h += '<td class="num cell-current-price">' + escapeHtml(formatMoney(r.current_price)) + '</td>';
       h += '<td class="num">' + skuRowChangePctHtml(r) + '</td>';
-      h += '<td>' + (r.flag ? '<span class="flag-badge">' + escapeHtml(r.flag) + '</span>' : '—') + '</td>';
       h += '<td>' + skuGroupBadgeHtml(r) + '</td>';
-      h += '<td class="cell-last-collected">' + escapeHtml(fmtCollectedAt(r.last_collected)) + '</td>';
+      h += '<td class="cell-last-collected">' + escapeHtml(fmtRecentShort(r.last_collected)) + '</td>';
+      h += '<td><div class="sku-actions-inline">';
       h +=
-        '<td class="cell-schedule" data-sku-schedule="' +
-        sidStr +
-        '">' +
-        scheduleCellInnerHtml(r.sku_id) +
-        '</td>';
-      h +=
-        '<td><button type="button" class="btn-icon btn-collect" data-collect-sku="' +
+        '<button type="button" class="btn-icon btn-collect" data-collect-sku="' +
         sidStr +
         '" data-sku-id="' +
         sidStr +
-        '" title="즉시 수집">▶</button></td>';
-      h += '<td><button type="button" class="btn-icon" data-edit-sku="' + sidStr + '" title="수정">✏️</button></td>';
-      h += '<td><button type="button" class="btn-icon" data-del-sku="' + sidStr + '" title="삭제">🗑</button></td>';
+        '" title="즉시 수집">▶</button>';
+      h += '<button type="button" class="btn-icon" data-edit-sku="' + sidStr + '" title="수정">✏️</button>';
+      h += '<button type="button" class="btn-icon" data-del-sku="' + sidStr + '" title="삭제">🗑</button>';
+      h += '</div></td>';
       h += '</tr>';
     }
     tbody.innerHTML = h;
@@ -1938,6 +2023,18 @@
     }
     var ca = document.getElementById('sku-check-all');
     if (ca) ca.checked = allOn && slice.length > 0;
+
+    var wrap = document.getElementById('sku-table-wrap');
+    if (wrap) {
+      wrap.className = '';
+      wrap.className = skuThemeClass(state.skuBrand === '__all__' ? '' : state.skuBrand);
+    }
+    var ids = getSelectedSkuIds();
+    var ba = document.getElementById('btn-bulk-group-a');
+    var bb = document.getElementById('btn-bulk-group-b');
+    var showBulk = ids.length > 0;
+    if (ba) ba.style.display = showBulk ? '' : 'none';
+    if (bb) bb.style.display = showBulk ? '' : 'none';
   }
 
   function loadSkuPage(forceRefresh) {
@@ -1977,7 +2074,9 @@
   }
 
   function filteredSkuRowsForCsv() {
-    return getFilteredSkuRows();
+    var rows = state.filteredSkuList || [];
+    if (!rows.length) return getFilteredSkuRows();
+    return rows.slice();
   }
 
   function findSkuRowById(skuId) {
@@ -2764,6 +2863,12 @@
     }
     var ca = document.getElementById('sku-check-all');
     if (ca) ca.checked = allOn && slice.length > 0;
+    var ids = getSelectedSkuIds();
+    var ba = document.getElementById('btn-bulk-group-a');
+    var bb = document.getElementById('btn-bulk-group-b');
+    var showBulk = ids.length > 0;
+    if (ba) ba.style.display = showBulk ? '' : 'none';
+    if (bb) bb.style.display = showBulk ? '' : 'none';
   });
 
   document.getElementById('btn-queue-clear').addEventListener('click', function () {
@@ -3156,12 +3261,18 @@
       var sid = pgtEl.getAttribute('data-pg-toggle');
       var rowPg = findSkuRowById(sid);
       var nxt = rowPg && normalizePriorityGroup(rowPg.priority_group) === 'A' ? 'B' : 'A';
+      state.skuPgLoading[sid] = true;
+      renderSkuTablePage();
       apiFetch('PATCH', '/sku-update', { sku_id: sid, priority_group: nxt })
         .then(function () {
+          if (rowPg) rowPg.priority_group = nxt;
           invalidateSkuCache();
+          state.skuPgLoading[sid] = false;
           return loadSkuPage(true);
         })
         .catch(function (e) {
+          state.skuPgLoading[sid] = false;
+          renderSkuTablePage();
           console.error(e);
           alert(e.message || String(e));
         });
