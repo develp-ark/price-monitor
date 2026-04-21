@@ -50,7 +50,7 @@ async function loadDayRows(client, day) {
       sku_name: r.sku_name,
       product_url: r.product_url,
       is_active: r.is_active,
-      last_collected: r.last_collected,
+      last_collected: r.last_collected || null,
       current_price: r.current_price || null,
       registered_price: r.registered_price || null,
     }));
