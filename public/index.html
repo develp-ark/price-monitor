@@ -1031,21 +1031,17 @@
       </div>
     </div>
   </div>
-  <div class="modal-bg" id="modal-alert-action">
-    <div class="modal">
-      <h3>가격변동 후속조치</h3>
-      <div id="alert-action-summary" class="alert-action-summary"></div>
-      <div class="form-row">
-        <label for="alert-action-memo">조치 메모</label>
-        <textarea id="alert-action-memo" rows="3" placeholder="조치 내용을 입력하세요"></textarea>
-      </div>
-      <div class="modal-actions" style="justify-content:space-between;flex-wrap:wrap;">
-        <button type="button" class="btn btn-danger" id="btn-alert-mark-pending" style="display:none;">미처리로 되돌리기</button>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto;">
-          <button type="button" class="btn btn-ghost" id="btn-alert-save-memo">메모만 저장</button>
-          <button type="button" class="btn btn-primary" id="btn-alert-mark-done">완료 처리</button>
-          <button type="button" class="btn btn-ghost" data-close="modal-alert-action">닫기</button>
-        </div>
+  <div class="modal-overlay" id="modal-alert-action" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:16px;max-width:500px;width:90%;padding:24px;position:relative">
+      <span onclick="closeAlertActionModal()" style="position:absolute;top:16px;right:16px;font-size:20px;cursor:pointer;color:#6B7280">&times;</span>
+      <h3 style="margin:0 0 16px;font-size:16px">가격 변동 처리</h3>
+      <div id="alert-action-summary" style="margin-bottom:16px"></div>
+      <label style="font-size:13px;font-weight:600;color:#1A1A1A">조치 내용</label>
+      <textarea id="alert-action-memo" rows="3" placeholder="조치 내용을 입력하세요" style="width:100%;margin-top:4px;padding:8px 12px;border:1px solid #E5E8EB;border-radius:8px;font-size:13px;resize:vertical;box-sizing:border-box"></textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+        <button id="btn-alert-unresolve" onclick="unresolveAlert()" style="display:none;background:#F04452;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer">미처리로 되돌리기</button>
+        <button onclick="saveAlertMemo()" style="background:#fff;border:1px solid #E5E8EB;border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer">메모만 저장</button>
+        <button onclick="resolveAlert()" style="background:#3182F6;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer">완료 처리</button>
       </div>
     </div>
   </div>
@@ -1055,6 +1051,8 @@
 (function () {
   var API_BASE = '/api';
   var DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
+  var allAlertData = [];
+  var currentAlertItem = null;
   var COLLECT_MODES = [
     { key: 'schedule_today', label: '스케줄 수집 (오늘)', shortLabel: '스케줄 수집', action: 'collect_schedule' },
     { key: 'all', label: '전체 SKU 수집', shortLabel: '전체 SKU 수집', action: 'collect_all' },
@@ -1892,6 +1890,7 @@
           });
         }
         state.alertRaw = normalized;
+        allAlertData = normalized.slice();
         var detailRows = (detail && detail.data) || [];
         var urlMap = {};
         for (var di = 0; di < detailRows.length; di++) {
@@ -2032,97 +2031,119 @@
       if (r && r.resolved === true) {
         h += '<td><span class="alert-status-badge done">완료</span>';
         if (r.memo) {
-          h += '<div class="alert-status-memo" title="' + escapeHtml(String(r.memo)) + '">' + escapeHtml(String(r.memo)) + '</div>';
+          h += '<div style="font-size:11px;color:#9CA3AF;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(String(r.memo)) + '">' + escapeHtml(String(r.memo)) + '</div>';
         }
         h += '</td>';
-        if (r.id != null && r.id !== '') {
-          h += '<td><button type="button" class="btn-text" data-alert-action="' + escapeHtml(String(r.id)) + '" onclick="openAlertActionModal(' + Number(r.id) + '); return false;">수정</button></td>';
-        } else {
-          h += '<td><span class="muted">—</span></td>';
-        }
+        h += '<td><button type="button" onclick="openAlertActionModal(\'' + escapeHtml(String(r.id != null && r.id !== '' ? r.id : ('idx_' + i))) + '\')" style="font-size:12px;padding:4px 12px;background:none;border:1px solid #E5E8EB;border-radius:6px;cursor:pointer;color:#3182F6">수정</button></td>';
       } else {
         h += '<td><span class="alert-status-badge pending">미처리</span></td>';
-        if (r.id != null && r.id !== '') {
-          h += '<td><button type="button" class="btn btn-ghost btn-sm" data-alert-action="' + escapeHtml(String(r.id)) + '" onclick="openAlertActionModal(' + Number(r.id) + '); return false;">처리</button></td>';
-        } else {
-          h += '<td><span class="muted">—</span></td>';
-        }
+        h += '<td><button onclick="openAlertActionModal(\'' + escapeHtml(String(r.id != null && r.id !== '' ? r.id : ('idx_' + i))) + '\')" style="font-size:12px;padding:4px 12px;background:#3182F6;color:#fff;border:none;border-radius:6px;cursor:pointer">처리</button></td>';
       }
       h += '</tr>';
     }
     tbody.innerHTML = h;
   }
 
-  function findAlertById(alertId) {
+  function showToast(msg) {
+    showManualToast(msg);
+  }
+
+  window.openAlertActionModal = function (alertId) {
+    var item = null;
     var idStr = String(alertId);
-    var list = state.alertRaw || [];
-    for (var i = 0; i < list.length; i++) {
-      if (String(list[i].id) == idStr) return list[i];
+    var arr = allAlertData || [];
+    for (var i = 0; i < arr.length; i++) {
+      var aid = arr[i].id != null && arr[i].id !== '' ? String(arr[i].id) : 'idx_' + i;
+      if (aid == idStr) {
+        item = arr[i];
+        break;
+      }
     }
-    return null;
-  }
-
-  function openAlertActionModal(alertId) {
-    var row = findAlertById(alertId);
-    if (!row) return;
-    state.alertActionTarget = row;
-    var summaryEl = document.getElementById('alert-action-summary');
-    var memoEl = document.getElementById('alert-action-memo');
-    var pendingBtn = document.getElementById('btn-alert-mark-pending');
-    var pctText = row.change_pct != null ? formatChangeCellHtml(row.change_pct) : '<span class="muted">—</span>';
-    summaryEl.innerHTML =
-      '<div><strong>' +
-      escapeHtml(row.sku_name || '') +
-      '</strong> · ' +
-      escapeHtml(row.brand || '') +
-      '</div>' +
-      '<div style="margin-top:4px;">' +
-      escapeHtml(formatMoney(row.prev_price)) +
-      ' → ' +
-      escapeHtml(formatMoney(row.new_price)) +
-      ' · ' +
-      pctText +
-      '</div>';
-    memoEl.value = row.memo ? String(row.memo) : '';
-    pendingBtn.style.display = row.resolved === true ? '' : 'none';
-    openModal('modal-alert-action');
-  }
-
-  function saveAlertAction(payload, doneMsg) {
-    var target = state.alertActionTarget;
-    if (!target || target.id == null) return;
-    var req = { id: target.id };
-    for (var k in payload) {
-      if (Object.prototype.hasOwnProperty.call(payload, k)) req[k] = payload[k];
+    if (!item) {
+      console.error('알림 항목을 찾을 수 없음:', alertId);
+      return;
     }
-    apiFetch('PATCH', '/price-alert', req)
-      .then(function () {
-        closeModal('modal-alert-action');
-        showManualToast(doneMsg);
-        state.alertActionTarget = null;
-        return loadAlerts();
-      })
-      .catch(function (e) {
-        console.error(e);
-        alert(e.message || String(e));
-      });
-  }
+    currentAlertItem = item;
+    var html = '<div style="padding:12px;background:#F9FAFB;border-radius:8px;font-size:13px">'
+      + '<div style="font-weight:600;margin-bottom:4px">' + escapeHtml(item.sku_name || '') + '</div>'
+      + '<div style="color:#6B7280;margin-bottom:8px">' + escapeHtml(item.brand || '') + '</div>'
+      + '<span>이전가: ' + Number(item.prev_price || 0).toLocaleString() + '원</span>'
+      + ' → <span style="font-weight:600">현재가: ' + Number(item.new_price || 0).toLocaleString() + '원</span>'
+      + ' <span style="color:' + ((item.change_pct || 0) > 0 ? '#F04452' : '#10B981') + ';font-weight:600">'
+      + ((item.change_pct || 0) > 0 ? '▲' : '▼') + Math.abs(item.change_pct || 0) + '%</span>'
+      + '</div>';
+    document.getElementById('alert-action-summary').innerHTML = html;
+    document.getElementById('alert-action-memo').value = item.memo || '';
+    document.getElementById('btn-alert-unresolve').style.display = item.resolved ? 'inline-block' : 'none';
+    var modal = document.getElementById('modal-alert-action');
+    modal.style.display = 'flex';
+    modal.style.alignItems = 'center';
+    modal.style.justifyContent = 'center';
+  };
 
-  window.openAlertActionModal = openAlertActionModal;
   window.closeAlertActionModal = function () {
-    closeModal('modal-alert-action');
-    state.alertActionTarget = null;
+    document.getElementById('modal-alert-action').style.display = 'none';
+    currentAlertItem = null;
   };
+
   window.resolveAlert = function () {
-    var memo = document.getElementById('alert-action-memo').value.trim();
-    saveAlertAction({ memo: memo, resolved: true }, '완료 처리되었습니다');
+    if (!currentAlertItem || currentAlertItem.id == null || currentAlertItem.id === '') {
+      showToast('알림 ID가 없어 처리할 수 없습니다');
+      return;
+    }
+    fetch('/api/price-alert', {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({id: currentAlertItem.id, memo: document.getElementById('alert-action-memo').value.trim(), resolved: true})
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.ok) {
+        showToast('완료 처리되었습니다');
+        closeAlertActionModal();
+        loadAlerts();
+      } else {
+        showToast('처리 실패: ' + (d.error || ''));
+      }
+    });
   };
+
   window.saveAlertMemo = function () {
-    var memo = document.getElementById('alert-action-memo').value.trim();
-    saveAlertAction({ memo: memo }, '메모가 저장되었습니다');
+    if (!currentAlertItem || currentAlertItem.id == null || currentAlertItem.id === '') {
+      showToast('알림 ID가 없어 저장할 수 없습니다');
+      return;
+    }
+    fetch('/api/price-alert', {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({id: currentAlertItem.id, memo: document.getElementById('alert-action-memo').value.trim()})
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.ok) {
+        showToast('메모가 저장되었습니다');
+        closeAlertActionModal();
+        loadAlerts();
+      } else {
+        showToast('저장 실패: ' + (d.error || ''));
+      }
+    });
   };
+
   window.unresolveAlert = function () {
-    saveAlertAction({ resolved: false }, '미처리로 되돌렸습니다');
+    if (!currentAlertItem || currentAlertItem.id == null || currentAlertItem.id === '') {
+      showToast('알림 ID가 없어 처리할 수 없습니다');
+      return;
+    }
+    fetch('/api/price-alert', {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({id: currentAlertItem.id, resolved: false})
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.ok) {
+        showToast('미처리로 되돌렸습니다');
+        closeAlertActionModal();
+        loadAlerts();
+      } else {
+        showToast('처리 실패: ' + (d.error || ''));
+      }
+    });
   };
 
   function loadSkuSchedules() {
@@ -3500,20 +3521,6 @@
         console.error(e);
         alert(e.message || String(e));
       });
-  });
-
-  document.getElementById('btn-alert-mark-done').addEventListener('click', function () {
-    var memo = document.getElementById('alert-action-memo').value.trim();
-    saveAlertAction({ memo: memo, resolved: true }, '알림을 완료 처리했습니다');
-  });
-
-  document.getElementById('btn-alert-save-memo').addEventListener('click', function () {
-    var memo = document.getElementById('alert-action-memo').value.trim();
-    saveAlertAction({ memo: memo }, '메모를 저장했습니다');
-  });
-
-  document.getElementById('btn-alert-mark-pending').addEventListener('click', function () {
-    saveAlertAction({ resolved: false }, '알림을 미처리로 되돌렸습니다');
   });
 
   document.getElementById('btn-toggle-queue').addEventListener('click', function () {
