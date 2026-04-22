@@ -885,7 +885,14 @@
       <div class="card" id="card-today-collect">
         <div class="card-head">
           <h2>오늘 수집 현황</h2>
-          <button type="button" class="btn btn-ghost" id="btn-today-csv">CSV 다운로드</button>
+          <div class="collect-split" id="today-csv-wrap">
+            <button type="button" class="btn btn-ghost" id="btn-today-csv">CSV 다운로드</button>
+            <div class="collect-menu" id="today-csv-menu" style="left:auto;right:0;min-width:200px;">
+              <button type="button" class="collect-menu-item" data-today-csv-action="all">전체 SKU 다운로드</button>
+              <button type="button" class="collect-menu-item" data-today-csv-action="current">현재 탭 다운로드</button>
+              <button type="button" class="collect-menu-item" data-today-csv-action="collected">수집 완료만 다운로드</button>
+            </div>
+          </div>
         </div>
         <div class="filter-btns" id="today-week-tabs" style="margin-bottom:12px;"></div>
         <div id="today-current-summary" class="hint" style="margin-bottom:10px;"></div>
@@ -1220,7 +1227,8 @@
     queueCollectFail: 0,
     queueRowsSnapshot: [],
     alertActionTarget: null,
-    retryCollectPending: {}
+    retryCollectPending: {},
+    todayCsvMenuOpen: false
   };
 
   var extensionReady = false;
@@ -1526,6 +1534,14 @@
     var menu = document.getElementById('collect-mode-menu');
     if (!menu) return;
     if (state.collectMenuOpen) menu.classList.add('open');
+    else menu.classList.remove('open');
+  }
+
+  function setTodayCsvMenuOpen(open) {
+    state.todayCsvMenuOpen = !!open;
+    var menu = document.getElementById('today-csv-menu');
+    if (!menu) return;
+    if (state.todayCsvMenuOpen) menu.classList.add('open');
     else menu.classList.remove('open');
   }
 
@@ -2076,7 +2092,7 @@
     URL.revokeObjectURL(a.href);
   }
 
-  function btnTodayCsvClick() {
+  function downloadCurrentTabCsv() {
     var merged = window.__todayCsvPayload;
     if (!merged || !merged.length) {
       alert('다운로드할 데이터가 없습니다.');
@@ -2099,12 +2115,61 @@
     }
     var ymd = kstYmd().replace(/-/g, '');
     if (String(state.todayTabKey) === 'current') {
-      downloadCsv('collect_result_' + ymd + '.csv', header, rows);
+      downloadCsv('collect_현재수집_' + ymd + '.csv', header, rows);
     } else {
       var dNum = Number(state.todayTabKey);
       if (isNaN(dNum)) dNum = 1;
-      downloadCsv('today_collect_day' + dNum + '_' + ymd + '.csv', header, rows);
+      var dayLabel = todayTabDayLabel(dNum) || ('day' + dNum);
+      downloadCsv('collect_' + dayLabel + '_' + ymd + '.csv', header, rows);
     }
+  }
+
+  function skuChangePctForCsv(reg, cur) {
+    var r = Number(reg);
+    var c = Number(cur);
+    if (isNaN(r) || r <= 0 || isNaN(c)) return '';
+    return Number((((c - r) / r) * 100).toFixed(2));
+  }
+
+  function downloadAllSkuCsv(collectedOnly) {
+    return apiFetch('GET', '/sku-detail', null)
+      .then(function (json) {
+        var list = (json && json.data) || [];
+        var rowsRaw = [];
+        for (var i = 0; i < list.length; i++) {
+          var r = list[i] || {};
+          var cur = r.current_price;
+          if (collectedOnly && (cur == null || Number(cur) <= 0)) continue;
+          rowsRaw.push(r);
+        }
+        if (!rowsRaw.length) {
+          alert('다운로드할 데이터가 없습니다.');
+          return;
+        }
+        var header = ['SKU_ID', '브랜드', '상품명', '등록가', '현재가', '변동률', '최종수집일', '그룹', '상태'];
+        var rows = [];
+        for (var j = 0; j < rowsRaw.length; j++) {
+          var rr = rowsRaw[j];
+          rows.push([
+            rr.sku_id,
+            rr.brand,
+            rr.sku_name,
+            rr.registered_price,
+            rr.current_price,
+            skuChangePctForCsv(rr.registered_price, rr.current_price),
+            rr.last_collected,
+            rr.priority_group || '',
+            rr.product_status || ''
+          ]);
+        }
+        var ymd = kstYmd().replace(/-/g, '');
+        var fn = collectedOnly ? ('sku_collected_' + ymd + '.csv') : ('sku_all_' + ymd + '.csv');
+        downloadCsv(fn, header, rows);
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
+      });
   }
 
   function uniqueBrandsFromAlerts(alerts) {
@@ -4202,7 +4267,10 @@
     loadSkuPage(true);
   });
 
-  document.getElementById('btn-today-csv').addEventListener('click', btnTodayCsvClick);
+  document.getElementById('btn-today-csv').addEventListener('click', function (ev) {
+    ev.stopPropagation();
+    setTodayCsvMenuOpen(!state.todayCsvMenuOpen);
+  });
 
   document.getElementById('schedule-popover').addEventListener('change', function (ev) {
     var t = ev.target;
@@ -4237,6 +4305,10 @@
     var cwrap = document.getElementById('collect-split-wrap');
     if (state.collectMenuOpen && cwrap && !cwrap.contains(ev.target)) {
       setCollectMenuOpen(false);
+    }
+    var twrap = document.getElementById('today-csv-wrap');
+    if (state.todayCsvMenuOpen && twrap && !twrap.contains(ev.target)) {
+      setTodayCsvMenuOpen(false);
     }
   });
 
@@ -4274,6 +4346,19 @@
     if (cmEl) {
       var modeKey = cmEl.getAttribute('data-collect-mode');
       if (modeKey) startCollectByMode(modeKey);
+      return;
+    }
+    var csvEl = t.closest && t.closest('[data-today-csv-action]');
+    if (csvEl) {
+      var action = csvEl.getAttribute('data-today-csv-action');
+      setTodayCsvMenuOpen(false);
+      if (action === 'all') {
+        downloadAllSkuCsv(false);
+      } else if (action === 'collected') {
+        downloadAllSkuCsv(true);
+      } else {
+        downloadCurrentTabCsv();
+      }
       return;
     }
     if (t.getAttribute('data-close')) {
