@@ -52,7 +52,7 @@ async function fetchAllSkuListForSchedule(client) {
     const { data, error } = await client
       .from('sku_list')
       .select(
-        'sku_id, brand, flag, is_active, last_collected, collect_cycle'
+        'sku_id, brand, flag, is_active, last_collected, collect_cycle, product_status'
       )
       .order('brand')
       .order('sku_id')
@@ -161,7 +161,7 @@ module.exports = async (req, res) => {
       collect_cycle: r.collect_cycle,
       flag: flagKey(r.flag) || null,
       product_url: r.product_url,
-      product_status: r.product_status || null,
+      product_status: r.product_status || 'active',
       priority_group: (function (v) {
         var u = String(v || '')
           .trim()
