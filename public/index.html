@@ -144,6 +144,48 @@
       align-items: center;
       gap: 8px;
     }
+    .alert-status-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .alert-status-badge.pending { background: #fff4e6; color: #f08c00; }
+    .alert-status-badge.done { background: #e8f8f1; color: #10B981; }
+    .alert-status-memo {
+      margin-top: 4px;
+      color: #9CA3AF;
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 220px;
+    }
+    .btn-text {
+      border: none;
+      background: transparent;
+      color: #3182F6;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0;
+    }
+    .btn-text:hover { text-decoration: underline; }
+    #alert-table-wrap tr.alert-row-done {
+      opacity: 0.6;
+      background: #FAFAFA !important;
+    }
+    .alert-action-summary {
+      background: #F8FAFC;
+      border: 1px solid #E5E8EB;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      line-height: 1.5;
+      font-size: 12px;
+    }
     .progress-bar {
       height: 10px;
       background: #e5e8eb;
@@ -698,6 +740,7 @@
         </div>
         <div class="filter-btns" id="alert-brand-filters" style="margin-bottom:8px;"></div>
         <div class="filter-btns" id="alert-dir-filters" style="margin-bottom:12px;"></div>
+        <div class="filter-btns" id="alert-status-filters" style="margin-bottom:12px;"></div>
         <div id="alert-empty" class="empty">오늘 가격 변동 내역이 없습니다</div>
         <div id="alert-table-wrap" style="display:none;">
           <table class="data">
@@ -1013,6 +1056,24 @@
       </div>
     </div>
   </div>
+  <div class="modal-bg" id="modal-alert-action">
+    <div class="modal">
+      <h3>가격변동 후속조치</h3>
+      <div id="alert-action-summary" class="alert-action-summary"></div>
+      <div class="form-row">
+        <label for="alert-action-memo">조치 메모</label>
+        <textarea id="alert-action-memo" rows="3" placeholder="조치 내용을 입력하세요"></textarea>
+      </div>
+      <div class="modal-actions" style="justify-content:space-between;flex-wrap:wrap;">
+        <button type="button" class="btn btn-danger" id="btn-alert-mark-pending" style="display:none;">미처리로 되돌리기</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto;">
+          <button type="button" class="btn btn-ghost" id="btn-alert-save-memo">메모만 저장</button>
+          <button type="button" class="btn btn-primary" id="btn-alert-mark-done">완료 처리</button>
+          <button type="button" class="btn btn-ghost" data-close="modal-alert-action">닫기</button>
+        </div>
+      </div>
+    </div>
+  </div>
   <div id="manual-toast" class="toast"></div>
 
   <script>
@@ -1053,6 +1114,7 @@
     clockTimer: null,
     alertBrand: '__all__',
     alertDir: 'all',
+    alertStatus: 'pending',
     skuBrand: '__all__',
     skuGroupFilter: '__all__',
     skuPage: 1,
@@ -1080,7 +1142,8 @@
     queueCollectRunActive: false,
     queueCollectSuccess: 0,
     queueCollectFail: 0,
-    queueRowsSnapshot: []
+    queueRowsSnapshot: [],
+    alertActionTarget: null
   };
 
   var extensionReady = false;
@@ -1326,6 +1389,8 @@
       '<th class="alert-sort-th" data-alert-sort="detected_at">감지일시' +
       renderAlertSortArrow('detected_at') +
       '</th>';
+    h += '<th>상태</th>';
+    h += '<th>액션</th>';
     thead.innerHTML = h;
   }
 
@@ -1725,7 +1790,7 @@
   }
 
   function updateAlertSummaryStats() {
-    var list = state.alertRaw || [];
+    var list = filterAlerts();
     var nAll = list.length;
     var nUp = 0;
     var nDown = 0;
@@ -1752,7 +1817,24 @@
       .then(function (results) {
         var json = results[0];
         var detail = results[1];
-        state.alertRaw = json.alerts || [];
+        var raw = json.alerts || [];
+        var normalized = [];
+        for (var ri = 0; ri < raw.length; ri++) {
+          var ar = raw[ri] || {};
+          normalized.push({
+            id: ar.id,
+            sku_id: ar.sku_id,
+            sku_name: ar.sku_name,
+            brand: ar.brand,
+            prev_price: ar.prev_price,
+            new_price: ar.new_price,
+            change_pct: ar.change_pct,
+            detected_at: ar.detected_at,
+            memo: ar.memo || '',
+            resolved: ar.resolved === true
+          });
+        }
+        state.alertRaw = normalized;
         var detailRows = (detail && detail.data) || [];
         var urlMap = {};
         for (var di = 0; di < detailRows.length; di++) {
@@ -1810,6 +1892,19 @@
       h2 += '<button type="button" data-ad="' + d.id + '" class="' + (state.alertDir === d.id ? 'on' : '') + '">' + escapeHtml(d.label) + '</button>';
     }
     fd.innerHTML = h2;
+
+    var fs = document.getElementById('alert-status-filters');
+    var statusItems = [
+      { id: 'all', label: '전체' },
+      { id: 'pending', label: '미처리' },
+      { id: 'done', label: '완료' }
+    ];
+    var h3 = '';
+    for (var k = 0; k < statusItems.length; k++) {
+      var st = statusItems[k];
+      h3 += '<button type="button" data-as="' + st.id + '" class="' + (state.alertStatus === st.id ? 'on' : '') + '">' + escapeHtml(st.label) + '</button>';
+    }
+    if (fs) fs.innerHTML = h3;
   }
 
   function filterAlerts() {
@@ -1821,6 +1916,9 @@
       var ch = Number(a.change_pct);
       if (state.alertDir === 'up' && !(ch > 0)) continue;
       if (state.alertDir === 'down' && !(ch < 0)) continue;
+      var isDone = a && a.resolved === true;
+      if (state.alertStatus === 'pending' && isDone) continue;
+      if (state.alertStatus === 'done' && !isDone) continue;
       out.push(a);
     }
     return out;
@@ -1829,6 +1927,12 @@
   function renderAlertTable() {
     var rows = filterAlerts().slice();
     sortAlertRows(rows);
+    rows.sort(function (a, b) {
+      var aa = a && a.resolved === true ? 1 : 0;
+      var bb = b && b.resolved === true ? 1 : 0;
+      return aa - bb;
+    });
+    updateAlertSummaryStats();
     var badge = document.getElementById('alert-count-badge');
     if (badge) {
       if (rows.length > 0) {
@@ -1859,16 +1963,92 @@
       var br = String(r.brand || '');
       var groupStart = i > 0 && br !== prevBrand;
       prevBrand = br;
-      h += '<tr' + (groupStart ? ' class="alert-row-group-start"' : '') + '>';
+      var cls = groupStart ? 'alert-row-group-start' : '';
+      if (r && r.resolved === true) cls += (cls ? ' ' : '') + 'alert-row-done';
+      h += '<tr' + (cls ? ' class="' + cls + '"' : '') + '>';
       h += '<td>' + productNameLinkHtml(r.sku_name, alertUrl) + '</td>';
       h += '<td>' + escapeHtml(br) + '</td>';
       h += '<td class="num">' + escapeHtml(formatMoney(r.prev_price)) + '</td>';
       h += '<td class="num">' + escapeHtml(formatMoney(r.new_price)) + '</td>';
       h += '<td class="num">' + formatAlertChangePctHtml(r.change_pct) + '</td>';
       h += '<td>' + escapeHtml(formatKstDateTimeShort(r.detected_at)) + '</td>';
+      if (r && r.resolved === true) {
+        h += '<td><span class="alert-status-badge done">완료</span>';
+        if (r.memo) {
+          h += '<div class="alert-status-memo" title="' + escapeHtml(String(r.memo)) + '">' + escapeHtml(String(r.memo)) + '</div>';
+        }
+        h += '</td>';
+        if (r.id != null && r.id !== '') {
+          h += '<td><button type="button" class="btn-text" data-alert-action="' + escapeHtml(String(r.id)) + '">수정</button></td>';
+        } else {
+          h += '<td><span class="muted">—</span></td>';
+        }
+      } else {
+        h += '<td><span class="alert-status-badge pending">미처리</span></td>';
+        if (r.id != null && r.id !== '') {
+          h += '<td><button type="button" class="btn btn-ghost btn-sm" data-alert-action="' + escapeHtml(String(r.id)) + '">처리</button></td>';
+        } else {
+          h += '<td><span class="muted">—</span></td>';
+        }
+      }
       h += '</tr>';
     }
     tbody.innerHTML = h;
+  }
+
+  function findAlertById(alertId) {
+    var idStr = String(alertId);
+    var list = state.alertRaw || [];
+    for (var i = 0; i < list.length; i++) {
+      if (String(list[i].id) === idStr) return list[i];
+    }
+    return null;
+  }
+
+  function openAlertActionModal(alertId) {
+    var row = findAlertById(alertId);
+    if (!row) return;
+    state.alertActionTarget = row;
+    var summaryEl = document.getElementById('alert-action-summary');
+    var memoEl = document.getElementById('alert-action-memo');
+    var pendingBtn = document.getElementById('btn-alert-mark-pending');
+    var pctText = row.change_pct != null ? formatChangeCellHtml(row.change_pct) : '<span class="muted">—</span>';
+    summaryEl.innerHTML =
+      '<div><strong>' +
+      escapeHtml(row.sku_name || '') +
+      '</strong> · ' +
+      escapeHtml(row.brand || '') +
+      '</div>' +
+      '<div style="margin-top:4px;">' +
+      escapeHtml(formatMoney(row.prev_price)) +
+      ' → ' +
+      escapeHtml(formatMoney(row.new_price)) +
+      ' · ' +
+      pctText +
+      '</div>';
+    memoEl.value = row.memo ? String(row.memo) : '';
+    pendingBtn.style.display = row.resolved === true ? '' : 'none';
+    openModal('modal-alert-action');
+  }
+
+  function saveAlertAction(payload, doneMsg) {
+    var target = state.alertActionTarget;
+    if (!target || target.id == null) return;
+    var req = { id: target.id };
+    for (var k in payload) {
+      if (Object.prototype.hasOwnProperty.call(payload, k)) req[k] = payload[k];
+    }
+    apiFetch('PATCH', '/price-alert', req)
+      .then(function () {
+        closeModal('modal-alert-action');
+        showManualToast(doneMsg);
+        state.alertActionTarget = null;
+        return loadAlerts();
+      })
+      .catch(function (e) {
+        console.error(e);
+        alert(e.message || String(e));
+      });
   }
 
   function loadSkuSchedules() {
@@ -3255,6 +3435,20 @@
       });
   });
 
+  document.getElementById('btn-alert-mark-done').addEventListener('click', function () {
+    var memo = document.getElementById('alert-action-memo').value.trim();
+    saveAlertAction({ memo: memo, resolved: true }, '알림을 완료 처리했습니다');
+  });
+
+  document.getElementById('btn-alert-save-memo').addEventListener('click', function () {
+    var memo = document.getElementById('alert-action-memo').value.trim();
+    saveAlertAction({ memo: memo }, '메모를 저장했습니다');
+  });
+
+  document.getElementById('btn-alert-mark-pending').addEventListener('click', function () {
+    saveAlertAction({ resolved: false }, '알림을 미처리로 되돌렸습니다');
+  });
+
   document.getElementById('btn-toggle-queue').addEventListener('click', function () {
     var body = document.getElementById('manual-queue-body');
     var icon = document.getElementById('manual-queue-toggle-icon');
@@ -3644,6 +3838,20 @@
       state.alertDir = ad;
       renderAlertFilters();
       renderAlertTable();
+    }
+    var asEl = t.closest && t.closest('[data-as]');
+    var as = asEl ? asEl.getAttribute('data-as') : t.getAttribute('data-as');
+    if (as != null) {
+      state.alertStatus = as;
+      renderAlertFilters();
+      renderAlertTable();
+      return;
+    }
+    var aaEl = t.closest && t.closest('[data-alert-action]');
+    var aa = aaEl ? aaEl.getAttribute('data-alert-action') : t.getAttribute('data-alert-action');
+    if (aa != null && aa !== '') {
+      openAlertActionModal(aa);
+      return;
     }
     var toggleDetailBtn = t.classList && t.classList.contains('btn-toggle-detail') ? t : null;
     if (toggleDetailBtn && toggleDetailBtn.getAttribute('data-day')) {

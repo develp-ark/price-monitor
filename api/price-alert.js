@@ -3,12 +3,47 @@ const { json, handleOptions } = require('../lib/cors');
 
 module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return handleOptions(res);
-  if (req.method !== 'GET') {
+  if (req.method !== 'GET' && req.method !== 'PATCH') {
     return json(res, 405, { ok: false, error: 'Method not allowed' });
   }
 
   const { client, error: envErr } = getSupabase();
   if (envErr) return json(res, 500, { ok: false, error: envErr });
+
+  if (req.method === 'PATCH') {
+    let body = req.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body || '{}');
+      } catch (e) {
+        return json(res, 400, { ok: false, error: 'Invalid JSON body' });
+      }
+    }
+    body = body || {};
+
+    const id = body.id;
+    if (id === undefined || id === null || id === '') {
+      return json(res, 400, { ok: false, error: 'id is required' });
+    }
+
+    const updateObj = {};
+    if (Object.prototype.hasOwnProperty.call(body, 'memo')) {
+      updateObj.memo = body.memo;
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'resolved')) {
+      if (body.resolved === true) {
+        updateObj.resolved = true;
+        updateObj.resolved_at = new Date().toISOString();
+      } else if (body.resolved === false) {
+        updateObj.resolved = false;
+        updateObj.resolved_at = null;
+      }
+    }
+
+    const { error } = await client.from('price_alert').update(updateObj).eq('id', id);
+    if (error) return json(res, 500, { ok: false, error: error.message });
+    return json(res, 200, { ok: true, id: id });
+  }
 
   const days = Math.min(
     Math.max(parseInt(String(req.query.days || '7'), 10) || 7, 1),
