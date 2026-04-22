@@ -2120,7 +2120,7 @@
     }
   }
 
-  window.retryCollectFromAlert = function (skuId, productUrl, skuName, btnEl) {
+  function retryCollectFromAlert(skuId, productUrl, skuName, btnEl) {
     var key = String(skuId);
     if (btnEl) {
       btnEl.disabled = true;
@@ -2142,9 +2142,9 @@
       '*'
     );
     showToast((skuName || String(skuId || 'SKU')) + ' 재수집 요청');
-  };
+  }
 
-  window.openAlertActionModal = function (alertId) {
+  function openAlertActionModal(alertId) {
     var item = null;
     var idStr = String(alertId);
     var arr = allAlertData || [];
@@ -2175,14 +2175,14 @@
     modal.style.display = 'flex';
     modal.style.alignItems = 'center';
     modal.style.justifyContent = 'center';
-  };
+  }
 
-  window.closeAlertActionModal = function () {
+  function closeAlertActionModal() {
     document.getElementById('modal-alert-action').style.display = 'none';
     currentAlertItem = null;
-  };
+  }
 
-  window.resolveAlert = function () {
+  function resolveAlert() {
     if (!currentAlertItem || currentAlertItem.id == null || currentAlertItem.id === '') {
       showToast('알림 ID가 없어 처리할 수 없습니다');
       return;
@@ -2200,9 +2200,9 @@
         showToast('처리 실패: ' + (d.error || ''));
       }
     });
-  };
+  }
 
-  window.saveAlertMemo = function () {
+  function saveAlertMemo() {
     if (!currentAlertItem || currentAlertItem.id == null || currentAlertItem.id === '') {
       showToast('알림 ID가 없어 저장할 수 없습니다');
       return;
@@ -2220,9 +2220,9 @@
         showToast('저장 실패: ' + (d.error || ''));
       }
     });
-  };
+  }
 
-  window.unresolveAlert = function () {
+  function unresolveAlert() {
     if (!currentAlertItem || currentAlertItem.id == null || currentAlertItem.id === '') {
       showToast('알림 ID가 없어 처리할 수 없습니다');
       return;
@@ -2240,7 +2240,7 @@
         showToast('처리 실패: ' + (d.error || ''));
       }
     });
-  };
+  }
 
   function loadSkuSchedules() {
     return apiFetch('GET', '/collect-schedule?day=all', null)
@@ -4168,6 +4168,24 @@
       })(modals[mi]);
     }
   })();
+
+  window.loadAlerts = loadAlerts;
+  window.loadPriceAlerts = loadAlerts;
+  window.loadTodaySection = loadTodaySection;
+  window.loadScheduleSummary = loadScheduleSummary;
+  window.showToast = showToast;
+  window.openAlertActionModal = openAlertActionModal;
+  window.closeAlertActionModal = closeAlertActionModal;
+  window.resolveAlert = resolveAlert;
+  window.saveAlertMemo = saveAlertMemo;
+  window.unresolveAlert = unresolveAlert;
+  window.retryCollectFromAlert = retryCollectFromAlert;
+  window.startCollectMode = startCollectByMode;
+  window.toggleCollectMenu = function () {
+    var nextOpen = !state.collectMenuOpen;
+    setCollectMenuOpen(nextOpen);
+    if (nextOpen) refreshCollectMenuCounts();
+  };
 
   updateClock();
   state.clockTimer = setInterval(updateClock, 1000);
