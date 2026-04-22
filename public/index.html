@@ -1908,21 +1908,27 @@
             change_pct: ar.change_pct,
             detected_at: ar.detected_at,
             memo: rMemo || '',
-            resolved: rResolved === true
+            resolved: rResolved === true,
+            product_status: ar.product_status || null
           });
         }
         state.alertRaw = normalized;
         allAlertData = normalized.slice();
         var detailRows = (detail && detail.data) || [];
         var urlMap = {};
+        var statusMap = {};
         for (var di = 0; di < detailRows.length; di++) {
           var dr = detailRows[di];
           var sid = dr && dr.sku_id != null ? String(dr.sku_id) : '';
           if (sid && dr.product_url) urlMap[sid] = dr.product_url;
+          if (sid && dr.product_status != null) statusMap[sid] = dr.product_status;
         }
         for (var ni = 0; ni < normalized.length; ni++) {
           var nsid = String(normalized[ni].sku_id || '');
           normalized[ni].product_url = urlMap[nsid] || '';
+          if (!normalized[ni].product_status && statusMap.hasOwnProperty(nsid)) {
+            normalized[ni].product_status = statusMap[nsid];
+          }
         }
         state.alertSkuUrlMap = urlMap;
         updateAlertSummaryStats();
@@ -2053,8 +2059,12 @@
       h += '<td class="num">' + escapeHtml(formatMoney(r.prev_price)) + '</td>';
       var newPriceNum = Number(r.new_price);
       var zeroPrice = r.new_price == null || (!isNaN(newPriceNum) && newPriceNum <= 0);
-      if (zeroPrice) {
-        h += '<td class="num"><span style="color:#F04452;font-weight:600;font-size:12px">판매중단 의심</span></td>';
+      var alertProductStatus = String(r.product_status || '').toLowerCase();
+      var isDiscontinued = alertProductStatus === 'discontinued';
+      if (isDiscontinued) {
+        h += '<td class="num"><span style="display:inline-block;background:#FEE2E2;color:#DC2626;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;">판매중단 확정</span></td>';
+      } else if (zeroPrice) {
+        h += '<td class="num"><span style="display:inline-block;background:#FEF3C7;color:#D97706;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;">판매중단 의심</span></td>';
       } else {
         h += '<td class="num">' + escapeHtml(formatMoney(r.new_price)) + '</td>';
       }
@@ -2071,14 +2081,18 @@
         }
         h += '</td>';
         h += '<td><button type="button" onclick="openAlertActionModal(\'' + escapeHtml(String(r.id != null && r.id !== '' ? r.id : ('idx_' + i))) + '\')" style="font-size:12px;padding:4px 12px;background:none;border:1px solid #E5E8EB;border-radius:6px;cursor:pointer;color:#3182F6">수정</button>';
-        if (zeroPrice) {
+        if (isDiscontinued) {
+          h += ' <span style="font-size:11px;color:#9CA3AF;margin-left:6px">확정됨</span>';
+        } else if (zeroPrice) {
           h += ' <button onclick="retryCollectFromAlert(\'' + escapeJsSingleQuoted(String(r.sku_id)) + '\', \'' + escapeJsSingleQuoted(String(r.product_url || alertUrl || '')) + '\', \'' + escapeJsSingleQuoted(String(r.sku_name || '')) + '\', this)" style="font-size:11px;padding:3px 8px;background:#F04452;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:4px">재수집</button>';
         }
         h += '</td>';
       } else {
         h += '<td><span class="alert-status-badge pending">미처리</span></td>';
         h += '<td><button onclick="openAlertActionModal(\'' + escapeHtml(String(r.id != null && r.id !== '' ? r.id : ('idx_' + i))) + '\')" style="font-size:12px;padding:4px 12px;background:#3182F6;color:#fff;border:none;border-radius:6px;cursor:pointer">처리</button>';
-        if (zeroPrice) {
+        if (isDiscontinued) {
+          h += ' <span style="font-size:11px;color:#9CA3AF;margin-left:6px">확정됨</span>';
+        } else if (zeroPrice) {
           h += ' <button onclick="retryCollectFromAlert(\'' + escapeJsSingleQuoted(String(r.sku_id)) + '\', \'' + escapeJsSingleQuoted(String(r.product_url || alertUrl || '')) + '\', \'' + escapeJsSingleQuoted(String(r.sku_name || '')) + '\', this)" style="font-size:11px;padding:3px 8px;background:#F04452;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:4px">재수집</button>';
         }
         h += '</td>';
@@ -2108,7 +2122,21 @@
     delete state.retryCollectPending[key];
 
     var name = pending.skuName || data.sku_name || key;
-    if (data.success) {
+    if (data && data.status === 'discontinued') {
+      showToast(name + ' — 판매중단 확정');
+      setTimeout(function() {
+        if (typeof loadAlerts === 'function') loadAlerts();
+        if (typeof loadPriceAlerts === 'function') loadPriceAlerts();
+        if (typeof loadTodaySection === 'function') loadTodaySection();
+      }, 3000);
+    } else if (data.success === true && Number(data.price) > 0) {
+      showToast(name + ' — 정상 수집 완료 (' + Number(data.price).toLocaleString('ko-KR') + '원)');
+      setTimeout(function() {
+        if (typeof loadAlerts === 'function') loadAlerts();
+        if (typeof loadPriceAlerts === 'function') loadPriceAlerts();
+        if (typeof loadTodaySection === 'function') loadTodaySection();
+      }, 3000);
+    } else if (data.success) {
       showToast('재수집 완료 — ' + name);
       setTimeout(function() {
         if (typeof loadAlerts === 'function') loadAlerts();
@@ -2548,7 +2576,6 @@
       h += '<td>' + skuBrandBadgeHtml(r.brand) + '</td>';
       h += '<td><a class="link sku-name-link" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(r.sku_name || '') + '</a>';
       if (isDisc) h += '<span style="font-size:11px;background:#FEE2E2;color:#DC2626;padding:2px 6px;border-radius:4px;margin-left:4px">판매중단</span>';
-      else if (isOut) h += '<span style="font-size:11px;background:#FEF3C7;color:#D97706;padding:2px 6px;border-radius:4px;margin-left:4px">품절</span>';
       h += '<div class="sku-id-sub">' + sidStr + '</div></td>';
       h += '<td class="num">' + escapeHtml(formatMoney(r.registered_price)) + '</td>';
       if (isZeroPrice) {

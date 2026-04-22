@@ -91,7 +91,33 @@ module.exports = async (req, res) => {
   const original_price = body.original_price ?? null;
   const discount_rate = body.discount_rate ?? null;
   const collected_by = body.collected_by ?? 'openclaw';
+  var product_status = body.product_status || null;
   const newPrice = Math.round(Number(price));
+
+  if (product_status === 'discontinued') {
+    var nowIso = new Date().toISOString();
+    const { error: skuUpErr } = await client
+      .from('sku_list')
+      .update({
+        product_status: 'discontinued',
+        last_collected: nowIso,
+      })
+      .eq('sku_id', sku_id);
+    if (skuUpErr) return json(res, 500, { ok: false, error: skuUpErr.message });
+
+    const { error: alertUpErr } = await client
+      .from('price_alert')
+      .update({
+        memo: '판매중단 확정 (자동)',
+        resolved: true,
+        resolved_at: nowIso,
+      })
+      .eq('sku_id', sku_id)
+      .eq('resolved', false);
+    if (alertUpErr) return json(res, 500, { ok: false, error: alertUpErr.message });
+
+    return json(res, 200, { ok: true, sku_id: sku_id, product_status: 'discontinued' });
+  }
 
   const { data: prevRow, error: prevErr } = await client
     .from('price_history')
@@ -115,12 +141,16 @@ module.exports = async (req, res) => {
 
   if (insErr) return json(res, 500, { ok: false, error: insErr.message });
 
+  var skuUpdatePayload = {
+    current_price: newPrice,
+    last_collected: new Date().toISOString(),
+  };
+  if (!product_status && newPrice > 0) {
+    skuUpdatePayload.product_status = 'active';
+  }
   await client
     .from('sku_list')
-    .update({
-      current_price: newPrice,
-      last_collected: new Date().toISOString(),
-    })
+    .update(skuUpdatePayload)
     .eq('sku_id', sku_id);
 
   // 기존 미처리 알림 중 new_price가 0이거나 null인 것을 현재 가격으로 업데이트
