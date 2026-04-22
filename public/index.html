@@ -1821,8 +1821,14 @@
         var normalized = [];
         for (var ri = 0; ri < raw.length; ri++) {
           var ar = raw[ri] || {};
+          var rid = ar.id;
+          if (rid == null && ar.alert_id != null) rid = ar.alert_id;
+          var rResolved = ar.resolved;
+          if (rResolved == null && ar.is_resolved != null) rResolved = ar.is_resolved;
+          var rMemo = ar.memo;
+          if ((rMemo == null || rMemo === '') && ar.action_memo != null) rMemo = ar.action_memo;
           normalized.push({
-            id: ar.id,
+            id: rid,
             sku_id: ar.sku_id,
             sku_name: ar.sku_name,
             brand: ar.brand,
@@ -1830,8 +1836,8 @@
             new_price: ar.new_price,
             change_pct: ar.change_pct,
             detected_at: ar.detected_at,
-            memo: ar.memo || '',
-            resolved: ar.resolved === true
+            memo: rMemo || '',
+            resolved: rResolved === true
           });
         }
         state.alertRaw = normalized;
@@ -1979,14 +1985,14 @@
         }
         h += '</td>';
         if (r.id != null && r.id !== '') {
-          h += '<td><button type="button" class="btn-text" data-alert-action="' + escapeHtml(String(r.id)) + '">수정</button></td>';
+          h += '<td><button type="button" class="btn-text" data-alert-action="' + escapeHtml(String(r.id)) + '" onclick="openAlertActionModal(' + Number(r.id) + '); return false;">수정</button></td>';
         } else {
           h += '<td><span class="muted">—</span></td>';
         }
       } else {
         h += '<td><span class="alert-status-badge pending">미처리</span></td>';
         if (r.id != null && r.id !== '') {
-          h += '<td><button type="button" class="btn btn-ghost btn-sm" data-alert-action="' + escapeHtml(String(r.id)) + '">처리</button></td>';
+          h += '<td><button type="button" class="btn btn-ghost btn-sm" data-alert-action="' + escapeHtml(String(r.id)) + '" onclick="openAlertActionModal(' + Number(r.id) + '); return false;">처리</button></td>';
         } else {
           h += '<td><span class="muted">—</span></td>';
         }
@@ -2000,7 +2006,7 @@
     var idStr = String(alertId);
     var list = state.alertRaw || [];
     for (var i = 0; i < list.length; i++) {
-      if (String(list[i].id) === idStr) return list[i];
+      if (String(list[i].id) == idStr) return list[i];
     }
     return null;
   }
@@ -2050,6 +2056,23 @@
         alert(e.message || String(e));
       });
   }
+
+  window.openAlertActionModal = openAlertActionModal;
+  window.closeAlertActionModal = function () {
+    closeModal('modal-alert-action');
+    state.alertActionTarget = null;
+  };
+  window.resolveAlert = function () {
+    var memo = document.getElementById('alert-action-memo').value.trim();
+    saveAlertAction({ memo: memo, resolved: true }, '완료 처리되었습니다');
+  };
+  window.saveAlertMemo = function () {
+    var memo = document.getElementById('alert-action-memo').value.trim();
+    saveAlertAction({ memo: memo }, '메모가 저장되었습니다');
+  };
+  window.unresolveAlert = function () {
+    saveAlertAction({ resolved: false }, '미처리로 되돌렸습니다');
+  };
 
   function loadSkuSchedules() {
     return apiFetch('GET', '/collect-schedule?day=all', null)
