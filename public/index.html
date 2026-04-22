@@ -2432,40 +2432,27 @@
   }
 
   function loadScheduleSummary() {
-    return Promise.all([
-      apiFetch('GET', '/sku-detail', null),
-      apiFetch('GET', '/collect-schedule?day=all', null)
-    ])
-      .then(function (results) {
-        var allSkus = (results[0] && results[0].data) || [];
-        var scheduleData = (results[1] && results[1].data) || [];
-        var built = scheduleBuildState(allSkus, scheduleData);
-        var dayMap = built.dayMap;
-        var assignedIds = built.assignedIds;
-        var totalActive = allSkus.length;
-        var assignedCount = Object.keys(assignedIds).length;
-        var unassignedCount = totalActive - assignedCount;
+    return apiFetch('GET', '/collect-schedule', null)
+      .then(function (json) {
+        var summary = (json && json.summary) || {};
+        var aGroup = Number(json && json.a_group);
+        var bGroup = Number(json && json.b_group);
+        if (isNaN(aGroup)) aGroup = 0;
+        if (isNaN(bGroup)) bGroup = 0;
 
         var dayCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-        for (var si = 0; si < scheduleData.length; si++) {
-          var srow = scheduleData[si] || {};
-          var dow = Number(srow.day_of_week);
-          if (dow >= 1 && dow <= 5) {
-            dayCounts[dow] = (dayCounts[dow] || 0) + 1;
-          }
+        for (var d = 1; d <= 5; d++) {
+          var n = Number(summary[d]);
+          dayCounts[d] = isNaN(n) ? 0 : n;
         }
         state.scheduleDayCounts = dayCounts;
         renderTodayWeekTabs();
 
-        var aAssigned = 0;
-        var bAssigned = 0;
-        for (var aid in assignedIds) {
-          if (!Object.prototype.hasOwnProperty.call(assignedIds, aid)) continue;
-          var skuRow = built.skuMap[aid];
-          var pg = normalizePriorityGroup(skuRow && skuRow.priority_group);
-          if (pg === 'A') aAssigned++;
-          else if (pg === 'B') bAssigned++;
-        }
+        var assignedCount =
+          dayCounts[1] + dayCounts[2] + dayCounts[3] + dayCounts[4] + dayCounts[5];
+        var totalActive = aGroup + bGroup;
+        var unassignedCount = totalActive - assignedCount;
+        if (unassignedCount < 0) unassignedCount = 0;
 
         var totalEl = document.getElementById('dash-sch-total');
         var asgEl = document.getElementById('dash-sch-assigned');
@@ -2475,38 +2462,29 @@
         if (unEl) unEl.textContent = String(unassignedCount);
 
         var tbody = document.getElementById('dash-schedule-summary-tbody');
-        if (!tbody) return { aAssigned: aAssigned, bAssigned: bAssigned };
+        if (!tbody) {
+          return {
+            aAssigned: aGroup,
+            bAssigned: bGroup,
+            a_group: aGroup,
+            b_group: bGroup
+          };
+        }
         var hx = '';
-        for (var d = 1; d <= 5; d++) {
-          var ids = dayMap[d] || [];
-          var brandCount = {};
-          for (var i = 0; i < ids.length; i++) {
-            var sid = String(ids[i]);
-            var sku = built.skuMap[sid];
-            var bk = sku && sku.brand ? String(sku.brand) : '(없음)';
-            brandCount[bk] = (brandCount[bk] || 0) + 1;
-          }
-          var brands = Object.keys(brandCount).sort();
-          var brandText = '';
-          if (!brands.length) {
-            brandText = '<span class="muted">—</span>';
-          } else {
-            var parts = [];
-            for (var bi = 0; bi < brands.length; bi++) {
-              parts.push(
-                escapeHtml(brands[bi]) + ' ' + escapeHtml(String(brandCount[brands[bi]]))
-              );
-            }
-            brandText = parts.join(' · ');
-          }
+        for (var di = 1; di <= 5; di++) {
           hx += '<tr>';
-          hx += '<td>' + escapeHtml(DAY_NAMES[d]) + '</td>';
-          hx += '<td class="num">' + escapeHtml(String(ids.length)) + '</td>';
-          hx += '<td>' + brandText + '</td>';
+          hx += '<td>' + escapeHtml(DAY_NAMES[di]) + '</td>';
+          hx += '<td class="num">' + escapeHtml(String(dayCounts[di] || 0)) + '</td>';
+          hx += '<td><span class="muted">—</span></td>';
           hx += '</tr>';
         }
         tbody.innerHTML = hx;
-        return { aAssigned: aAssigned, bAssigned: bAssigned };
+        return {
+          aAssigned: aGroup,
+          bAssigned: bGroup,
+          a_group: aGroup,
+          b_group: bGroup
+        };
       })
       .catch(function (e) {
         console.error(e);
@@ -3029,7 +3007,9 @@
     var line = document.getElementById('collect-running-text');
     if (line) {
       line.style.display = '';
-      line.textContent = '0/' + list.length + ' 시작 중...';
+      var startGrp =
+        state.collectRunKind === 'B' ? 'B그룹 수집 진행 중 — ' : 'A그룹 수집 진행 중 — ';
+      line.textContent = startGrp + '0/' + list.length + ' 시작 중...';
     }
     var bar = document.getElementById('collect-progress-bar');
     if (bar) bar.style.width = '0%';
@@ -3479,11 +3459,21 @@
   document.getElementById('btn-auto-dist').addEventListener('click', function () {
     if (!confirm('SKU를 요일에 자동 분배할까요?')) return;
     apiFetch('POST', '/collect-schedule', { action: 'auto_distribute' })
-      .then(function () {
+      .then(function (json) {
         invalidateSkuCache();
         return loadScheduleSummary().then(function (meta) {
-          var aN = meta && meta.aAssigned != null ? meta.aAssigned : 0;
-          var bN = meta && meta.bAssigned != null ? meta.bAssigned : 0;
+          var aN =
+            json != null && json.a_group != null
+              ? Number(json.a_group)
+              : meta && meta.aAssigned != null
+                ? meta.aAssigned
+                : 0;
+          var bN =
+            json != null && json.b_group != null
+              ? Number(json.b_group)
+              : meta && meta.bAssigned != null
+                ? meta.bAssigned
+                : 0;
           showManualToast('자동분배 완료 — A그룹 ' + aN + '개, B그룹 ' + bN + '개');
           return loadSkuPage(true);
         });
@@ -3497,11 +3487,21 @@
   document.getElementById('btn-sch-auto-dist').addEventListener('click', function () {
     if (!confirm('요일별 자동 분배를 실행할까요?')) return;
     apiFetch('POST', '/collect-schedule', { action: 'auto_distribute' })
-      .then(function () {
+      .then(function (json) {
         invalidateSkuCache();
         return loadScheduleSummary().then(function (meta) {
-          var aN = meta && meta.aAssigned != null ? meta.aAssigned : 0;
-          var bN = meta && meta.bAssigned != null ? meta.bAssigned : 0;
+          var aN =
+            json != null && json.a_group != null
+              ? Number(json.a_group)
+              : meta && meta.aAssigned != null
+                ? meta.aAssigned
+                : 0;
+          var bN =
+            json != null && json.b_group != null
+              ? Number(json.b_group)
+              : meta && meta.bAssigned != null
+                ? meta.bAssigned
+                : 0;
           showManualToast('자동분배 완료 — A그룹 ' + aN + '개, B그룹 ' + bN + '개');
           return loadScheduleTab();
         });
