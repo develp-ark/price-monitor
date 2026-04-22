@@ -262,6 +262,73 @@ module.exports = async (req, res) => {
     }
   }
 
+  if (body.action === 'collect_schedule') {
+    var kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    var kstDay = kstNow.getUTCDay();
+
+    // collect_schedule 테이블에서 오늘 요일의 sku_id 조회 (페이지네이션)
+    var schedIds = [];
+    var sFrom = 0;
+    while (true) {
+      var sResult = await client.from('collect_schedule').select('sku_id').eq('day_of_week', kstDay).range(sFrom, sFrom + 999);
+      if (sResult.error) return json(res, 500, { ok: false, error: sResult.error.message });
+      schedIds = schedIds.concat((sResult.data || []).map(function(r) { return r.sku_id; }));
+      if (!sResult.data || sResult.data.length < 1000) break;
+      sFrom += 1000;
+    }
+
+    if (!schedIds.length) {
+      return json(res, 200, { ok: true, action: 'collect_schedule', day_of_week: kstDay, items: [], total: 0 });
+    }
+
+    // sku_list에서 해당 SKU 정보 조회 (페이지네이션, is_active=true)
+    var items = [];
+    var batchSize = 300;
+    for (var b = 0; b < schedIds.length; b += batchSize) {
+      var batch = schedIds.slice(b, b + batchSize);
+      var skuResult = await client.from('sku_list').select('sku_id, product_url, sku_name, brand, last_collected').eq('is_active', true).in('sku_id', batch);
+      if (skuResult.error) return json(res, 500, { ok: false, error: skuResult.error.message });
+      items = items.concat((skuResult.data || []).map(function(r) {
+        return { sku_id: r.sku_id, product_url: r.product_url, sku_name: r.sku_name, brand: r.brand, last_collected: r.last_collected || null };
+      }));
+    }
+
+    return json(res, 200, { ok: true, action: 'collect_schedule', day_of_week: kstDay, items: items, total: items.length });
+  }
+
+  if (body.action === 'collect_all') {
+    var allItems = [];
+    var aFrom = 0;
+    while (true) {
+      var aResult = await client.from('sku_list').select('sku_id, product_url, sku_name, brand, last_collected').eq('is_active', true).order('brand', { ascending: true }).order('sku_id', { ascending: true }).range(aFrom, aFrom + 999);
+      if (aResult.error) return json(res, 500, { ok: false, error: aResult.error.message });
+      allItems = allItems.concat((aResult.data || []).map(function(r) {
+        return { sku_id: r.sku_id, product_url: r.product_url, sku_name: r.sku_name, brand: r.brand, last_collected: r.last_collected || null };
+      }));
+      if (!aResult.data || aResult.data.length < 1000) break;
+      aFrom += 1000;
+    }
+    return json(res, 200, { ok: true, action: 'collect_all', items: allItems, total: allItems.length });
+  }
+
+  if (body.action === 'collect_brand') {
+    var brandName = (body.brand || '').trim();
+    if (!brandName) return json(res, 400, { ok: false, error: 'brand is required' });
+
+    var brandItems = [];
+    var bFrom = 0;
+    while (true) {
+      var bResult = await client.from('sku_list').select('sku_id, product_url, sku_name, brand, last_collected').eq('is_active', true).eq('brand', brandName).order('sku_id', { ascending: true }).range(bFrom, bFrom + 999);
+      if (bResult.error) return json(res, 500, { ok: false, error: bResult.error.message });
+      brandItems = brandItems.concat((bResult.data || []).map(function(r) {
+        return { sku_id: r.sku_id, product_url: r.product_url, sku_name: r.sku_name, brand: r.brand, last_collected: r.last_collected || null };
+      }));
+      if (!bResult.data || bResult.data.length < 1000) break;
+      bFrom += 1000;
+    }
+    return json(res, 200, { ok: true, action: 'collect_brand', brand: brandName, items: brandItems, total: brandItems.length });
+  }
+
   const day = parseDay(body.day_of_week);
   const sku_ids = Array.isArray(body.sku_ids)
     ? body.sku_ids.map((x) => String(x || '').trim()).filter(Boolean)

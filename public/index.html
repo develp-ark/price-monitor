@@ -348,8 +348,9 @@
     .queue-add-tools input[type="search"] { min-width: 160px; flex: 1; }
     .status-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; }
     .empty { color: var(--muted2); font-size: 13px; padding: 16px 0; }
-    .collect-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; }
-    .collect-split { position: relative; display: inline-flex; align-items: stretch; }
+    .collect-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; overflow: visible; }
+    #card-collect { overflow: visible; }
+    .collect-split { position: relative; display: inline-flex; align-items: stretch; overflow: visible; }
     .collect-main-btn { border-top-right-radius: 0; border-bottom-right-radius: 0; }
     .collect-drop-btn {
       border-top-left-radius: 0;
@@ -360,14 +361,15 @@
     }
     .collect-menu {
       position: absolute;
-      top: calc(100% + 6px);
+      bottom: 100%;
       left: 0;
-      min-width: 270px;
+      margin-bottom: 4px;
+      min-width: 220px;
       background: #fff;
       border: 1px solid #E5E8EB;
       border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,.1);
-      z-index: 100;
+      box-shadow: 0 -4px 12px rgba(0,0,0,.1);
+      z-index: 9999;
       overflow: hidden;
       display: none;
     }
@@ -1145,7 +1147,8 @@
     queueCollectSuccess: 0,
     queueCollectFail: 0,
     queueRowsSnapshot: [],
-    alertActionTarget: null
+    alertActionTarget: null,
+    retryCollectPending: {}
   };
 
   var extensionReady = false;
@@ -1165,6 +1168,7 @@
 
     if (event.data.type === 'PRICE_COLLECT_RESULT') {
       handleCollectResult(event.data);
+      handleRetryCollectResult(event.data);
     }
 
     if (event.data.type === 'SCHEDULE_COLLECT_DONE') {
@@ -2068,14 +2072,14 @@
         h += '</td>';
         h += '<td><button type="button" onclick="openAlertActionModal(\'' + escapeHtml(String(r.id != null && r.id !== '' ? r.id : ('idx_' + i))) + '\')" style="font-size:12px;padding:4px 12px;background:none;border:1px solid #E5E8EB;border-radius:6px;cursor:pointer;color:#3182F6">수정</button>';
         if (zeroPrice) {
-          h += ' <button onclick="retryCollectFromAlert(\'' + escapeJsSingleQuoted(String(r.sku_id)) + '\', \'' + escapeJsSingleQuoted(String(r.product_url || alertUrl || '')) + '\', \'' + escapeJsSingleQuoted(String(r.sku_name || '')) + '\')" style="font-size:11px;padding:3px 8px;background:#F04452;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:4px">재수집</button>';
+          h += ' <button onclick="retryCollectFromAlert(\'' + escapeJsSingleQuoted(String(r.sku_id)) + '\', \'' + escapeJsSingleQuoted(String(r.product_url || alertUrl || '')) + '\', \'' + escapeJsSingleQuoted(String(r.sku_name || '')) + '\', this)" style="font-size:11px;padding:3px 8px;background:#F04452;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:4px">재수집</button>';
         }
         h += '</td>';
       } else {
         h += '<td><span class="alert-status-badge pending">미처리</span></td>';
         h += '<td><button onclick="openAlertActionModal(\'' + escapeHtml(String(r.id != null && r.id !== '' ? r.id : ('idx_' + i))) + '\')" style="font-size:12px;padding:4px 12px;background:#3182F6;color:#fff;border:none;border-radius:6px;cursor:pointer">처리</button>';
         if (zeroPrice) {
-          h += ' <button onclick="retryCollectFromAlert(\'' + escapeJsSingleQuoted(String(r.sku_id)) + '\', \'' + escapeJsSingleQuoted(String(r.product_url || alertUrl || '')) + '\', \'' + escapeJsSingleQuoted(String(r.sku_name || '')) + '\')" style="font-size:11px;padding:3px 8px;background:#F04452;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:4px">재수집</button>';
+          h += ' <button onclick="retryCollectFromAlert(\'' + escapeJsSingleQuoted(String(r.sku_id)) + '\', \'' + escapeJsSingleQuoted(String(r.product_url || alertUrl || '')) + '\', \'' + escapeJsSingleQuoted(String(r.sku_name || '')) + '\', this)" style="font-size:11px;padding:3px 8px;background:#F04452;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:4px">재수집</button>';
         }
         h += '</td>';
       }
@@ -2088,7 +2092,44 @@
     showManualToast(msg);
   }
 
-  window.retryCollectFromAlert = function (skuId, productUrl, skuName) {
+  function handleRetryCollectResult(data) {
+    if (!data || data.sku_id == null) return;
+    var key = String(data.sku_id);
+    var pending = state.retryCollectPending[key];
+    if (!pending) return;
+
+    var btns = pending.buttons || [];
+    for (var bi = 0; bi < btns.length; bi++) {
+      var b = btns[bi];
+      if (!b) continue;
+      b.disabled = false;
+      b.textContent = '재수집';
+    }
+    delete state.retryCollectPending[key];
+
+    var name = pending.skuName || data.sku_name || key;
+    if (data.success) {
+      showToast('재수집 완료 — ' + name);
+      setTimeout(function() {
+        if (typeof loadAlerts === 'function') loadAlerts();
+        if (typeof loadPriceAlerts === 'function') loadPriceAlerts();
+        if (typeof loadTodaySection === 'function') loadTodaySection();
+      }, 3000);
+    } else {
+      showToast('재수집 실패 — ' + (data.error || name));
+    }
+  }
+
+  window.retryCollectFromAlert = function (skuId, productUrl, skuName, btnEl) {
+    var key = String(skuId);
+    if (btnEl) {
+      btnEl.disabled = true;
+      btnEl.textContent = '...';
+    }
+    if (!state.retryCollectPending[key]) {
+      state.retryCollectPending[key] = { buttons: [], skuName: skuName || key };
+    }
+    if (btnEl) state.retryCollectPending[key].buttons.push(btnEl);
     window.postMessage(
       {
         type: 'PRICE_COLLECT_REQUEST',
