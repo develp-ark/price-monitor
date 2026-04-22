@@ -35,7 +35,7 @@ async function loadDayRows(client, day) {
   const { data: skuRows, error: skuErr } = await client
     .from('sku_list')
     .select(
-      'sku_id, brand, sku_name, product_url, last_collected, is_active, current_price, registered_price, priority_group'
+      'sku_id, brand, sku_name, product_url, last_collected, is_active, current_price, registered_price, priority_group, product_status'
     )
     .in('sku_id', ids);
   if (skuErr) throw new Error(skuErr.message);
@@ -53,6 +53,7 @@ async function loadDayRows(client, day) {
       last_collected: r.last_collected || null,
       current_price: r.current_price || null,
       registered_price: r.registered_price || null,
+      product_status: r.product_status || null,
       priority_group: (function (v) {
         var u = String(v || '')
           .trim()
@@ -286,10 +287,10 @@ module.exports = async (req, res) => {
     var batchSize = 300;
     for (var b = 0; b < schedIds.length; b += batchSize) {
       var batch = schedIds.slice(b, b + batchSize);
-      var skuResult = await client.from('sku_list').select('sku_id, product_url, sku_name, brand, last_collected').eq('is_active', true).in('sku_id', batch);
+      var skuResult = await client.from('sku_list').select('sku_id, product_url, sku_name, brand, last_collected, product_status').eq('is_active', true).in('sku_id', batch);
       if (skuResult.error) return json(res, 500, { ok: false, error: skuResult.error.message });
       items = items.concat((skuResult.data || []).map(function(r) {
-        return { sku_id: r.sku_id, product_url: r.product_url, sku_name: r.sku_name, brand: r.brand, last_collected: r.last_collected || null };
+        return { sku_id: r.sku_id, product_url: r.product_url, sku_name: r.sku_name, brand: r.brand, last_collected: r.last_collected || null, product_status: r.product_status || null };
       }));
     }
 
@@ -300,10 +301,10 @@ module.exports = async (req, res) => {
     var allItems = [];
     var aFrom = 0;
     while (true) {
-      var aResult = await client.from('sku_list').select('sku_id, product_url, sku_name, brand, last_collected').eq('is_active', true).order('brand', { ascending: true }).order('sku_id', { ascending: true }).range(aFrom, aFrom + 999);
+      var aResult = await client.from('sku_list').select('sku_id, product_url, sku_name, brand, last_collected, product_status').eq('is_active', true).order('brand', { ascending: true }).order('sku_id', { ascending: true }).range(aFrom, aFrom + 999);
       if (aResult.error) return json(res, 500, { ok: false, error: aResult.error.message });
       allItems = allItems.concat((aResult.data || []).map(function(r) {
-        return { sku_id: r.sku_id, product_url: r.product_url, sku_name: r.sku_name, brand: r.brand, last_collected: r.last_collected || null };
+        return { sku_id: r.sku_id, product_url: r.product_url, sku_name: r.sku_name, brand: r.brand, last_collected: r.last_collected || null, product_status: r.product_status || null };
       }));
       if (!aResult.data || aResult.data.length < 1000) break;
       aFrom += 1000;
@@ -318,10 +319,10 @@ module.exports = async (req, res) => {
     var brandItems = [];
     var bFrom = 0;
     while (true) {
-      var bResult = await client.from('sku_list').select('sku_id, product_url, sku_name, brand, last_collected').eq('is_active', true).eq('brand', brandName).order('sku_id', { ascending: true }).range(bFrom, bFrom + 999);
+      var bResult = await client.from('sku_list').select('sku_id, product_url, sku_name, brand, last_collected, product_status').eq('is_active', true).eq('brand', brandName).order('sku_id', { ascending: true }).range(bFrom, bFrom + 999);
       if (bResult.error) return json(res, 500, { ok: false, error: bResult.error.message });
       brandItems = brandItems.concat((bResult.data || []).map(function(r) {
-        return { sku_id: r.sku_id, product_url: r.product_url, sku_name: r.sku_name, brand: r.brand, last_collected: r.last_collected || null };
+        return { sku_id: r.sku_id, product_url: r.product_url, sku_name: r.sku_name, brand: r.brand, last_collected: r.last_collected || null, product_status: r.product_status || null };
       }));
       if (!bResult.data || bResult.data.length < 1000) break;
       bFrom += 1000;
