@@ -1833,11 +1833,10 @@
 
   function formatCollectResultBadge(status) {
     var s = String(status || '').toLowerCase();
-    if (s === 'success') return '<span style="color:#10B981;font-weight:700;">✓ 성공</span>';
-    if (s === 'failed') return '<span style="color:#F04452;font-weight:700;">✗ 실패</span>';
+    if (s === 'done') return '<span style="color:#10B981;font-weight:700;">✓</span>';
     if (s === 'discontinued') return '<span style="display:inline-block;background:#FEE2E2;color:#DC2626;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;">판매중단</span>';
-    if (s === 'collecting') return '<span class="muted">수집 중...</span>';
-    if (s === 'pending') return '<span style="color:#9CA3AF;">대기</span>';
+    if (s === 'collecting') return '<span style="color:#3182F6">수집중...</span>';
+    if (s === 'pending') return '<span style="color:#9CA3AF">대기</span>';
     return '<span style="color:#9CA3AF;">—</span>';
   }
 
@@ -1856,14 +1855,12 @@
     var items = window._currentCollectItems || [];
     var st = window._lastCollectStatus || {};
     var current = Number(st.current) || 0;
-    var success = Number(st.success) || 0;
-    var fail = Number(st.fail) || 0;
     var rows = [];
     for (var i = 0; i < items.length; i++) {
       var it = items[i] || {};
       var result = 'pending';
       if (i < current) {
-        result = i < success ? 'success' : (i < success + fail ? 'failed' : 'success');
+        result = 'done';
       } else if (i === current && (st.status === 'running' || st.status === 'stopping')) {
         result = 'collecting';
       }
@@ -1929,12 +1926,22 @@
     var st = window._lastCollectStatus || { status: 'idle' };
     var mode = window._currentCollectMode || '수집';
     var current = Number(st.current) || 0;
-    var total = Number(st.total) || ((window._currentCollectItems && window._currentCollectItems.length) || 0);
+    var total = Number(window._currentCollectTotal) || Number(st.total) || ((window._currentCollectItems && window._currentCollectItems.length) || 0);
     var success = Number(st.success) || 0;
     var fail = Number(st.fail) || 0;
+    var items = window._currentCollectItems || [];
+    var modeBadge = '<span style="background:#EBF3FF;color:#3182F6;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:600;margin-right:6px;">' + escapeHtml(mode) + '</span>';
+    if (!items.length) {
+      if (st.status === 'running' || st.status === 'stopping') {
+        el.innerHTML = modeBadge + '수집이 진행 중이지만 상세 목록을 표시할 수 없습니다. 페이지 새로고침 전에 시작된 수집입니다.';
+        return;
+      }
+      el.textContent = '수집 대기 중 — 수집 버튼을 눌러 시작하세요';
+      return;
+    }
     if (st.status === 'running' || st.status === 'stopping') {
       el.innerHTML =
-        '<span class="badge running" style="margin-right:6px;">' + escapeHtml(mode) + '</span>' +
+        modeBadge +
         '수집 중 — ' + current + '/' + total + ' (성공 ' + success + ' / 실패 ' + fail + ')';
       return;
     }
@@ -1945,7 +1952,7 @@
         duration = fmtDurationFromSeconds(durSec);
       }
       el.innerHTML =
-        '<span class="badge done" style="margin-right:6px;">완료</span>' +
+        '<span style="background:#DCFCE7;color:#15803D;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:600;margin-right:6px;">수집 완료</span>' +
         '수집 완료 — ' + total + '건 (성공 ' + success + ' / 실패 ' + fail + ')' + (duration ? ' · 소요 ' + duration : '');
       return;
     }
@@ -3684,6 +3691,10 @@
         if (!confirm(msg)) return;
         window._currentCollectItems = list.slice ? list.slice() : list;
         window._currentCollectMode = mode.shortLabel || mode.label || '수집';
+        window._currentCollectTotal = total;
+        state.todayTabKey = 'current';
+        renderTodayWeekTabs();
+        loadTodaySection();
         state.lastCollectModeKey = mode.key;
         try {
           localStorage.setItem('lastCollectMode', mode.key);
