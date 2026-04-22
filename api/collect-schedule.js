@@ -131,6 +131,41 @@ async function fetchActivePriorityGroupRowsPaged(client) {
   return groupRows;
 }
 
+async function fetchActiveCollectItemsPaged(client, brand) {
+  const all = [];
+  for (let from = 0; ; from += 1000) {
+    let q = client
+      .from('sku_list')
+      .select('sku_id, product_url, sku_name, brand')
+      .eq('is_active', true)
+      .order('sku_id', { ascending: true })
+      .range(from, from + 999);
+    if (brand != null) q = q.eq('brand', brand);
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    const rows = data || [];
+    for (let i = 0; i < rows.length; i++) {
+      all.push({
+        sku_id: rows[i].sku_id,
+        product_url: rows[i].product_url,
+        sku_name: rows[i].sku_name,
+        brand: rows[i].brand,
+      });
+    }
+    if (rows.length < 1000) break;
+  }
+  return all;
+}
+
+function mapCollectItems(rows) {
+  return (rows || []).map((r) => ({
+    sku_id: r.sku_id,
+    product_url: r.product_url,
+    sku_name: r.sku_name,
+    brand: r.brand,
+  }));
+}
+
 module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return handleOptions(res);
 
@@ -213,6 +248,54 @@ module.exports = async (req, res) => {
 
   const body = parseBody(req, res);
   if (!body) return;
+
+  if (body.action === 'collect_all') {
+    try {
+      const items = await fetchActiveCollectItemsPaged(client);
+      return json(res, 200, {
+        ok: true,
+        action: 'collect_all',
+        items,
+        total: items.length,
+      });
+    } catch (e) {
+      return json(res, 500, { ok: false, error: e.message || 'collect_all failed' });
+    }
+  }
+
+  if (body.action === 'collect_brand') {
+    const brand = String(body.brand || '').trim();
+    if (!brand) return json(res, 400, { ok: false, error: 'brand is required' });
+    try {
+      const items = await fetchActiveCollectItemsPaged(client, brand);
+      return json(res, 200, {
+        ok: true,
+        action: 'collect_brand',
+        brand,
+        items,
+        total: items.length,
+      });
+    } catch (e) {
+      return json(res, 500, { ok: false, error: e.message || 'collect_brand failed' });
+    }
+  }
+
+  if (body.action === 'collect_schedule') {
+    try {
+      const day = parseDay('today');
+      const rows = await loadDayRows(client, day);
+      const items = mapCollectItems(rows);
+      return json(res, 200, {
+        ok: true,
+        action: 'collect_schedule',
+        day_of_week: day,
+        items,
+        total: items.length,
+      });
+    } catch (e) {
+      return json(res, 500, { ok: false, error: e.message || 'collect_schedule failed' });
+    }
+  }
 
   if (body.action === 'auto_distribute') {
     try {

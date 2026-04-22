@@ -349,6 +349,53 @@
     .status-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; }
     .empty { color: var(--muted2); font-size: 13px; padding: 16px 0; }
     .collect-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .collect-split { position: relative; display: inline-flex; align-items: stretch; }
+    .collect-main-btn { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+    .collect-drop-btn {
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+      border-left: 1px solid rgba(255,255,255,0.35);
+      width: 36px;
+      padding: 0;
+    }
+    .collect-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      min-width: 260px;
+      background: #fff;
+      border: 1px solid #E5E8EB;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      z-index: 100;
+      display: none;
+      overflow: hidden;
+    }
+    .collect-menu.open { display: block; }
+    .collect-menu-item {
+      width: 100%;
+      border: none;
+      background: #fff;
+      text-align: left;
+      padding: 10px 16px;
+      font-size: 13px;
+      color: #1A1A1A;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .collect-menu-item:hover { background: #F5F6F8; }
+    .collect-item-left { display: flex; align-items: center; gap: 8px; }
+    .collect-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      flex: 0 0 auto;
+    }
+    .collect-item-count { color: #6B7280; font-size: 12px; }
     .sku-toolbar-left { flex: 1; min-width: 0; }
     .sku-toolbar-card { padding: 14px 16px; }
     .sku-toolbar-row {
@@ -719,8 +766,11 @@
             <div id="collect-running-text" class="hint" style="display:none;"></div>
           </div>
           <div class="actions">
-            <button type="button" class="btn btn-primary" id="btn-collect-group-a">▶ A그룹 수집 (매일)</button>
-            <button type="button" class="btn btn-primary" id="btn-collect-group-b">▶ B그룹 수집 (오늘분)</button>
+            <div class="collect-split" id="collect-split-wrap">
+              <button type="button" class="btn btn-primary collect-main-btn" id="btn-collect-start-main">▶ 스케줄 수집 시작</button>
+              <button type="button" class="btn btn-primary collect-drop-btn" id="btn-collect-mode-toggle">▼</button>
+              <div class="collect-menu" id="collect-mode-menu"></div>
+            </div>
             <button type="button" class="btn btn-danger" id="btn-stop-collect" disabled>■ 중지</button>
           </div>
         </div>
@@ -1080,6 +1130,13 @@
 (function () {
   var API_BASE = '/api';
   var DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
+  var COLLECT_MODES = [
+    { key: 'schedule_today', label: '스케줄 수집 (오늘)', shortLabel: '스케줄 수집', action: 'collect_schedule' },
+    { key: 'all', label: '전체 SKU 수집', shortLabel: '전체 SKU 수집', action: 'collect_all' },
+    { key: 'kunwoo', label: '건우코리아 수집', shortLabel: '건우코리아 수집', action: 'collect_brand', brand: '건우코리아', dot: '#EF4444' },
+    { key: 'arico', label: '아리코 수집', shortLabel: '아리코 수집', action: 'collect_brand', brand: '아리코', dot: '#3B82F6' },
+    { key: 'yoom', label: '윰 수집', shortLabel: '윰 수집', action: 'collect_brand', brand: '윰', dot: '#10B981' }
+  ];
 
   function getDefaultKstWeekTabDay() {
     var parts = new Intl.DateTimeFormat('en', {
@@ -1138,6 +1195,15 @@
     todayTabDay: getDefaultKstWeekTabDay(),
     dashboardCollectPending: false,
     collectRunKind: null,
+    collectMenuOpen: false,
+    collectModeCounts: {},
+    lastCollectModeKey: (function () {
+      try {
+        return localStorage.getItem('lastCollectMode') || 'schedule_today';
+      } catch (e) {
+        return 'schedule_today';
+      }
+    })(),
     scheduleDayCounts: {},
     queueCollectRunActive: false,
     queueCollectSuccess: 0,
@@ -1430,19 +1496,84 @@
     }, 3000);
   }
 
+  function getCollectModeByKey(key) {
+    var k = String(key || '');
+    for (var i = 0; i < COLLECT_MODES.length; i++) {
+      if (COLLECT_MODES[i].key === k) return COLLECT_MODES[i];
+    }
+    return COLLECT_MODES[0];
+  }
+
+  function setCollectMenuOpen(open) {
+    state.collectMenuOpen = !!open;
+    var menu = document.getElementById('collect-mode-menu');
+    if (!menu) return;
+    if (state.collectMenuOpen) menu.classList.add('open');
+    else menu.classList.remove('open');
+  }
+
+  function updateCollectMainButtonText() {
+    var btn = document.getElementById('btn-collect-start-main');
+    if (!btn) return;
+    var m = getCollectModeByKey(state.lastCollectModeKey);
+    btn.textContent = '▶ ' + m.shortLabel + ' 시작';
+  }
+
+  function renderCollectModeMenu() {
+    var menu = document.getElementById('collect-mode-menu');
+    if (!menu) return;
+    var h = '';
+    for (var i = 0; i < COLLECT_MODES.length; i++) {
+      var m = COLLECT_MODES[i];
+      var cnt = state.collectModeCounts[m.key];
+      if (cnt == null) cnt = 0;
+      h += '<button type="button" class="collect-menu-item" data-collect-mode="' + escapeHtml(m.key) + '">';
+      h += '<span class="collect-item-left">';
+      if (m.dot) h += '<span class="collect-dot" style="background:' + escapeHtml(m.dot) + ';"></span>';
+      h += '<span>' + escapeHtml(m.label) + '</span>';
+      h += '</span>';
+      h += '<span class="collect-item-count">(' + escapeHtml(String(cnt)) + ')</span>';
+      h += '</button>';
+    }
+    menu.innerHTML = h;
+  }
+
+  function refreshCollectModeCounts() {
+    return Promise.all([
+      apiFetch('GET', '/collect-schedule?day=today', null),
+      apiFetch('GET', '/sku-detail', null)
+    ])
+      .then(function (results) {
+        var todayRows = (results[0] && results[0].data) || [];
+        var skuRows = (results[1] && results[1].data) || [];
+        var counts = { schedule_today: todayRows.length, all: 0, kunwoo: 0, arico: 0, yoom: 0 };
+        for (var i = 0; i < skuRows.length; i++) {
+          var r = skuRows[i] || {};
+          if (r.is_active === false) continue;
+          counts.all++;
+          var b = String(r.brand || '');
+          if (b === '건우코리아') counts.kunwoo++;
+          else if (b === '아리코') counts.arico++;
+          else if (b === '윰') counts.yoom++;
+        }
+        state.collectModeCounts = counts;
+        renderCollectModeMenu();
+      })
+      .catch(function (e) {
+        console.error(e);
+      });
+  }
+
   function setCollectStartButtonsState(isRunning) {
-    var labelA = '▶ A그룹 수집 (매일)';
-    var labelB = '▶ B그룹 수집 (오늘분)';
-    var btnA = document.getElementById('btn-collect-group-a');
-    var btnB = document.getElementById('btn-collect-group-b');
-    if (btnA) {
-      btnA.disabled = !!isRunning;
-      btnA.textContent = isRunning ? '수집 중...' : labelA;
+    var mainBtn = document.getElementById('btn-collect-start-main');
+    var toggleBtn = document.getElementById('btn-collect-mode-toggle');
+    if (mainBtn) {
+      mainBtn.disabled = !!isRunning;
+      if (isRunning) mainBtn.textContent = '수집 중...';
+      else updateCollectMainButtonText();
     }
-    if (btnB) {
-      btnB.disabled = !!isRunning;
-      btnB.textContent = isRunning ? '수집 중...' : labelB;
-    }
+    if (toggleBtn) toggleBtn.disabled = !!isRunning;
+    if (isRunning) setCollectMenuOpen(false);
   }
 
   function loadCollectStatus() {
@@ -1484,9 +1615,7 @@
             else if (m > 0) elapsed = m + '분 ' + s + '초';
             else elapsed = s + '초';
           }
-          var grpPre = '';
-          if (state.collectRunKind === 'A') grpPre = 'A그룹 수집 진행 중 — ';
-          else if (state.collectRunKind === 'B') grpPre = 'B그룹 수집 진행 중 — ';
+          var grpPre = state.collectRunKind ? state.collectRunKind + ' 진행 중 — ' : '';
           var lineText =
             grpPre +
             cur +
@@ -2632,6 +2761,8 @@
     loadQueue();
     loadTodaySection();
     loadAlerts();
+    refreshCollectModeCounts();
+    updateCollectMainButtonText();
   }
 
   function loadScheduleSummary() {
@@ -3180,21 +3311,14 @@
     activateTab('sku');
   });
 
-  function beginDashboardCollect(list, collectKind) {
+  function beginDashboardCollect(list, mode) {
     lastTableRefresh = 0;
     state.dashboardCollectPending = true;
-    state.collectRunKind = collectKind === 'B' ? 'B' : 'A';
+    state.collectRunKind = mode && mode.shortLabel ? mode.shortLabel : '수집';
     window.postMessage(
       {
-        type: 'SCHEDULE_COLLECT_START',
-        skuList: list.map(function (r) {
-          return {
-            sku_id: r.sku_id,
-            sku_name: r.sku_name,
-            brand: r.brand,
-            product_url: r.product_url
-          };
-        })
+        type: 'SCHEDULE_COLLECT_REQUEST',
+        items: list
       },
       '*'
     );
@@ -3210,8 +3334,7 @@
     var line = document.getElementById('collect-running-text');
     if (line) {
       line.style.display = '';
-      var startGrp =
-        state.collectRunKind === 'B' ? 'B그룹 수집 진행 중 — ' : 'A그룹 수집 진행 중 — ';
+      var startGrp = (mode && mode.shortLabel ? mode.shortLabel : '수집') + ' 진행 중 — ';
       line.textContent = startGrp + '0/' + list.length + ' 시작 중...';
     }
     var bar = document.getElementById('collect-progress-bar');
@@ -3222,64 +3345,60 @@
     loadCollectStatus();
   }
 
-  document.getElementById('btn-collect-group-a').addEventListener('click', function () {
+  function fetchCollectModeItems(mode) {
+    var body;
+    if (mode.action === 'collect_schedule') body = { action: 'collect_schedule' };
+    else if (mode.action === 'collect_all') body = { action: 'collect_all' };
+    else body = { action: 'collect_brand', brand: mode.brand };
+    return apiFetch('POST', '/collect-schedule', body);
+  }
+
+  function startCollectByMode(modeKey) {
+    var mode = getCollectModeByKey(modeKey);
     if (!extensionReady) {
       alert('Chrome 확장프로그램이 감지되지 않습니다.\n이 페이지에서 확장프로그램이 로드되었는지 확인하세요.');
       return;
     }
-    apiFetch('GET', '/sku-detail', null)
+    setCollectMenuOpen(false);
+    fetchCollectModeItems(mode)
       .then(function (json) {
-        var rows = (json && json.data) || [];
-        var list = [];
-        for (var i = 0; i < rows.length; i++) {
-          var r = rows[i];
-          if (r.is_active === false) continue;
-          if (normalizePriorityGroup(r.priority_group) !== 'A') continue;
-          if (!r.product_url || String(r.product_url).trim() === '') continue;
-          list.push(r);
-        }
-        if (!list.length) {
-          alert('A그룹 수집 대상(활성·URL 있음)이 없습니다.');
+        var items = (json && json.items) || [];
+        if (!items.length) {
+          alert(mode.label + ' 대상 SKU가 없습니다.');
           return;
         }
-        if (!confirm('A그룹 ' + list.length + '개 상품을 수집할까요?')) return;
-        beginDashboardCollect(list, 'A');
+        var total = Number(json && json.total);
+        if (isNaN(total) || total <= 0) total = items.length;
+        var mins = Math.max(1, Math.ceil((total * 15) / 60));
+        var ask =
+          mode.shortLabel +
+          ' — ' +
+          total +
+          '개 SKU를 수집합니다.\n예상 소요시간: 약 ' +
+          mins +
+          '분\n시작할까요?';
+        if (!confirm(ask)) return;
+        state.lastCollectModeKey = mode.key;
+        try {
+          localStorage.setItem('lastCollectMode', mode.key);
+        } catch (e) {}
+        updateCollectMainButtonText();
+        beginDashboardCollect(items, mode);
       })
       .catch(function (e) {
         console.error(e);
         alert(e.message || String(e));
-        setCollectStartButtonsState(false);
       });
+  }
+
+  document.getElementById('btn-collect-start-main').addEventListener('click', function () {
+    startCollectByMode(state.lastCollectModeKey || 'schedule_today');
   });
 
-  document.getElementById('btn-collect-group-b').addEventListener('click', function () {
-    if (!extensionReady) {
-      alert('Chrome 확장프로그램이 감지되지 않습니다.\n이 페이지에서 확장프로그램이 로드되었는지 확인하세요.');
-      return;
-    }
-    apiFetch('GET', '/collect-schedule?day=today', null)
-      .then(function (j) {
-        var rows = (j && j.data) || [];
-        var list = [];
-        for (var i = 0; i < rows.length; i++) {
-          var r = rows[i];
-          if (r.is_active === false) continue;
-          if (normalizePriorityGroup(r.priority_group) === 'A') continue;
-          if (!r.product_url || String(r.product_url).trim() === '') continue;
-          list.push(r);
-        }
-        if (!list.length) {
-          alert('오늘 B그룹 수집 대상이 없습니다.');
-          return;
-        }
-        if (!confirm('오늘 분 B그룹 ' + list.length + '개 상품을 수집할까요?')) return;
-        beginDashboardCollect(list, 'B');
-      })
-      .catch(function (e) {
-        console.error(e);
-        alert(e.message || String(e));
-        setCollectStartButtonsState(false);
-      });
+  document.getElementById('btn-collect-mode-toggle').addEventListener('click', function (ev) {
+    ev.stopPropagation();
+    setCollectMenuOpen(!state.collectMenuOpen);
+    if (state.collectMenuOpen) refreshCollectModeCounts();
   });
 
   document.getElementById('btn-stop-collect').addEventListener('click', function () {
@@ -3760,11 +3879,16 @@
 
   document.addEventListener('mousedown', function (ev) {
     var pop = document.getElementById('schedule-popover');
-    if (!pop || pop.style.display === 'none') return;
-    if (pop.contains(ev.target)) return;
-    var schedCell = ev.target.closest && ev.target.closest('.cell-schedule');
-    if (schedCell) return;
-    hideSchedulePopover();
+    if (pop && pop.style.display !== 'none') {
+      if (!pop.contains(ev.target)) {
+        var schedCell = ev.target.closest && ev.target.closest('.cell-schedule');
+        if (!schedCell) hideSchedulePopover();
+      }
+    }
+    var cwrap = document.getElementById('collect-split-wrap');
+    if (state.collectMenuOpen && cwrap && !cwrap.contains(ev.target)) {
+      setCollectMenuOpen(false);
+    }
   });
 
   document.addEventListener('click', function (ev) {
@@ -3793,6 +3917,12 @@
         renderTodayWeekTabs();
         loadTodaySection();
       }
+      return;
+    }
+    var cmEl = t.closest && t.closest('[data-collect-mode]');
+    if (cmEl) {
+      var mk = cmEl.getAttribute('data-collect-mode');
+      if (mk) startCollectByMode(mk);
       return;
     }
     if (t.getAttribute('data-close')) {
