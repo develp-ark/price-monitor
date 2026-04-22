@@ -153,30 +153,50 @@ module.exports = async (req, res) => {
     .update(skuUpdatePayload)
     .eq('sku_id', sku_id);
 
-  // 기존 미처리 알림 중 new_price가 0이거나 null인 것을 현재 가격으로 업데이트
   if (newPrice > 0) {
+    // 1. prev_price가 0인 미처리 알림 -> 수집 오류였으므로 자동 완료 처리
     await client
       .from('price_alert')
-      .update({ new_price: newPrice, change_pct: null })
+      .update({
+        new_price: newPrice,
+        change_pct: 0,
+        memo: '수집 오류 정정 — 정상가격 확인 (' + newPrice + '원)',
+        resolved: true,
+        resolved_at: new Date().toISOString()
+      })
+      .eq('sku_id', sku_id)
+      .eq('resolved', false)
+      .eq('prev_price', 0);
+
+    // 2. new_price가 0인 미처리 알림 (prev_price > 0) -> 현재가 업데이트 + change_pct 재계산
+    var { data: zeroAlerts } = await client
+      .from('price_alert')
+      .select('id, prev_price')
       .eq('sku_id', sku_id)
       .eq('resolved', false)
       .or('new_price.eq.0,new_price.is.null');
 
-    // 업데이트된 행의 change_pct 재계산
-    var { data: updatedAlerts } = await client
-      .from('price_alert')
-      .select('id, prev_price, new_price')
-      .eq('sku_id', sku_id)
-      .eq('resolved', false)
-      .eq('new_price', newPrice)
-      .is('change_pct', null);
-
-    if (updatedAlerts && updatedAlerts.length > 0) {
-      for (var ua = 0; ua < updatedAlerts.length; ua++) {
-        var alert = updatedAlerts[ua];
-        if (alert.prev_price && alert.prev_price > 0) {
-          var newChangePct = Number((((alert.new_price - alert.prev_price) / alert.prev_price) * 100).toFixed(2));
-          await client.from('price_alert').update({ change_pct: newChangePct }).eq('id', alert.id);
+    if (zeroAlerts && zeroAlerts.length > 0) {
+      for (var ua = 0; ua < zeroAlerts.length; ua++) {
+        var al = zeroAlerts[ua];
+        var pct = (al.prev_price && al.prev_price > 0)
+          ? Number((((newPrice - al.prev_price) / al.prev_price) * 100).toFixed(2))
+          : 0;
+        // 가격이 동일하면 오류였으므로 자동 완료
+        if (pct === 0 || (al.prev_price === newPrice)) {
+          await client.from('price_alert').update({
+            new_price: newPrice,
+            change_pct: 0,
+            memo: '수집 오류 정정 — 가격 변동 없음',
+            resolved: true,
+            resolved_at: new Date().toISOString()
+          }).eq('id', al.id);
+        } else {
+          // 실제 가격 변동이 있으면 new_price와 change_pct만 업데이트
+          await client.from('price_alert').update({
+            new_price: newPrice,
+            change_pct: pct
+          }).eq('id', al.id);
         }
       }
     }

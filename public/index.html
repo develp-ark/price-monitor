@@ -116,16 +116,16 @@
     }
     .alert-summary-row {
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       gap: 8px;
       margin-bottom: 12px;
     }
     .alert-summary-box {
       flex: 1;
-      min-width: 100px;
+      min-width: 0;
       border-radius: 8px;
-      padding: 12px 16px;
-      font-size: 14px;
+      padding: 8px 12px;
+      font-size: 13px;
       font-weight: 600;
       line-height: 1.35;
     }
@@ -674,6 +674,60 @@
       background: rgba(255,255,255,0.25);
       color: #fff;
     }
+    .alert-filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .alert-filter-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+    .alert-filter-label {
+      font-size: 11px;
+      color: #9CA3AF;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .alert-filter-divider {
+      width: 1px;
+      height: 20px;
+      background: #E5E8EB;
+    }
+    .alert-filter-row .filter-btns {
+      display: flex;
+      gap: 3px;
+      flex-wrap: wrap;
+    }
+    .alert-filter-row .filter-btns button {
+      background: #F3F4F6;
+      color: #6B7280;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .alert-filter-row .filter-btns button.on {
+      background: #3182F6;
+      color: #fff;
+    }
+    .alert-filter-row .filter-btns .badge.alert-brand-count {
+      margin-left: 4px;
+      padding: 0;
+      background: transparent;
+      color: #9CA3AF;
+      font-size: 11px;
+    }
+    .alert-filter-row #alert-brand-filters button.on .badge.alert-brand-count {
+      color: #fff;
+      background: transparent;
+    }
     #alert-table-wrap table.data tbody tr.alert-row-group-start td {
       border-top: 2px solid #e5e8eb;
     }
@@ -798,9 +852,22 @@
           <div class="alert-summary-box up" id="alert-sum-up"><span>▲</span><span>가격 상승: 0건</span></div>
           <div class="alert-summary-box down" id="alert-sum-down"><span>▼</span><span>가격 하락: 0건</span></div>
         </div>
-        <div class="filter-btns" id="alert-brand-filters" style="margin-bottom:8px;"></div>
-        <div class="filter-btns" id="alert-dir-filters" style="margin-bottom:12px;"></div>
-        <div class="filter-btns" id="alert-status-filters" style="margin-bottom:12px;"></div>
+        <div class="alert-filter-row">
+          <div class="alert-filter-group">
+            <span class="alert-filter-label">브랜드</span>
+            <div class="filter-btns" id="alert-brand-filters"></div>
+          </div>
+          <div class="alert-filter-divider"></div>
+          <div class="alert-filter-group">
+            <span class="alert-filter-label">변동</span>
+            <div class="filter-btns" id="alert-dir-filters"></div>
+          </div>
+          <div class="alert-filter-divider"></div>
+          <div class="alert-filter-group">
+            <span class="alert-filter-label">상태</span>
+            <div class="filter-btns" id="alert-status-filters"></div>
+          </div>
+        </div>
         <div id="alert-empty" class="empty">오늘 가격 변동 내역이 없습니다</div>
         <div id="alert-table-wrap" style="display:none;">
           <table class="data">
