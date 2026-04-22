@@ -63,6 +63,16 @@ module.exports = async (req, res) => {
       if (pg === 'A' || pg === 'B') updates.priority_group = pg;
     }
   }
+  if (b.product_status !== undefined) {
+    if (b.product_status === null || b.product_status === '') {
+      updates.product_status = null;
+    } else {
+      const ps = String(b.product_status).trim().toLowerCase();
+      if (ps === 'active' || ps === 'discontinued' || ps === 'out_of_stock') {
+        updates.product_status = ps;
+      }
+    }
+  }
 
   if (Object.keys(updates).length === 0) {
     return json(res, 400, { ok: false, error: '수정할 항목 없음' });

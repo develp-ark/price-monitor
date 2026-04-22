@@ -466,6 +466,19 @@
     .sku-brand-arico { background: #EBF3FF; color: #3B82F6; }
     .sku-brand-yoom { background: #E8FFF5; color: #10B981; }
     .sku-brand-default { background: #f3f4f6; color: #666; }
+    .sku-status-badge {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1;
+      vertical-align: middle;
+    }
+    .sku-status-badge.discontinued { background: #fee2e2; color: #dc2626; }
+    .sku-status-badge.outofstock { background: #fff7ed; color: #ea580c; }
+    tr.sku-row-discontinued { background: #FFF5F5 !important; }
     .sku-actions-inline { display: flex; gap: 4px; align-items: center; }
     .sku-actions-inline .btn-icon { padding: 2px 6px; }
     .form-row input[readonly], .form-row textarea[readonly] {
@@ -1168,6 +1181,11 @@
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  function escapeJsSingleQuoted(s) {
+    if (s == null) return '';
+    return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   }
 
   function productNameLinkHtml(name, url) {
@@ -1898,6 +1916,10 @@
           var sid = dr && dr.sku_id != null ? String(dr.sku_id) : '';
           if (sid && dr.product_url) urlMap[sid] = dr.product_url;
         }
+        for (var ni = 0; ni < normalized.length; ni++) {
+          var nsid = String(normalized[ni].sku_id || '');
+          normalized[ni].product_url = urlMap[nsid] || '';
+        }
         state.alertSkuUrlMap = urlMap;
         updateAlertSummaryStats();
         renderAlertFilters();
@@ -2025,8 +2047,18 @@
       h += '<td>' + productNameLinkHtml(r.sku_name, alertUrl) + '</td>';
       h += '<td>' + escapeHtml(br) + '</td>';
       h += '<td class="num">' + escapeHtml(formatMoney(r.prev_price)) + '</td>';
-      h += '<td class="num">' + escapeHtml(formatMoney(r.new_price)) + '</td>';
-      h += '<td class="num">' + formatAlertChangePctHtml(r.change_pct) + '</td>';
+      var newPriceNum = Number(r.new_price);
+      var zeroPrice = r.new_price == null || (!isNaN(newPriceNum) && newPriceNum <= 0);
+      if (zeroPrice) {
+        h += '<td class="num"><span style="color:#F04452;font-weight:600;font-size:12px">판매중단 의심</span></td>';
+      } else {
+        h += '<td class="num">' + escapeHtml(formatMoney(r.new_price)) + '</td>';
+      }
+      if (zeroPrice) {
+        h += '<td class="num"><span style="display:inline-block;background:#FEE2E2;color:#F04452;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;">확인필요</span></td>';
+      } else {
+        h += '<td class="num">' + formatAlertChangePctHtml(r.change_pct) + '</td>';
+      }
       h += '<td>' + escapeHtml(formatKstDateTimeShort(r.detected_at)) + '</td>';
       if (r && r.resolved === true) {
         h += '<td><span class="alert-status-badge done">완료</span>';
@@ -2034,10 +2066,18 @@
           h += '<div style="font-size:11px;color:#9CA3AF;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(String(r.memo)) + '">' + escapeHtml(String(r.memo)) + '</div>';
         }
         h += '</td>';
-        h += '<td><button type="button" onclick="openAlertActionModal(\'' + escapeHtml(String(r.id != null && r.id !== '' ? r.id : ('idx_' + i))) + '\')" style="font-size:12px;padding:4px 12px;background:none;border:1px solid #E5E8EB;border-radius:6px;cursor:pointer;color:#3182F6">수정</button></td>';
+        h += '<td><button type="button" onclick="openAlertActionModal(\'' + escapeHtml(String(r.id != null && r.id !== '' ? r.id : ('idx_' + i))) + '\')" style="font-size:12px;padding:4px 12px;background:none;border:1px solid #E5E8EB;border-radius:6px;cursor:pointer;color:#3182F6">수정</button>';
+        if (zeroPrice) {
+          h += ' <button onclick="retryCollectFromAlert(\'' + escapeJsSingleQuoted(String(r.sku_id)) + '\', \'' + escapeJsSingleQuoted(String(r.product_url || alertUrl || '')) + '\', \'' + escapeJsSingleQuoted(String(r.sku_name || '')) + '\')" style="font-size:11px;padding:3px 8px;background:#F04452;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:4px">재수집</button>';
+        }
+        h += '</td>';
       } else {
         h += '<td><span class="alert-status-badge pending">미처리</span></td>';
-        h += '<td><button onclick="openAlertActionModal(\'' + escapeHtml(String(r.id != null && r.id !== '' ? r.id : ('idx_' + i))) + '\')" style="font-size:12px;padding:4px 12px;background:#3182F6;color:#fff;border:none;border-radius:6px;cursor:pointer">처리</button></td>';
+        h += '<td><button onclick="openAlertActionModal(\'' + escapeHtml(String(r.id != null && r.id !== '' ? r.id : ('idx_' + i))) + '\')" style="font-size:12px;padding:4px 12px;background:#3182F6;color:#fff;border:none;border-radius:6px;cursor:pointer">처리</button>';
+        if (zeroPrice) {
+          h += ' <button onclick="retryCollectFromAlert(\'' + escapeJsSingleQuoted(String(r.sku_id)) + '\', \'' + escapeJsSingleQuoted(String(r.product_url || alertUrl || '')) + '\', \'' + escapeJsSingleQuoted(String(r.sku_name || '')) + '\')" style="font-size:11px;padding:3px 8px;background:#F04452;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:4px">재수집</button>';
+        }
+        h += '</td>';
       }
       h += '</tr>';
     }
@@ -2047,6 +2087,21 @@
   function showToast(msg) {
     showManualToast(msg);
   }
+
+  window.retryCollectFromAlert = function (skuId, productUrl, skuName) {
+    window.postMessage(
+      {
+        type: 'PRICE_COLLECT_REQUEST',
+        sku: {
+          sku_id: skuId,
+          product_url: productUrl || '',
+          sku_name: skuName || ''
+        }
+      },
+      '*'
+    );
+    showToast((skuName || String(skuId || 'SKU')) + ' 재수집 요청');
+  };
 
   window.openAlertActionModal = function (alertId) {
     var item = null;
@@ -2435,7 +2490,14 @@
       var url = r.product_url || '#';
       var sidStr = escapeHtml(String(r.sku_id));
       var checked = state.skuChecked[String(r.sku_id)] ? ' checked' : '';
-      h += '<tr>';
+      var pstat = String(r.product_status || '').toLowerCase();
+      var isDisc = pstat === 'discontinued';
+      var isOut = pstat === 'out_of_stock';
+      var needRecollect = isDisc || r.current_price == null || Number(r.current_price) <= 0;
+      var isZeroPrice = r.current_price != null && Number(r.current_price) === 0;
+      var trStyle = '';
+      if (isDisc || isZeroPrice) trStyle = ' style="background:#FFF5F5"';
+      h += '<tr' + (isDisc ? ' class="sku-row-discontinued"' : '') + trStyle + '>';
       h +=
         '<td><input type="checkbox" class="sku-row-cb" data-sku-cb="' +
         sidStr +
@@ -2443,9 +2505,16 @@
         checked +
         ' /></td>';
       h += '<td>' + skuBrandBadgeHtml(r.brand) + '</td>';
-      h += '<td><a class="link sku-name-link" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(r.sku_name || '') + '</a><div class="sku-id-sub">' + sidStr + '</div></td>';
+      h += '<td><a class="link sku-name-link" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(r.sku_name || '') + '</a>';
+      if (isDisc) h += '<span style="font-size:11px;background:#FEE2E2;color:#DC2626;padding:2px 6px;border-radius:4px;margin-left:4px">판매중단</span>';
+      else if (isOut) h += '<span style="font-size:11px;background:#FEF3C7;color:#D97706;padding:2px 6px;border-radius:4px;margin-left:4px">품절</span>';
+      h += '<div class="sku-id-sub">' + sidStr + '</div></td>';
       h += '<td class="num">' + escapeHtml(formatMoney(r.registered_price)) + '</td>';
-      h += '<td class="num cell-current-price">' + escapeHtml(formatMoney(r.current_price)) + '</td>';
+      if (isZeroPrice) {
+        h += '<td class="num cell-current-price"><span style="color:#F04452;font-weight:700">0원</span></td>';
+      } else {
+        h += '<td class="num cell-current-price">' + escapeHtml(formatMoney(r.current_price)) + '</td>';
+      }
       h += '<td class="num">' + skuRowChangePctHtml(r) + '</td>';
       h += '<td>' + skuGroupBadgeHtml(r) + '</td>';
       h += '<td class="cell-last-collected">' + escapeHtml(fmtRecentShort(r.last_collected)) + '</td>';
@@ -2456,6 +2525,9 @@
         '" data-sku-id="' +
         sidStr +
         '" title="즉시 수집">▶</button>';
+      if (needRecollect) {
+        h += '<button type="button" class="btn-icon" data-recollect-sku="' + sidStr + '" title="재수집">↻</button>';
+      }
       h += '<button type="button" class="btn-icon" data-edit-sku="' + sidStr + '" title="수정">✏️</button>';
       h += '<button type="button" class="btn-icon" data-del-sku="' + sidStr + '" title="삭제">🗑</button>';
       h += '</div></td>';
@@ -2662,6 +2734,28 @@
 
     btn.disabled = false;
     setTimeout(function () { btn.textContent = '▶'; }, 3000);
+  }
+
+  function triggerSingleCollectRequest(skuId, productUrl, skuName, btnEl) {
+    if (!extensionReady) {
+      alert('Chrome 확장프로그램이 감지되지 않습니다.\nprice-monitor 페이지에서 확장프로그램이 설치되어 있는지 확인하세요.');
+      return;
+    }
+    if (btnEl) {
+      btnEl.textContent = '⏳';
+      btnEl.disabled = true;
+    }
+    window.postMessage(
+      {
+        type: 'PRICE_COLLECT_REQUEST',
+        sku: {
+          sku_id: skuId,
+          product_url: productUrl || '',
+          sku_name: skuName || ''
+        }
+      },
+      '*'
+    );
   }
 
   function btnSkuCsvDl() {
@@ -3906,6 +4000,24 @@
       openAlertActionModal(aa);
       return;
     }
+    var arEl = t.closest && t.closest('[data-alert-recollect]');
+    var ar = arEl ? arEl.getAttribute('data-alert-recollect') : t.getAttribute('data-alert-recollect');
+    if (ar != null && ar !== '') {
+      var alertItem = null;
+      for (var ai = 0; ai < allAlertData.length; ai++) {
+        if (String(allAlertData[ai].sku_id) === String(ar)) {
+          alertItem = allAlertData[ai];
+          break;
+        }
+      }
+      triggerSingleCollectRequest(
+        ar,
+        state.alertSkuUrlMap[String(ar)] || '',
+        alertItem && alertItem.sku_name ? alertItem.sku_name : '',
+        arEl
+      );
+      return;
+    }
     var toggleDetailBtn = t.classList && t.classList.contains('btn-toggle-detail') ? t : null;
     if (toggleDetailBtn && toggleDetailBtn.getAttribute('data-day')) {
       var dayBtn = Number(toggleDetailBtn.getAttribute('data-day'));
@@ -3950,24 +4062,23 @@
     }
     var cs = t.getAttribute('data-collect-sku');
     if (cs != null) {
-      if (!extensionReady) {
-        alert('Chrome 확장프로그램이 감지되지 않습니다.\nprice-monitor 페이지에서 확장프로그램이 설치되어 있는지 확인하세요.');
-        return;
-      }
       var rowC = findSkuRowById(cs);
-      var btnCollect = t;
-      btnCollect.textContent = '⏳';
-      btnCollect.disabled = true;
-      window.postMessage(
-        {
-          type: 'PRICE_COLLECT_REQUEST',
-          sku: {
-            sku_id: rowC && rowC.sku_id != null ? rowC.sku_id : cs,
-            product_url: rowC && rowC.product_url ? rowC.product_url : '',
-            sku_name: rowC && rowC.sku_name ? rowC.sku_name : ''
-          }
-        },
-        '*'
+      triggerSingleCollectRequest(
+        rowC && rowC.sku_id != null ? rowC.sku_id : cs,
+        rowC && rowC.product_url ? rowC.product_url : '',
+        rowC && rowC.sku_name ? rowC.sku_name : '',
+        t
+      );
+      return;
+    }
+    var rs = t.getAttribute('data-recollect-sku');
+    if (rs != null) {
+      var rowR = findSkuRowById(rs);
+      triggerSingleCollectRequest(
+        rowR && rowR.sku_id != null ? rowR.sku_id : rs,
+        rowR && rowR.product_url ? rowR.product_url : '',
+        rowR && rowR.sku_name ? rowR.sku_name : '',
+        t
       );
       return;
     }
