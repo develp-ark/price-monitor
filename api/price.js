@@ -123,6 +123,35 @@ module.exports = async (req, res) => {
     })
     .eq('sku_id', sku_id);
 
+  // 기존 미처리 알림 중 new_price가 0이거나 null인 것을 현재 가격으로 업데이트
+  if (newPrice > 0) {
+    await client
+      .from('price_alert')
+      .update({ new_price: newPrice, change_pct: null })
+      .eq('sku_id', sku_id)
+      .eq('resolved', false)
+      .or('new_price.eq.0,new_price.is.null');
+
+    // 업데이트된 행의 change_pct 재계산
+    var { data: updatedAlerts } = await client
+      .from('price_alert')
+      .select('id, prev_price, new_price')
+      .eq('sku_id', sku_id)
+      .eq('resolved', false)
+      .eq('new_price', newPrice)
+      .is('change_pct', null);
+
+    if (updatedAlerts && updatedAlerts.length > 0) {
+      for (var ua = 0; ua < updatedAlerts.length; ua++) {
+        var alert = updatedAlerts[ua];
+        if (alert.prev_price && alert.prev_price > 0) {
+          var newChangePct = Number((((alert.new_price - alert.prev_price) / alert.prev_price) * 100).toFixed(2));
+          await client.from('price_alert').update({ change_pct: newChangePct }).eq('id', alert.id);
+        }
+      }
+    }
+  }
+
   let changed = false;
   let comparePrice = prev_price;
 
