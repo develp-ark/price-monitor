@@ -885,6 +885,7 @@
           <button type="button" class="btn btn-ghost" id="btn-today-csv">CSV 다운로드</button>
         </div>
         <div class="filter-btns" id="today-week-tabs" style="margin-bottom:12px;"></div>
+        <div id="today-current-summary" class="hint" style="margin-bottom:10px;"></div>
         <div id="today-empty" class="empty">오늘 배정된 SKU가 없습니다.</div>
         <div id="today-table-wrap" style="display:none;">
           <table class="data">
@@ -896,6 +897,7 @@
                 <th class="num">현재가</th>
                 <th class="num">변동률</th>
                 <th>수집시간</th>
+                <th>결과</th>
               </tr>
             </thead>
             <tbody id="today-tbody"></tbody>
@@ -1197,7 +1199,7 @@
     alertSortKey: 'pct_abs',
     alertSortAsc: false,
     skuPgLoading: {},
-    todayTabDay: getDefaultKstWeekTabDay(),
+    todayTabKey: String(getDefaultKstWeekTabDay()),
     dashboardCollectPending: false,
     collectRunKind: null,
     collectMenuOpen: false,
@@ -1590,6 +1592,16 @@
       .then(function (json) {
         var d = json.data || {};
         var st = d.status || 'idle';
+        window._lastCollectStatus = d;
+        window._lastCollectStatus.status = st;
+        if (st === 'running' || st === 'stopping') {
+          if (String(state.todayTabKey) !== 'current') {
+            state.todayTabKey = 'current';
+          }
+        } else if (String(state.todayTabKey) === 'current') {
+          state.todayTabKey = String(getDefaultKstWeekTabDay());
+        }
+        renderTodayWeekTabs();
         var badge = document.getElementById('collect-badge');
         badge.className = 'badge ' + st;
         badge.textContent = st;
@@ -1776,7 +1788,11 @@
   function setTodayEmptyMessage() {
     var el = document.getElementById('today-empty');
     if (!el) return;
-    var lab = todayTabDayLabel(state.todayTabDay);
+    if (String(state.todayTabKey) === 'current') {
+      el.textContent = '수집 대기 중 — 수집 버튼을 눌러 시작하세요';
+      return;
+    }
+    var lab = todayTabDayLabel(state.todayTabKey);
     el.textContent = lab
       ? lab + '요일에 배정된 SKU가 없습니다.'
       : '해당 요일에 배정된 SKU가 없습니다.';
@@ -1787,11 +1803,20 @@
     if (!el) return;
     var cnt = state.scheduleDayCounts || {};
     var labs = ['월', '화', '수', '목', '금'];
+    var st = (window._lastCollectStatus && window._lastCollectStatus.status) || 'idle';
     var htm = '';
+    var currentOn = String(state.todayTabKey) === 'current' ? 'on' : '';
+    var currentTail = '';
+    if (st === 'running' || st === 'stopping') {
+      currentTail = '<span style="width:6px;height:6px;border-radius:50%;background:#10B981;display:inline-block;margin-left:4px;animation:pulse 1.5s infinite"></span>';
+    } else if (st === 'done') {
+      currentTail = '<span style="margin-left:4px;color:#10B981;font-weight:700;">✓</span>';
+    }
+    htm += '<button type="button" data-today-tab="current" class="' + currentOn + '">현재 수집' + currentTail + '</button>';
     for (var ti = 0; ti < 5; ti++) {
       var day = ti + 1;
       var num = cnt[day] != null ? cnt[day] : 0;
-      var onCls = Number(state.todayTabDay) === day ? 'on' : '';
+      var onCls = String(state.todayTabKey) === String(day) ? 'on' : '';
       htm +=
         '<button type="button" data-today-tab="' +
         day +
@@ -1806,11 +1831,139 @@
     el.innerHTML = htm;
   }
 
+  function formatCollectResultBadge(status) {
+    var s = String(status || '').toLowerCase();
+    if (s === 'success') return '<span style="color:#10B981;font-weight:700;">✓ 성공</span>';
+    if (s === 'failed') return '<span style="color:#F04452;font-weight:700;">✗ 실패</span>';
+    if (s === 'discontinued') return '<span style="display:inline-block;background:#FEE2E2;color:#DC2626;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;">판매중단</span>';
+    if (s === 'collecting') return '<span class="muted">수집 중...</span>';
+    if (s === 'pending') return '<span style="color:#9CA3AF;">대기</span>';
+    return '<span style="color:#9CA3AF;">—</span>';
+  }
+
+  function fmtDurationFromSeconds(totalSec) {
+    var durSec = Math.floor(Number(totalSec) || 0);
+    if (durSec < 0) durSec = 0;
+    var dh = Math.floor(durSec / 3600);
+    var dm = Math.floor((durSec % 3600) / 60);
+    var ds = durSec % 60;
+    if (dh > 0) return dh + '시간 ' + dm + '분';
+    if (dm > 0) return dm + '분 ' + ds + '초';
+    return ds + '초';
+  }
+
+  function buildCurrentCollectRows() {
+    var items = window._currentCollectItems || [];
+    var st = window._lastCollectStatus || {};
+    var current = Number(st.current) || 0;
+    var success = Number(st.success) || 0;
+    var fail = Number(st.fail) || 0;
+    var rows = [];
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i] || {};
+      var result = 'pending';
+      if (i < current) {
+        result = i < success ? 'success' : (i < success + fail ? 'failed' : 'success');
+      } else if (i === current && (st.status === 'running' || st.status === 'stopping')) {
+        result = 'collecting';
+      }
+      if (String(it.product_status || '').toLowerCase() === 'discontinued') result = 'discontinued';
+      rows.push({
+        _ix: i,
+        sku_id: it.sku_id,
+        sku_name: it.sku_name || '',
+        brand: it.brand || '',
+        registered_price: it.registered_price,
+        current_price: it.current_price,
+        change_pct: it.change_pct,
+        last_collected: it.last_collected || null,
+        product_url: it.product_url || '',
+        result_status: result
+      });
+    }
+    rows.sort(function (a, b) {
+      return b._ix - a._ix;
+    });
+    return rows;
+  }
+
+  function renderTodayRows(merged) {
+    var empty = document.getElementById('today-empty');
+    var wrap = document.getElementById('today-table-wrap');
+    var tbody = document.getElementById('today-tbody');
+    if (!merged.length) {
+      setTodayEmptyMessage();
+      empty.style.display = '';
+      wrap.style.display = 'none';
+      tbody.innerHTML = '';
+      return;
+    }
+    empty.style.display = 'none';
+    wrap.style.display = '';
+    var h = '';
+    for (var i = 0; i < merged.length; i++) {
+      var r = merged[i];
+      var pu = r.product_url || '';
+      var lcRaw = r.last_collected ? String(r.last_collected) : '';
+      var collectTime = '<span class="muted">미수집</span>';
+      if (lcRaw) {
+        var hhmm = formatLastCollectedHHMM(lcRaw);
+        collectTime = hhmm ? escapeHtml(hhmm) : '<span class="muted">미수집</span>';
+      }
+      h += '<tr>';
+      h += '<td>' + productNameLinkHtml(r.sku_name, pu) + '</td>';
+      h += '<td>' + escapeHtml(r.brand || '') + '</td>';
+      h += '<td class="num">' + escapeHtml(formatMoney(r.registered_price)) + '</td>';
+      h += '<td class="num">' + escapeHtml(formatMoney(r.current_price)) + '</td>';
+      h += '<td class="num">' + formatChangeCellHtml(r.change_pct) + '</td>';
+      h += '<td>' + collectTime + '</td>';
+      h += '<td>' + formatCollectResultBadge(r.result_status) + '</td>';
+      h += '</tr>';
+    }
+    tbody.innerHTML = h;
+  }
+
+  function renderTodayCurrentSummary() {
+    var el = document.getElementById('today-current-summary');
+    if (!el) return;
+    var st = window._lastCollectStatus || { status: 'idle' };
+    var mode = window._currentCollectMode || '수집';
+    var current = Number(st.current) || 0;
+    var total = Number(st.total) || ((window._currentCollectItems && window._currentCollectItems.length) || 0);
+    var success = Number(st.success) || 0;
+    var fail = Number(st.fail) || 0;
+    if (st.status === 'running' || st.status === 'stopping') {
+      el.innerHTML =
+        '<span class="badge running" style="margin-right:6px;">' + escapeHtml(mode) + '</span>' +
+        '수집 중 — ' + current + '/' + total + ' (성공 ' + success + ' / 실패 ' + fail + ')';
+      return;
+    }
+    if (st.status === 'done') {
+      var duration = '';
+      if (st.started_at && st.finished_at) {
+        var durSec = Math.floor((new Date(st.finished_at).getTime() - new Date(st.started_at).getTime()) / 1000);
+        duration = fmtDurationFromSeconds(durSec);
+      }
+      el.innerHTML =
+        '<span class="badge done" style="margin-right:6px;">완료</span>' +
+        '수집 완료 — ' + total + '건 (성공 ' + success + ' / 실패 ' + fail + ')' + (duration ? ' · 소요 ' + duration : '');
+      return;
+    }
+    el.textContent = '수집 대기 중 — 수집 버튼을 눌러 시작하세요';
+  }
+
   function loadTodaySection() {
-    var dayNum = Number(state.todayTabDay);
+    renderTodayCurrentSummary();
+    if (String(state.todayTabKey) === 'current') {
+      var currentRows = buildCurrentCollectRows();
+      renderTodayRows(currentRows);
+      window.__todayCsvPayload = currentRows;
+      return Promise.resolve();
+    }
+    var dayNum = Number(state.todayTabKey);
     if (isNaN(dayNum) || dayNum < 1 || dayNum > 5) {
       dayNum = getDefaultKstWeekTabDay();
-      state.todayTabDay = dayNum;
+      state.todayTabKey = String(dayNum);
     }
 
     return Promise.all([
@@ -1823,39 +1976,10 @@
         var scheduleRows = sched.data || [];
         var detailRows = detail.data || [];
         var merged = mergeSkuMaps(scheduleRows, detailRows);
-        var empty = document.getElementById('today-empty');
-        var wrap = document.getElementById('today-table-wrap');
-        var tbody = document.getElementById('today-tbody');
-        if (!merged.length) {
-          setTodayEmptyMessage();
-          empty.style.display = '';
-          wrap.style.display = 'none';
-          tbody.innerHTML = '';
-          return;
+        for (var mi = 0; mi < merged.length; mi++) {
+          merged[mi].result_status = '';
         }
-        empty.style.display = 'none';
-        wrap.style.display = '';
-        var h = '';
-        for (var i = 0; i < merged.length; i++) {
-          var r = merged[i];
-          var schedRow = scheduleRows[i];
-          var pu = r.product_url || (schedRow && schedRow.product_url) || '';
-          var lcRaw = r.last_collected ? String(r.last_collected) : '';
-          var collectTime = '<span class="muted">미수집</span>';
-          if (lcRaw) {
-            var hhmm = formatLastCollectedHHMM(lcRaw);
-            collectTime = hhmm ? escapeHtml(hhmm) : '<span class="muted">미수집</span>';
-          }
-          h += '<tr>';
-          h += '<td>' + productNameLinkHtml(r.sku_name, pu) + '</td>';
-          h += '<td>' + escapeHtml(r.brand || '') + '</td>';
-          h += '<td class="num">' + escapeHtml(formatMoney(r.registered_price)) + '</td>';
-          h += '<td class="num">' + escapeHtml(formatMoney(r.current_price)) + '</td>';
-          h += '<td class="num">' + formatChangeCellHtml(r.change_pct) + '</td>';
-          h += '<td>' + collectTime + '</td>';
-          h += '</tr>';
-        }
-        tbody.innerHTML = h;
+        renderTodayRows(merged);
         window.__todayCsvPayload = merged;
       })
       .catch(function (e) {
@@ -1893,7 +2017,7 @@
       alert('다운로드할 데이터가 없습니다.');
       return;
     }
-    var header = ['sku_id', 'brand', 'sku_name', 'registered_price', 'current_price', 'change_pct', 'last_collected'];
+    var header = ['sku_id', 'brand', 'sku_name', 'registered_price', 'current_price', 'change_pct', 'last_collected', 'result'];
     var rows = [];
     for (var i = 0; i < merged.length; i++) {
       var r = merged[i];
@@ -1904,13 +2028,18 @@
         r.registered_price,
         r.current_price,
         r.change_pct,
-        r.last_collected
+        r.last_collected,
+        r.result_status || ''
       ]);
     }
     var ymd = kstYmd().replace(/-/g, '');
-    var dNum = Number(state.todayTabDay);
-    if (isNaN(dNum)) dNum = 1;
-    downloadCsv('today_collect_day' + dNum + '_' + ymd + '.csv', header, rows);
+    if (String(state.todayTabKey) === 'current') {
+      downloadCsv('collect_result_' + ymd + '.csv', header, rows);
+    } else {
+      var dNum = Number(state.todayTabKey);
+      if (isNaN(dNum)) dNum = 1;
+      downloadCsv('today_collect_day' + dNum + '_' + ymd + '.csv', header, rows);
+    }
   }
 
   function uniqueBrandsFromAlerts(alerts) {
@@ -3553,6 +3682,8 @@
           mins +
           '분\n시작할까요?';
         if (!confirm(msg)) return;
+        window._currentCollectItems = list.slice ? list.slice() : list;
+        window._currentCollectMode = mode.shortLabel || mode.label || '수집';
         state.lastCollectModeKey = mode.key;
         try {
           localStorage.setItem('lastCollectMode', mode.key);
@@ -4040,12 +4171,14 @@
     }
     var ttEl = t.closest && t.closest('[data-today-tab]');
     if (ttEl) {
-      var td = parseInt(ttEl.getAttribute('data-today-tab'), 10);
-      if (!isNaN(td) && td >= 1 && td <= 5) {
-        state.todayTabDay = td;
-        renderTodayWeekTabs();
-        loadTodaySection();
+      var tdRaw = String(ttEl.getAttribute('data-today-tab') || '');
+      if (tdRaw === 'current') state.todayTabKey = 'current';
+      else {
+        var td = parseInt(tdRaw, 10);
+        if (!isNaN(td) && td >= 1 && td <= 5) state.todayTabKey = String(td);
       }
+      renderTodayWeekTabs();
+      loadTodaySection();
       return;
     }
     var cmEl = t.closest && t.closest('[data-collect-mode]');
