@@ -44,6 +44,7 @@ module.exports = async (req, res) => {
         ok: true,
         data: data || {
           status: 'idle',
+          collect_mode: null,
           total: 0,
           current: 0,
           success: 0,
@@ -95,11 +96,13 @@ module.exports = async (req, res) => {
 
   if (body.action === 'start') {
     const total = sanitizeInt(body.total, 0);
+    const collect_mode = body.collect_mode != null ? String(body.collect_mode) : null;
     const now = new Date().toISOString();
     const { data, error } = await client
       .from('collect_status')
       .insert({
         status: 'running',
+        collect_mode,
         total,
         current: 0,
         success: 0,

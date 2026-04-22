@@ -1893,6 +1893,36 @@
     return rows;
   }
 
+  function restoreCollectItemsFromStorage() {
+    var items = window._collectItems || window._currentCollectItems || [];
+    if (items && items.length) return;
+    try {
+      var stored = localStorage.getItem('_collectItems');
+      if (stored) {
+        var parsed = JSON.parse(stored);
+        if (parsed && parsed.length) {
+          window._collectItems = parsed;
+          window._currentCollectItems = parsed;
+        }
+      }
+      var storedMode = localStorage.getItem('_collectMode');
+      if (storedMode) {
+        window._collectMode = storedMode;
+        window._currentCollectMode = storedMode;
+      }
+    } catch (e) {}
+  }
+
+  function loadTodayFallbackScheduleRows() {
+    return apiFetch('GET', '/collect-schedule?day=today', null)
+      .then(function (sched) {
+        var rows = (sched && sched.data) || [];
+        for (var i = 0; i < rows.length; i++) rows[i].result_status = '';
+        renderTodayRows(rows);
+        window.__todayCsvPayload = rows;
+      });
+  }
+
   function renderTodayRows(merged) {
     var empty = document.getElementById('today-empty');
     var wrap = document.getElementById('today-table-wrap');
@@ -1932,6 +1962,7 @@
   function renderTodayCurrentSummary() {
     var el = document.getElementById('today-current-summary');
     if (!el) return;
+    restoreCollectItemsFromStorage();
     var st = window._lastCollectStatus || { status: 'idle' };
     var mode = window._collectMode || window._currentCollectMode || '수집';
     var current = Number(st.current) || 0;
@@ -1942,7 +1973,7 @@
     var modeBadge = '<span style="background:#EBF3FF;color:#3182F6;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:600;margin-right:6px;">' + escapeHtml(mode) + '</span>';
     if (!items.length) {
       if (st.status === 'running' || st.status === 'stopping') {
-        el.innerHTML = modeBadge + '수집이 진행 중입니다. (페이지 새로고침 전에 시작된 수집)';
+        el.innerHTML = modeBadge + '수집 진행 중 — 상세 목록을 보려면 수집 시작 시 이 페이지를 열어두세요';
         return;
       }
       el.textContent = '수집 대기 중';
@@ -1965,13 +1996,31 @@
         '수집 완료 — ' + total + '건 (성공 ' + success + ' / 실패 ' + fail + ')' + (duration ? ' · 소요 ' + duration : '');
       return;
     }
-    el.textContent = '수집 대기 중 — 수집 버튼을 눌러 시작하세요';
+    el.textContent = '수집 대기 중';
   }
 
   function loadTodaySection() {
     renderTodayCurrentSummary();
     if (String(state.todayTabKey) === 'current') {
+      restoreCollectItemsFromStorage();
       var currentRows = buildCurrentCollectRows();
+      var st = window._lastCollectStatus || { status: 'idle' };
+      if (!currentRows.length) {
+        if (st.status === 'running' || st.status === 'done' || st.status === 'stopping') {
+          return loadTodayFallbackScheduleRows()
+            .then(function () {
+              var empty = document.getElementById('today-empty');
+              if (empty && (!window.__todayCsvPayload || !window.__todayCsvPayload.length)) {
+                empty.textContent = '수집 진행 중 — 상세 목록을 보려면 수집 시작 시 이 페이지를 열어두세요';
+              }
+            })
+            .catch(function (e) {
+              console.error(e);
+              var empty2 = document.getElementById('today-empty');
+              if (empty2) empty2.textContent = '수집 진행 중 — 상세 목록을 보려면 수집 시작 시 이 페이지를 열어두세요';
+            });
+        }
+      }
       renderTodayRows(currentRows);
       window.__todayCsvPayload = currentRows;
       return Promise.resolve();
@@ -3636,7 +3685,17 @@
     window.postMessage(
       {
         type: 'SCHEDULE_COLLECT_START',
-        skuList: list
+        skuList: (list || []).map(function (it) {
+          var row = it || {};
+          return {
+            sku_id: row.sku_id,
+            product_url: row.product_url || '',
+            sku_name: row.sku_name || '',
+            brand: row.brand || '',
+            registered_price: row.registered_price || null,
+            current_price: row.current_price || null
+          };
+        })
       },
       '*'
     );
@@ -3709,6 +3768,8 @@
         window._currentCollectItems = window._collectItems;
         window._currentCollectMode = window._collectMode;
         window._currentCollectTotal = window._collectTotal;
+        try { localStorage.setItem('_collectItems', JSON.stringify(window._collectItems || [])); } catch (e) {}
+        try { localStorage.setItem('_collectMode', label); } catch (e) {}
         state.todayTabKey = 'current';
         renderTodayWeekTabs();
         loadTodaySection();
