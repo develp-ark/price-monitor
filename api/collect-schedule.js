@@ -62,6 +62,75 @@ async function loadDayRows(client, day) {
     }));
 }
 
+/** is_active=true AND (priority_group='B' OR priority_group IS NULL), 1000 rows/page */
+async function fetchSkuListBGroup(client) {
+  const all = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await client
+      .from('sku_list')
+      .select('sku_id')
+      .eq('is_active', true)
+      .or('priority_group.eq.B,priority_group.is.null')
+      .order('sku_id', { ascending: true })
+      .range(from, from + 999);
+    if (error) throw new Error(error.message);
+    const rows = data || [];
+    for (let i = 0; i < rows.length; i++) all.push(rows[i]);
+    if (rows.length < 1000) break;
+  }
+  return all;
+}
+
+/** is_active=true AND priority_group='A', 1000 rows/page */
+async function fetchSkuListAGroup(client) {
+  const all = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await client
+      .from('sku_list')
+      .select('sku_id')
+      .eq('is_active', true)
+      .eq('priority_group', 'A')
+      .order('sku_id', { ascending: true })
+      .range(from, from + 999);
+    if (error) throw new Error(error.message);
+    const rows = data || [];
+    for (let i = 0; i < rows.length; i++) all.push(rows[i]);
+    if (rows.length < 1000) break;
+  }
+  return all;
+}
+
+async function fetchAllScheduleDaysPaged(client) {
+  const allRows = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await client
+      .from('collect_schedule')
+      .select('day_of_week')
+      .range(from, from + 999);
+    if (error) throw new Error(error.message);
+    const rows = data || [];
+    for (let i = 0; i < rows.length; i++) allRows.push(rows[i]);
+    if (rows.length < 1000) break;
+  }
+  return allRows;
+}
+
+async function fetchActivePriorityGroupRowsPaged(client) {
+  const groupRows = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await client
+      .from('sku_list')
+      .select('priority_group')
+      .eq('is_active', true)
+      .range(from, from + 999);
+    if (error) throw new Error(error.message);
+    const rows = data || [];
+    for (let i = 0; i < rows.length; i++) groupRows.push(rows[i]);
+    if (rows.length < 1000) break;
+  }
+  return groupRows;
+}
+
 module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return handleOptions(res);
 
@@ -69,6 +138,33 @@ module.exports = async (req, res) => {
   if (envErr) return json(res, 500, { ok: false, error: envErr });
 
   if (req.method === 'GET') {
+    if (req.query.day === undefined) {
+      try {
+        const allRows = await fetchAllScheduleDaysPaged(client);
+        const summary = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+        allRows.forEach(function (r) {
+          summary[r.day_of_week]++;
+        });
+        const groupRows = await fetchActivePriorityGroupRowsPaged(client);
+        let aCount = 0;
+        let bCount = 0;
+        groupRows.forEach(function (r) {
+          if (r.priority_group === 'A') aCount++;
+          else bCount++;
+        });
+        return json(res, 200, {
+          ok: true,
+          summary,
+          a_group: aCount,
+          b_group: bCount,
+        });
+      } catch (e) {
+        return json(res, 500, {
+          ok: false,
+          error: e.message || 'Failed to load summary',
+        });
+      }
+    }
     if (req.query.day === 'all') {
       const { data, error } = await client
         .from('collect_schedule')
@@ -119,33 +215,51 @@ module.exports = async (req, res) => {
   if (!body) return;
 
   if (body.action === 'auto_distribute') {
-    const { data: activeRows, error: skuErr } = await client
-      .from('sku_list')
-      .select('sku_id')
-      .eq('is_active', true)
-      .order('brand')
-      .order('sku_id');
-    if (skuErr) return json(res, 500, { ok: false, error: skuErr.message });
+    try {
+      const bSkus = await fetchSkuListBGroup(client);
+      const aSkus = await fetchSkuListAGroup(client);
+      const days = [1, 2, 3, 4, 5];
 
-    const skuIds = (activeRows || []).map((r) => r.sku_id);
-    const weekdays = [1, 2, 3, 4, 5];
-    const inserts = skuIds.map((sku_id, i) => ({
-      day_of_week: weekdays[i % weekdays.length],
-      sku_id,
-    }));
+      const { error: delErr } = await client
+        .from('collect_schedule')
+        .delete()
+        .in('day_of_week', days);
+      if (delErr) return json(res, 500, { ok: false, error: delErr.message });
 
-    const { error: delErr } = await client
-      .from('collect_schedule')
-      .delete()
-      .in('day_of_week', weekdays);
-    if (delErr) return json(res, 500, { ok: false, error: delErr.message });
+      const inserts = [];
+      bSkus.forEach(function (s, idx) {
+        inserts.push({ sku_id: s.sku_id, day_of_week: days[idx % 5] });
+      });
+      aSkus.forEach(function (s) {
+        days.forEach(function (d) {
+          inserts.push({ sku_id: s.sku_id, day_of_week: d });
+        });
+      });
 
-    if (inserts.length) {
-      const { error: insErr } = await client.from('collect_schedule').insert(inserts);
-      if (insErr) return json(res, 500, { ok: false, error: insErr.message });
+      for (let b = 0; b < inserts.length; b += 500) {
+        const chunk = inserts.slice(b, b + 500);
+        const { error: insErr } = await client.from('collect_schedule').insert(chunk);
+        if (insErr) return json(res, 500, { ok: false, error: insErr.message });
+      }
+
+      const summary = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+      inserts.forEach(function (r) {
+        summary[r.day_of_week]++;
+      });
+
+      return json(res, 200, {
+        ok: true,
+        message: 'Auto-distribute complete',
+        a_group: aSkus.length,
+        b_group: bSkus.length,
+        summary,
+      });
+    } catch (e) {
+      return json(res, 500, {
+        ok: false,
+        error: e.message || 'Auto-distribute failed',
+      });
     }
-
-    return json(res, 200, { ok: true, assigned: inserts.length });
   }
 
   const day = parseDay(body.day_of_week);
