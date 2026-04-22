@@ -682,9 +682,9 @@
       margin-bottom: 12px;
     }
     .alert-filter-group {
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
       min-width: 0;
     }
     .alert-filter-label {
@@ -694,9 +694,9 @@
       white-space: nowrap;
     }
     .alert-filter-divider {
-      width: 1px;
-      height: 20px;
-      background: #E5E8EB;
+      color: #E5E8EB;
+      font-size: 14px;
+      line-height: 1;
     }
     .alert-filter-row .filter-btns {
       display: flex;
@@ -708,10 +708,13 @@
       color: #6B7280;
       border: none;
       border-radius: 4px;
-      padding: 4px 10px;
+      padding: 3px 8px;
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;
+    }
+    .alert-filter-row .filter-btns button:not(.on):hover {
+      background: #E5E8EB;
     }
     .alert-filter-row .filter-btns button.on {
       background: #3182F6;
@@ -857,12 +860,12 @@
             <span class="alert-filter-label">브랜드</span>
             <div class="filter-btns" id="alert-brand-filters"></div>
           </div>
-          <div class="alert-filter-divider"></div>
+          <span class="alert-filter-divider">|</span>
           <div class="alert-filter-group">
             <span class="alert-filter-label">변동</span>
             <div class="filter-btns" id="alert-dir-filters"></div>
           </div>
-          <div class="alert-filter-divider"></div>
+          <span class="alert-filter-divider">|</span>
           <div class="alert-filter-group">
             <span class="alert-filter-label">상태</span>
             <div class="filter-btns" id="alert-status-filters"></div>
@@ -1789,7 +1792,13 @@
     var el = document.getElementById('today-empty');
     if (!el) return;
     if (String(state.todayTabKey) === 'current') {
-      el.textContent = '수집 대기 중 — 수집 버튼을 눌러 시작하세요';
+      var st = window._lastCollectStatus || { status: 'idle' };
+      var items = window._collectItems || window._currentCollectItems || [];
+      if (!items.length && (st.status === 'running' || st.status === 'stopping')) {
+        el.textContent = '수집이 진행 중입니다. (페이지 새로고침 전에 시작된 수집)';
+      } else {
+        el.textContent = '수집 대기 중';
+      }
       return;
     }
     var lab = todayTabDayLabel(state.todayTabKey);
@@ -1833,10 +1842,10 @@
 
   function formatCollectResultBadge(status) {
     var s = String(status || '').toLowerCase();
-    if (s === 'done') return '<span style="color:#10B981;font-weight:700;">✓</span>';
+    if (s === 'done') return '<span style="color:#10B981;font-weight:700;">✓ 완료</span>';
     if (s === 'discontinued') return '<span style="display:inline-block;background:#FEE2E2;color:#DC2626;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;">판매중단</span>';
-    if (s === 'collecting') return '<span style="color:#3182F6">수집중...</span>';
-    if (s === 'pending') return '<span style="color:#9CA3AF">대기</span>';
+    if (s === 'collecting') return '<span style="color:#3182F6">● 수집중</span>';
+    if (s === 'pending') return '<span style="color:#9CA3AF">— 대기</span>';
     return '<span style="color:#9CA3AF;">—</span>';
   }
 
@@ -1852,7 +1861,7 @@
   }
 
   function buildCurrentCollectRows() {
-    var items = window._currentCollectItems || [];
+    var items = window._collectItems || window._currentCollectItems || [];
     var st = window._lastCollectStatus || {};
     var current = Number(st.current) || 0;
     var rows = [];
@@ -1924,19 +1933,19 @@
     var el = document.getElementById('today-current-summary');
     if (!el) return;
     var st = window._lastCollectStatus || { status: 'idle' };
-    var mode = window._currentCollectMode || '수집';
+    var mode = window._collectMode || window._currentCollectMode || '수집';
     var current = Number(st.current) || 0;
-    var total = Number(window._currentCollectTotal) || Number(st.total) || ((window._currentCollectItems && window._currentCollectItems.length) || 0);
+    var total = Number(window._collectTotal) || Number(window._currentCollectTotal) || Number(st.total) || (((window._collectItems || window._currentCollectItems) && (window._collectItems || window._currentCollectItems).length) || 0);
     var success = Number(st.success) || 0;
     var fail = Number(st.fail) || 0;
-    var items = window._currentCollectItems || [];
+    var items = window._collectItems || window._currentCollectItems || [];
     var modeBadge = '<span style="background:#EBF3FF;color:#3182F6;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:600;margin-right:6px;">' + escapeHtml(mode) + '</span>';
     if (!items.length) {
       if (st.status === 'running' || st.status === 'stopping') {
-        el.innerHTML = modeBadge + '수집이 진행 중이지만 상세 목록을 표시할 수 없습니다. 페이지 새로고침 전에 시작된 수집입니다.';
+        el.innerHTML = modeBadge + '수집이 진행 중입니다. (페이지 새로고침 전에 시작된 수집)';
         return;
       }
-      el.textContent = '수집 대기 중 — 수집 버튼을 눌러 시작하세요';
+      el.textContent = '수집 대기 중';
       return;
     }
     if (st.status === 'running' || st.status === 'stopping') {
@@ -3631,6 +3640,9 @@
       },
       '*'
     );
+    state.todayTabKey = 'current';
+    renderTodayWeekTabs();
+    loadTodaySection();
     var badge = document.getElementById('collect-badge');
     if (badge) {
       badge.className = 'badge running';
@@ -3673,6 +3685,7 @@
     setCollectMenuOpen(false);
     fetchCollectModeItems(mode)
       .then(function (json) {
+        var d = json || {};
         var list = (json && json.items) || [];
         var total = Number(json && json.total);
         if (isNaN(total) || total <= 0) total = list.length;
@@ -3689,9 +3702,13 @@
           mins +
           '분\n시작할까요?';
         if (!confirm(msg)) return;
-        window._currentCollectItems = list.slice ? list.slice() : list;
-        window._currentCollectMode = mode.shortLabel || mode.label || '수집';
-        window._currentCollectTotal = total;
+        var label = mode.shortLabel || mode.label || '수집';
+        window._collectItems = d.items || [];
+        window._collectMode = label;
+        window._collectTotal = d.total || (d.items ? d.items.length : list.length);
+        window._currentCollectItems = window._collectItems;
+        window._currentCollectMode = window._collectMode;
+        window._currentCollectTotal = window._collectTotal;
         state.todayTabKey = 'current';
         renderTodayWeekTabs();
         loadTodaySection();
