@@ -114,6 +114,36 @@
       box-shadow: 0 2px 8px rgba(240, 68, 82, 0.08);
       margin-top: 4px;
     }
+    .alert-summary-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .alert-summary-box {
+      flex: 1;
+      min-width: 100px;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+    .alert-summary-box.total { background: #F3F4F6; color: #1A1A1A; }
+    .alert-summary-box.up {
+      background: #FFF0F0;
+      color: #F04452;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .alert-summary-box.down {
+      background: #F0FFF4;
+      color: #10B981;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
     .progress-bar {
       height: 10px;
       background: #e5e8eb;
@@ -661,6 +691,11 @@
             <span id="alert-count-badge" class="badge badge-danger" style="display:none;"></span>
           </h2>
         </div>
+        <div class="alert-summary-row" id="alert-summary-row">
+          <div class="alert-summary-box total" id="alert-sum-total">전체 변동: 0건</div>
+          <div class="alert-summary-box up" id="alert-sum-up"><span>▲</span><span>가격 상승: 0건</span></div>
+          <div class="alert-summary-box down" id="alert-sum-down"><span>▼</span><span>가격 하락: 0건</span></div>
+        </div>
         <div class="filter-btns" id="alert-brand-filters" style="margin-bottom:8px;"></div>
         <div class="filter-btns" id="alert-dir-filters" style="margin-bottom:12px;"></div>
         <div id="alert-empty" class="empty">오늘 가격 변동 내역이 없습니다</div>
@@ -679,6 +714,7 @@
           <h2>오늘 수집 현황</h2>
           <button type="button" class="btn btn-ghost" id="btn-today-csv">CSV 다운로드</button>
         </div>
+        <div class="filter-btns" id="today-week-tabs" style="margin-bottom:12px;"></div>
         <div id="today-empty" class="empty">오늘 배정된 SKU가 없습니다.</div>
         <div id="today-table-wrap" style="display:none;">
           <table class="data">
@@ -825,7 +861,8 @@
           <span class="muted" id="manual-queue-toggle-icon">▼</span>
         </div>
         <div id="manual-queue-body" class="manual-queue-body">
-          <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:center;">
+            <button type="button" class="btn btn-primary" id="btn-queue-run-collect" disabled>큐 수집 시작</button>
             <button type="button" class="btn btn-ghost" id="btn-queue-clear">완료 항목 삭제</button>
           </div>
           <div id="queue-empty" class="empty">수동 수집 대기 항목이 없습니다.</div>
@@ -983,6 +1020,34 @@
   var API_BASE = '/api';
   var DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 
+  function getDefaultKstWeekTabDay() {
+    var parts = new Intl.DateTimeFormat('en', {
+      timeZone: 'Asia/Seoul',
+      weekday: 'short'
+    }).formatToParts(new Date());
+    var w = '';
+    for (var wi = 0; wi < parts.length; wi++) {
+      if (parts[wi].type === 'weekday') w = parts[wi].value;
+    }
+    var mapEn = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5 };
+    if (mapEn[w]) return mapEn[w];
+    return 1;
+  }
+
+  function pad2Num(n) {
+    var x = Math.floor(Number(n));
+    if (isNaN(x)) return '00';
+    return (x < 10 ? '0' : '') + x;
+  }
+
+  function formatLastCollectedHHMM(isoStr) {
+    if (!isoStr) return '';
+    var d = new Date(isoStr);
+    if (isNaN(d.getTime())) return '';
+    var kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+    return pad2Num(kst.getUTCHours()) + ':' + pad2Num(kst.getUTCMinutes());
+  }
+
   var state = {
     collectPollTimer: null,
     clockTimer: null,
@@ -1007,7 +1072,15 @@
     schedulePopoverSkuId: null,
     alertSortKey: 'pct_abs',
     alertSortAsc: false,
-    skuPgLoading: {}
+    skuPgLoading: {},
+    todayTabDay: getDefaultKstWeekTabDay(),
+    dashboardCollectPending: false,
+    collectRunKind: null,
+    scheduleDayCounts: {},
+    queueCollectRunActive: false,
+    queueCollectSuccess: 0,
+    queueCollectFail: 0,
+    queueRowsSnapshot: []
   };
 
   var extensionReady = false;
@@ -1282,7 +1355,11 @@
 
   function startCollectPollingIfNeeded(status) {
     stopCollectPolling();
-    if (status !== 'running' && status !== 'stopping') return;
+    var shouldPoll =
+      status === 'running' ||
+      status === 'stopping' ||
+      !!state.dashboardCollectPending;
+    if (!shouldPoll) return;
     state.collectPollTimer = setInterval(function () {
       loadCollectStatus();
     }, 3000);
@@ -1342,7 +1419,15 @@
             else if (m > 0) elapsed = m + '분 ' + s + '초';
             else elapsed = s + '초';
           }
-          var lineText = cur + '/' + total + (st === 'stopping' ? ' 중지 중' : ' 수집 중');
+          var grpPre = '';
+          if (state.collectRunKind === 'A') grpPre = 'A그룹 수집 진행 중 — ';
+          else if (state.collectRunKind === 'B') grpPre = 'B그룹 수집 진행 중 — ';
+          var lineText =
+            grpPre +
+            cur +
+            '/' +
+            total +
+            (st === 'stopping' ? ' 중지 중' : ' 수집 중');
           lineText += skuName ? ' (' + skuName + ')' : '';
           lineText += ' · 성공 ' + (d.success || 0) + ' / 실패 ' + (d.fail || 0);
           if (elapsed) lineText += ' · 경과 ' + elapsed;
@@ -1350,11 +1435,15 @@
           detail.style.display = 'none';
           detail.textContent = '';
           if (st === 'running') {
+            state.dashboardCollectPending = false;
             var nowMs = Date.now();
             if (nowMs - lastTableRefresh > TABLE_REFRESH_INTERVAL) {
               lastTableRefresh = nowMs;
               loadTodaySection();
             }
+          }
+          if (st === 'stopping') {
+            state.dashboardCollectPending = false;
           }
         } else {
           progWrap.style.display = 'none';
@@ -1363,6 +1452,8 @@
         }
 
         if (st === 'done') {
+          state.dashboardCollectPending = false;
+          state.collectRunKind = null;
           var total2 = Number(d.current || d.total) || 0;
           var succ = Number(d.success) || 0;
           var fail = Number(d.fail) || 0;
@@ -1384,10 +1475,15 @@
           if (duration) doneText += ' · 소요 ' + duration;
           detail.textContent = doneText;
           loadTodaySection();
+          setTimeout(function () {
+            loadTodaySection();
+          }, 2000);
           loadScheduleSummary();
           loadAlerts();
           stopCollectPolling();
         } else if (st === 'idle' || st === 'error') {
+          if (st === 'error') state.dashboardCollectPending = false;
+          if (st === 'error') state.collectRunKind = null;
           detail.textContent = st === 'error' ? '오류가 발생했습니다.' : '대기 중입니다.';
         } else if (st !== 'running') {
           detail.textContent = '';
@@ -1418,6 +1514,13 @@
         var wrap = document.getElementById('queue-table-wrap');
         var empty = document.getElementById('queue-empty');
         var tbody = document.getElementById('queue-tbody');
+
+        state.queueRowsSnapshot = rows.slice ? rows.slice() : rows;
+
+        var runBtn = document.getElementById('btn-queue-run-collect');
+        if (runBtn && !runBtn._queueBusy) {
+          runBtn.disabled = rows.length === 0;
+        }
 
         if (!rows.length) {
           empty.style.display = '';
@@ -1461,9 +1564,54 @@
     return out;
   }
 
+  function todayTabDayLabel(d) {
+    var n = Number(d);
+    if (n >= 1 && n <= 5 && DAY_NAMES[n]) return DAY_NAMES[n];
+    return '';
+  }
+
+  function setTodayEmptyMessage() {
+    var el = document.getElementById('today-empty');
+    if (!el) return;
+    var lab = todayTabDayLabel(state.todayTabDay);
+    el.textContent = lab
+      ? lab + '요일에 배정된 SKU가 없습니다.'
+      : '해당 요일에 배정된 SKU가 없습니다.';
+  }
+
+  function renderTodayWeekTabs() {
+    var el = document.getElementById('today-week-tabs');
+    if (!el) return;
+    var cnt = state.scheduleDayCounts || {};
+    var labs = ['월', '화', '수', '목', '금'];
+    var htm = '';
+    for (var ti = 0; ti < 5; ti++) {
+      var day = ti + 1;
+      var num = cnt[day] != null ? cnt[day] : 0;
+      var onCls = Number(state.todayTabDay) === day ? 'on' : '';
+      htm +=
+        '<button type="button" data-today-tab="' +
+        day +
+        '" class="' +
+        onCls +
+        '">' +
+        labs[ti] +
+        ' ' +
+        num +
+        '</button>';
+    }
+    el.innerHTML = htm;
+  }
+
   function loadTodaySection() {
+    var dayNum = Number(state.todayTabDay);
+    if (isNaN(dayNum) || dayNum < 1 || dayNum > 5) {
+      dayNum = getDefaultKstWeekTabDay();
+      state.todayTabDay = dayNum;
+    }
+
     return Promise.all([
-      apiFetch('GET', '/collect-schedule?day=today', null),
+      apiFetch('GET', '/collect-schedule?day=' + encodeURIComponent(String(dayNum)), null),
       apiFetch('GET', '/sku-detail', null)
     ])
       .then(function (results) {
@@ -1472,11 +1620,11 @@
         var scheduleRows = sched.data || [];
         var detailRows = detail.data || [];
         var merged = mergeSkuMaps(scheduleRows, detailRows);
-        var todayYmd = kstYmd();
         var empty = document.getElementById('today-empty');
         var wrap = document.getElementById('today-table-wrap');
         var tbody = document.getElementById('today-tbody');
         if (!merged.length) {
+          setTodayEmptyMessage();
           empty.style.display = '';
           wrap.style.display = 'none';
           tbody.innerHTML = '';
@@ -1490,28 +1638,10 @@
           var schedRow = scheduleRows[i];
           var pu = r.product_url || (schedRow && schedRow.product_url) || '';
           var lcRaw = r.last_collected ? String(r.last_collected) : '';
-          var lc = lcRaw ? lcRaw.slice(0, 10) : '';
           var collectTime = '<span class="muted">미수집</span>';
-          if (lcRaw && lc === todayYmd) {
-            if (/^\d{4}-\d{2}-\d{2}$/.test(lcRaw)) {
-              collectTime = '✅';
-            } else {
-              try {
-                var dt = new Date(lcRaw);
-                if (!isNaN(dt.getTime())) {
-                  collectTime = dt.toLocaleTimeString('ko-KR', {
-                    timeZone: 'Asia/Seoul',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false
-                  });
-                } else {
-                  collectTime = '✅';
-                }
-              } catch (e) {
-                collectTime = '✅';
-              }
-            }
+          if (lcRaw) {
+            var hhmm = formatLastCollectedHHMM(lcRaw);
+            collectTime = hhmm ? escapeHtml(hhmm) : '<span class="muted">미수집</span>';
           }
           h += '<tr>';
           h += '<td>' + productNameLinkHtml(r.sku_name, pu) + '</td>';
@@ -1575,7 +1705,9 @@
       ]);
     }
     var ymd = kstYmd().replace(/-/g, '');
-    downloadCsv('today_collect_' + ymd + '.csv', header, rows);
+    var dNum = Number(state.todayTabDay);
+    if (isNaN(dNum)) dNum = 1;
+    downloadCsv('today_collect_day' + dNum + '_' + ymd + '.csv', header, rows);
   }
 
   function uniqueBrandsFromAlerts(alerts) {
@@ -1592,6 +1724,29 @@
     return arr;
   }
 
+  function updateAlertSummaryStats() {
+    var list = state.alertRaw || [];
+    var nAll = list.length;
+    var nUp = 0;
+    var nDown = 0;
+    for (var i = 0; i < list.length; i++) {
+      var ch = Number((list[i] && list[i].change_pct) != null ? list[i].change_pct : 0);
+      if (isNaN(ch)) ch = 0;
+      if (ch > 0) nUp++;
+      else if (ch < 0) nDown++;
+    }
+    var elT = document.getElementById('alert-sum-total');
+    var elU = document.getElementById('alert-sum-up');
+    var elD = document.getElementById('alert-sum-down');
+    if (elT) elT.textContent = '전체 변동: ' + nAll + '건';
+    if (elU) {
+      elU.innerHTML = '<span>▲</span><span>가격 상승: ' + nUp + '건</span>';
+    }
+    if (elD) {
+      elD.innerHTML = '<span>▼</span><span>가격 하락: ' + nDown + '건</span>';
+    }
+  }
+
   function loadAlerts() {
     return Promise.all([apiFetch('GET', '/price-alert', null), apiFetch('GET', '/sku-detail', null)])
       .then(function (results) {
@@ -1606,6 +1761,7 @@
           if (sid && dr.product_url) urlMap[sid] = dr.product_url;
         }
         state.alertSkuUrlMap = urlMap;
+        updateAlertSummaryStats();
         renderAlertFilters();
         renderAlertTable();
         return json;
@@ -2197,6 +2353,10 @@
 
   function handleCollectResult(data) {
     if (!data || data.sku_id == null) return;
+    if (state.queueCollectRunActive) {
+      if (data.success) state.queueCollectSuccess++;
+      else state.queueCollectFail++;
+    }
     var btn = document.querySelector('.btn-collect[data-sku-id="' + String(data.sku_id) + '"]');
     if (!btn) return;
     var row = findSkuRowById(data.sku_id);
@@ -2286,6 +2446,27 @@
         var assignedCount = Object.keys(assignedIds).length;
         var unassignedCount = totalActive - assignedCount;
 
+        var dayCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+        for (var si = 0; si < scheduleData.length; si++) {
+          var srow = scheduleData[si] || {};
+          var dow = Number(srow.day_of_week);
+          if (dow >= 1 && dow <= 5) {
+            dayCounts[dow] = (dayCounts[dow] || 0) + 1;
+          }
+        }
+        state.scheduleDayCounts = dayCounts;
+        renderTodayWeekTabs();
+
+        var aAssigned = 0;
+        var bAssigned = 0;
+        for (var aid in assignedIds) {
+          if (!Object.prototype.hasOwnProperty.call(assignedIds, aid)) continue;
+          var skuRow = built.skuMap[aid];
+          var pg = normalizePriorityGroup(skuRow && skuRow.priority_group);
+          if (pg === 'A') aAssigned++;
+          else if (pg === 'B') bAssigned++;
+        }
+
         var totalEl = document.getElementById('dash-sch-total');
         var asgEl = document.getElementById('dash-sch-assigned');
         var unEl = document.getElementById('dash-sch-unassigned');
@@ -2294,8 +2475,8 @@
         if (unEl) unEl.textContent = String(unassignedCount);
 
         var tbody = document.getElementById('dash-schedule-summary-tbody');
-        if (!tbody) return;
-        var h = '';
+        if (!tbody) return { aAssigned: aAssigned, bAssigned: bAssigned };
+        var hx = '';
         for (var d = 1; d <= 5; d++) {
           var ids = dayMap[d] || [];
           var brandCount = {};
@@ -2318,13 +2499,14 @@
             }
             brandText = parts.join(' · ');
           }
-          h += '<tr>';
-          h += '<td>' + escapeHtml(DAY_NAMES[d]) + '</td>';
-          h += '<td class="num">' + escapeHtml(String(ids.length)) + '</td>';
-          h += '<td>' + brandText + '</td>';
-          h += '</tr>';
+          hx += '<tr>';
+          hx += '<td>' + escapeHtml(DAY_NAMES[d]) + '</td>';
+          hx += '<td class="num">' + escapeHtml(String(ids.length)) + '</td>';
+          hx += '<td>' + brandText + '</td>';
+          hx += '</tr>';
         }
-        tbody.innerHTML = h;
+        tbody.innerHTML = hx;
+        return { aAssigned: aAssigned, bAssigned: bAssigned };
       })
       .catch(function (e) {
         console.error(e);
@@ -2817,8 +2999,10 @@
     activateTab('sku');
   });
 
-  function beginDashboardCollect(list) {
+  function beginDashboardCollect(list, collectKind) {
     lastTableRefresh = 0;
+    state.dashboardCollectPending = true;
+    state.collectRunKind = collectKind === 'B' ? 'B' : 'A';
     window.postMessage(
       {
         type: 'SCHEDULE_COLLECT_START',
@@ -2852,11 +3036,6 @@
     var stopBtn = document.getElementById('btn-stop-collect');
     if (stopBtn) stopBtn.disabled = false;
     setCollectStartButtonsState(true);
-    if (!state.collectPollTimer) {
-      state.collectPollTimer = setInterval(function () {
-        loadCollectStatus();
-      }, 3000);
-    }
     loadCollectStatus();
   }
 
@@ -2881,7 +3060,7 @@
           return;
         }
         if (!confirm('A그룹 ' + list.length + '개 상품을 수집할까요?')) return;
-        beginDashboardCollect(list);
+        beginDashboardCollect(list, 'A');
       })
       .catch(function (e) {
         console.error(e);
@@ -2911,7 +3090,7 @@
           return;
         }
         if (!confirm('오늘 분 B그룹 ' + list.length + '개 상품을 수집할까요?')) return;
-        beginDashboardCollect(list);
+        beginDashboardCollect(list, 'B');
       })
       .catch(function (e) {
         console.error(e);
@@ -2922,6 +3101,8 @@
 
   document.getElementById('btn-stop-collect').addEventListener('click', function () {
     if (!confirm('수집을 중지할까요?')) return;
+    state.dashboardCollectPending = false;
+    state.collectRunKind = null;
     apiFetch('POST', '/collect-status', { action: 'stop' })
       .then(function () {
         return loadCollectStatus();
@@ -3108,6 +3289,56 @@
     }
   });
 
+  document.getElementById('btn-queue-run-collect').addEventListener('click', function () {
+    if (!extensionReady) {
+      alert('Chrome 확장프로그램이 감지되지 않습니다.\n이 페이지에서 확장프로그램이 로드되었는지 확인하세요.');
+      return;
+    }
+    var rows = state.queueRowsSnapshot || [];
+    if (!rows.length) return;
+    var btn = document.getElementById('btn-queue-run-collect');
+    btn._queueBusy = true;
+    btn.disabled = true;
+    state.queueCollectRunActive = true;
+    state.queueCollectSuccess = 0;
+    state.queueCollectFail = 0;
+
+    function sendOne(idx) {
+      if (idx >= rows.length) {
+        state.queueCollectRunActive = false;
+        btn._queueBusy = false;
+        btn.textContent = '큐 수집 시작';
+        showManualToast(
+          '수동 수집 완료 (성공 ' +
+            state.queueCollectSuccess +
+            ' / 실패 ' +
+            state.queueCollectFail +
+            ')'
+        );
+        loadQueue();
+        return;
+      }
+      btn.textContent = '수집 중... (' + (idx + 1) + '/' + rows.length + ')';
+      var item = rows[idx];
+      window.postMessage(
+        {
+          type: 'PRICE_COLLECT_REQUEST',
+          sku: {
+            sku_id: item.sku_id,
+            product_url: item.product_url || item.url || '',
+            sku_name: item.sku_name || ''
+          }
+        },
+        '*'
+      );
+      var delayMs = idx + 1 >= rows.length ? 0 : 5000;
+      setTimeout(function () {
+        sendOne(idx + 1);
+      }, delayMs);
+    }
+    sendOne(0);
+  });
+
   document.getElementById('btn-sku-add').addEventListener('click', function () {
     document.getElementById('f-sku-id').value = '';
     document.getElementById('f-sku-name').value = '';
@@ -3250,7 +3481,12 @@
     apiFetch('POST', '/collect-schedule', { action: 'auto_distribute' })
       .then(function () {
         invalidateSkuCache();
-        return loadSkuPage(true);
+        return loadScheduleSummary().then(function (meta) {
+          var aN = meta && meta.aAssigned != null ? meta.aAssigned : 0;
+          var bN = meta && meta.bAssigned != null ? meta.bAssigned : 0;
+          showManualToast('자동분배 완료 — A그룹 ' + aN + '개, B그룹 ' + bN + '개');
+          return loadSkuPage(true);
+        });
       })
       .catch(function (e) {
         console.error(e);
@@ -3263,7 +3499,12 @@
     apiFetch('POST', '/collect-schedule', { action: 'auto_distribute' })
       .then(function () {
         invalidateSkuCache();
-        return loadScheduleTab();
+        return loadScheduleSummary().then(function (meta) {
+          var aN = meta && meta.aAssigned != null ? meta.aAssigned : 0;
+          var bN = meta && meta.bAssigned != null ? meta.bAssigned : 0;
+          showManualToast('자동분배 완료 — A그룹 ' + aN + '개, B그룹 ' + bN + '개');
+          return loadScheduleTab();
+        });
       })
       .catch(function (e) {
         console.error(e);
@@ -3324,6 +3565,16 @@
         hideSchedulePopover();
       } else {
         showSchedulePopover(sid, schedEl);
+      }
+      return;
+    }
+    var ttEl = t.closest && t.closest('[data-today-tab]');
+    if (ttEl) {
+      var td = parseInt(ttEl.getAttribute('data-today-tab'), 10);
+      if (!isNaN(td) && td >= 1 && td <= 5) {
+        state.todayTabDay = td;
+        renderTodayWeekTabs();
+        loadTodaySection();
       }
       return;
     }
