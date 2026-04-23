@@ -70,7 +70,7 @@ module.exports = async (req, res) => {
   let q = client
     .from('price_alert')
     .select(
-      'id, sku_id, sku_name, brand, prev_price, new_price, change_pct, detected_at, memo, resolved, resolved_at'
+      'id, sku_id, prev_price, new_price, change_pct, detected_at, memo, resolved, resolved_at'
     )
     .gte('detected_at', sinceIso)
     .order('detected_at', { ascending: false });
@@ -93,12 +93,12 @@ module.exports = async (req, res) => {
   }
 
   const alerts = alertsRaw.map((r) => {
-    const meta = skuMap[r.sku_id];
+    const meta = skuMap[r.sku_id] || {};
     return {
       id: r.id,
       sku_id: r.sku_id,
-      sku_name: r.sku_name ?? meta?.sku_name ?? null,
-      brand: r.brand ?? meta?.brand ?? null,
+      sku_name: meta.sku_name || '',
+      brand: meta.brand || '',
       prev_price: r.prev_price,
       new_price: r.new_price,
       change_pct: r.change_pct != null ? Number(r.change_pct) : null,
