@@ -1183,10 +1183,10 @@
     return (x < 10 ? '0' : '') + x;
   }
 
-  function formatLastCollectedHHMM(isoStr) {
-    if (!isoStr) return '';
+  function formatCollectTime(isoStr) {
+    if (!isoStr) return '미수집';
     var d = new Date(isoStr);
-    if (isNaN(d.getTime())) return '';
+    if (isNaN(d.getTime())) return '미수집';
     var kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
     return pad2Num(kst.getUTCHours()) + ':' + pad2Num(kst.getUTCMinutes());
   }
@@ -1976,12 +1976,8 @@
     for (var i = 0; i < merged.length; i++) {
       var r = merged[i];
       var pu = r.product_url || '';
-      var lcRaw = r.last_collected ? String(r.last_collected) : '';
-      var collectTime = '<span class="muted">미수집</span>';
-      if (lcRaw) {
-        var hhmm = formatLastCollectedHHMM(lcRaw);
-        collectTime = hhmm ? escapeHtml(hhmm) : '<span class="muted">미수집</span>';
-      }
+      var collectTimeText = formatCollectTime(r.last_collected ? String(r.last_collected) : '');
+      var collectTime = collectTimeText === '미수집' ? '<span class="muted">미수집</span>' : escapeHtml(collectTimeText);
       h += '<tr>';
       h += '<td>' + productNameLinkHtml(r.sku_name, pu) + '</td>';
       h += '<td>' + escapeHtml(r.brand || '') + '</td>';
