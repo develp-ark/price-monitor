@@ -210,6 +210,14 @@
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .btn-primary { background: var(--primary); color: #fff; }
     .btn-danger { background: var(--danger); color: #fff; }
+    #btn-stop-collect {
+      background: #F04452;
+      color: #fff;
+    }
+    #btn-stop-collect.is-stopping {
+      background: #DC2626;
+      color: #fff;
+    }
     .btn-ghost { background: #fff; border: 1px solid var(--border); color: var(--text); }
     .btn:hover { filter: brightness(0.95); }
     table.data {
@@ -1228,7 +1236,9 @@
     queueRowsSnapshot: [],
     alertActionTarget: null,
     retryCollectPending: {},
-    todayCsvMenuOpen: false
+    todayCsvMenuOpen: false,
+    stopForcePending: false,
+    stopForceResponded: false
   };
 
   var extensionReady = false;
@@ -1249,6 +1259,16 @@
     if (event.data.type === 'PRICE_COLLECT_RESULT') {
       handleCollectResult(event.data);
       handleRetryCollectResult(event.data);
+    }
+
+    if (event.data.type === 'FORCE_STOP_RESULT') {
+      state.stopForceResponded = true;
+      state.stopForcePending = false;
+      if (event.data.ok === true) {
+        showToast('수집 중지 요청이 전달되었습니다');
+      } else {
+        showToast('확장프로그램 연결 실패 — 3초 후 서버에서 강제 중지합니다');
+      }
     }
 
     if (event.data.type === 'SCHEDULE_COLLECT_DONE') {
@@ -3865,14 +3885,62 @@
     if (!confirm('수집을 중지할까요?')) return;
     state.dashboardCollectPending = false;
     state.collectRunKind = null;
-    apiFetch('POST', '/collect-status', { action: 'stop' })
-      .then(function () {
-        return loadCollectStatus();
-      })
-      .catch(function (e) {
-        console.error(e);
-        alert(e.message || String(e));
-      });
+    var stopBtn = document.getElementById('btn-stop-collect');
+    if (stopBtn) {
+      stopBtn.disabled = true;
+      stopBtn.classList.add('is-stopping');
+      stopBtn.textContent = '중지 중...';
+    }
+
+    // 1단계: 서버 상태를 stopping으로 변경
+    fetch('/api/collect-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'stop' })
+    }).catch(function (e) {
+      console.error(e);
+    });
+
+    // 2단계: 확장프로그램에 강제 중지 메시지 전송
+    state.stopForcePending = true;
+    state.stopForceResponded = false;
+    window.postMessage({ type: 'FORCE_STOP_COLLECT' }, '*');
+    setTimeout(function () {
+      if (state.stopForcePending && !state.stopForceResponded) {
+        state.stopForcePending = false;
+        showToast('확장프로그램 연결 실패 — 3초 후 서버에서 강제 중지합니다');
+      }
+    }, 1200);
+
+    // 3단계: 3초 후 서버 상태가 여전히 running/stopping이면 강제로 done 처리
+    setTimeout(function () {
+      fetch('/api/collect-status')
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var info = d.data || d;
+          if (info.status === 'running' || info.status === 'stopping') {
+            return fetch('/api/collect-status', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'done' })
+            }).then(function () {
+              if (typeof showToast === 'function') showToast('수집이 강제 중지되었습니다', 'warning');
+              if (typeof loadCollectStatus === 'function') loadCollectStatus();
+            });
+          }
+          return null;
+        })
+        .catch(function (e) {
+          console.error(e);
+        })
+        .then(function () {
+          if (stopBtn) {
+            stopBtn.disabled = false;
+            stopBtn.classList.remove('is-stopping');
+            stopBtn.textContent = '■ 중지';
+          }
+        });
+    }, 3000);
   });
 
   document.getElementById('btn-bulk-group-a').addEventListener('click', function () {
