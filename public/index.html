@@ -4800,11 +4800,6 @@
     startCollectByMode(state.lastCollectModeKey || 'schedule_today');
   });
 
-  var _elBtnOpenCurrentCollectModal = document.getElementById('btn-open-current-collect-modal');
-  if (_elBtnOpenCurrentCollectModal) _elBtnOpenCurrentCollectModal.addEventListener('click', function () {
-    toggleCollectListPanel();
-  });
-
   var _elBtnCollectModeToggle = document.getElementById('btn-collect-mode-toggle');
   if (_elBtnCollectModeToggle) _elBtnCollectModeToggle.addEventListener('click', function (ev) {
     ev.stopPropagation();
