@@ -8,6 +8,38 @@ function normalizeFlag(flag) {
 
 module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return handleOptions(res);
+
+  if (req.method === 'PATCH') {
+    let body = req.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body || '{}');
+      } catch {
+        return json(res, 400, { ok: false, error: 'Invalid JSON body' });
+      }
+    }
+    body = body || {};
+    const ids = body.sku_ids;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return json(res, 400, { ok: false, error: 'sku_ids array required' });
+    }
+    if (typeof body.is_active !== 'boolean') {
+      return json(res, 400, { ok: false, error: 'is_active (boolean) required' });
+    }
+    const skuIds = ids.map((x) => String(x).trim()).filter(Boolean);
+    if (!skuIds.length) {
+      return json(res, 400, { ok: false, error: 'sku_ids empty' });
+    }
+    const { client, error: envErr } = getSupabase();
+    if (envErr) return json(res, 500, { ok: false, error: envErr });
+    const { error } = await client
+      .from('sku_list')
+      .update({ is_active: body.is_active })
+      .in('sku_id', skuIds);
+    if (error) return json(res, 500, { ok: false, error: error.message });
+    return json(res, 200, { ok: true, updated: skuIds.length });
+  }
+
   if (req.method !== 'POST') {
     return json(res, 405, { ok: false, error: 'Method not allowed' });
   }

@@ -1004,7 +1004,23 @@
     </div>
 
     <div id="panel-sku" class="panel">
+      <div id="today-sku-box" style="display:none; margin:0 0 16px; background:#EBF3FF; border:1px solid #BFDBFE; border-radius:12px; padding:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <div>
+            <span style="font-size:14px; font-weight:700; color:#1A1A1A;">오늘 등록된 SKU</span>
+            <span id="today-sku-count" style="margin-left:8px; padding:2px 8px; background:#3182F6; color:#fff; border-radius:10px; font-size:12px; font-weight:600;">0</span>
+          </div>
+          <button type="button" onclick="toggleTodaySkuList()" id="btn-toggle-today" style="padding:4px 12px; background:#fff; color:#3182F6; border:1px solid #3182F6; border-radius:6px; font-size:12px; cursor:pointer;">펼치기</button>
+        </div>
+        <div id="today-sku-list" style="display:none; max-height:300px; overflow-y:auto;"></div>
+      </div>
       <div class="card sku-toolbar-card">
+        <div id="bulk-action-bar" style="display:none; margin-bottom:12px; padding:8px 16px; background:#EBF3FF; border-radius:8px; align-items:center; gap:12px; flex-wrap:wrap;">
+          <span style="font-size:13px; font-weight:600; color:#3182F6;" id="selected-count">0개 선택</span>
+          <button type="button" onclick="bulkDeactivate()" style="padding:4px 12px; background:#F04452; color:#fff; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;">일괄 비활성화</button>
+          <button type="button" onclick="bulkActivate()" style="padding:4px 12px; background:#10B981; color:#fff; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;">일괄 활성화</button>
+          <button type="button" onclick="clearSelection()" style="padding:4px 12px; background:#F3F4F6; color:#6B7280; border:1px solid #E5E8EB; border-radius:6px; font-size:12px; cursor:pointer;">선택 해제</button>
+        </div>
         <div class="sku-toolbar-row sku-toolbar-row-top">
           <div class="brand-tabs" id="sku-brand-tabs"></div>
           <div class="filter-btns" id="sku-group-filter"></div>
@@ -1327,6 +1343,7 @@
     })(),
     scheduleDayCounts: {},
     dashScheduleDetailDay: null,
+    todaySkuListExpanded: false,
     queueCollectRunActive: false,
     queueCollectSuccess: 0,
     queueCollectFail: 0,
@@ -3255,6 +3272,152 @@
     }
   }
 
+  function getTodayRegisteredSkuRows() {
+    var rows = state.skuDetailList || [];
+    var out = [];
+    for (var i = 0; i < rows.length; i++) {
+      if (isCreatedAtTodayKstUserRule(rows[i].created_at)) out.push(rows[i]);
+    }
+    return out;
+  }
+
+  function renderTodaySkuListInner() {
+    var wrap = document.getElementById('today-sku-list');
+    if (!wrap) return;
+    var list = getTodayRegisteredSkuRows();
+    var h = '<table style="width:100%; border-collapse:collapse;">';
+    h += '<thead><tr><th>브랜드</th><th>상품명</th><th class="num">등록가</th><th>SKU ID</th><th></th></tr></thead><tbody>';
+    for (var i = 0; i < list.length; i++) {
+      var r = list[i];
+      var sidStr = escapeHtml(String(r.sku_id));
+      h += '<tr style="font-size:12px;">';
+      h +=
+        '<td style="padding:6px 12px; border-bottom:1px solid #E5E8EB;">' +
+        escapeHtml(r.brand || '') +
+        '</td>';
+      h += '<td style="padding:6px 12px; border-bottom:1px solid #E5E8EB;">';
+      h +=
+        '<span style="background:#D1FAE5; color:#059669; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; margin-right:6px;">NEW</span>';
+      h += escapeHtml(r.sku_name || '') + '</td>';
+      h +=
+        '<td class="num" style="padding:6px 12px; border-bottom:1px solid #E5E8EB;">' +
+        escapeHtml(formatMoney(r.registered_price)) +
+        '</td>';
+      h += '<td style="padding:6px 12px; border-bottom:1px solid #E5E8EB;">' + sidStr + '</td>';
+      h +=
+        '<td style="padding:6px 12px; border-bottom:1px solid #E5E8EB;"><button type="button" class="btn-icon" data-edit-sku="' +
+        sidStr +
+        '" title="수정">✏️</button></td>';
+      h += '</tr>';
+    }
+    h += '</tbody></table>';
+    wrap.innerHTML = h;
+  }
+
+  function updateTodaySkuBox() {
+    var box = document.getElementById('today-sku-box');
+    var nEl = document.getElementById('today-sku-count');
+    var list = getTodayRegisteredSkuRows();
+    if (!box || !nEl) return;
+    nEl.textContent = String(list.length);
+    if (list.length === 0) {
+      box.style.display = 'none';
+      state.todaySkuListExpanded = false;
+      var wrap0 = document.getElementById('today-sku-list');
+      var btn0 = document.getElementById('btn-toggle-today');
+      if (wrap0) {
+        wrap0.style.display = 'none';
+        wrap0.innerHTML = '';
+      }
+      if (btn0) btn0.textContent = '펼치기';
+      return;
+    }
+    box.style.display = '';
+    if (state.todaySkuListExpanded) {
+      var wrap = document.getElementById('today-sku-list');
+      var btn = document.getElementById('btn-toggle-today');
+      if (wrap) {
+        wrap.style.display = 'block';
+        renderTodaySkuListInner();
+      }
+      if (btn) btn.textContent = '접기';
+    } else {
+      var wrap1 = document.getElementById('today-sku-list');
+      if (wrap1) wrap1.style.display = 'none';
+      var btn1 = document.getElementById('btn-toggle-today');
+      if (btn1) btn1.textContent = '펼치기';
+    }
+  }
+
+  function toggleTodaySkuList() {
+    state.todaySkuListExpanded = !state.todaySkuListExpanded;
+    var wrap = document.getElementById('today-sku-list');
+    var btn = document.getElementById('btn-toggle-today');
+    if (wrap) {
+      wrap.style.display = state.todaySkuListExpanded ? 'block' : 'none';
+    }
+    if (btn) btn.textContent = state.todaySkuListExpanded ? '접기' : '펼치기';
+    if (state.todaySkuListExpanded) {
+      renderTodaySkuListInner();
+    }
+  }
+
+  function updateBulkActionBar() {
+    var ids = getSelectedSkuIds();
+    var bar = document.getElementById('bulk-action-bar');
+    var cnt = document.getElementById('selected-count');
+    if (!bar || !cnt) return;
+    if (ids.length === 0) {
+      bar.style.display = 'none';
+      return;
+    }
+    bar.style.display = 'flex';
+    cnt.textContent = ids.length + '개 선택';
+  }
+
+  function clearSelection() {
+    state.skuChecked = {};
+    renderSkuTablePage();
+  }
+
+  function bulkDeactivate() {
+    var ids = getSelectedSkuIds();
+    if (!ids.length) return;
+    apiFetch('PATCH', '/sku-batch-toggle', { sku_ids: ids, is_active: false })
+      .then(function (d) {
+        if (d && d.ok) {
+          showManualToast(String(ids.length) + '개 SKU 비활성화 완료');
+          state.skuChecked = {};
+          invalidateSkuCache();
+          return loadSkuPage(true);
+        }
+        showManualToast('처리에 실패했습니다');
+      })
+      .catch(function (e) {
+        console.error(e);
+        showManualToast(e.message || '요청 실패');
+      });
+  }
+
+  function bulkActivate() {
+    var ids = getSelectedSkuIds();
+    if (!ids.length) return;
+    apiFetch('PATCH', '/sku-batch-toggle', { sku_ids: ids, is_active: true })
+      .then(function (d) {
+        if (d && d.ok) {
+          showManualToast(String(ids.length) + '개 SKU 활성화 완료');
+          state.skuChecked = {};
+          invalidateSkuCache();
+          return loadSkuPage(true);
+        }
+        showManualToast('처리에 실패했습니다');
+      })
+      .catch(function (e) {
+        console.error(e);
+        showManualToast(e.message || '요청 실패');
+      });
+  }
+
   function toggleTodayFilter() {
     state.skuTodayOnly = !state.skuTodayOnly;
     state.skuPage = 1;
@@ -3286,8 +3449,13 @@
       var isOut = pstat === 'out_of_stock';
       var needRecollect = isDisc || r.current_price == null || Number(r.current_price) <= 0;
       var isZeroPrice = r.current_price != null && Number(r.current_price) === 0;
+      var isInactive = r.is_active === false;
       var trStyle = '';
-      if (isDisc || isZeroPrice) trStyle = ' style="background:#FFF5F5"';
+      if (isInactive) {
+        trStyle = ' style="opacity:0.5;background:#FAFAFA"';
+      } else if (isDisc || isZeroPrice) {
+        trStyle = ' style="background:#FFF5F5"';
+      }
       h += '<tr' + (isDisc ? ' class="sku-row-discontinued"' : '') + trStyle + '>';
       h +=
         '<td><input type="checkbox" class="sku-row-cb" data-sku-cb="' +
@@ -3295,7 +3463,12 @@
         '"' +
         checked +
         ' /></td>';
-      h += '<td>' + skuBrandBadgeHtml(r.brand) + '</td>';
+      h += '<td>' + skuBrandBadgeHtml(r.brand);
+      if (isInactive) {
+        h +=
+          ' <span style="font-size:10px;padding:2px 6px;background:#E5E7EB;color:#6B7280;border-radius:4px;font-weight:600">비활성</span>';
+      }
+      h += '</td>';
       h += '<td><a class="link sku-name-link" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(r.sku_name || '') + '</a>';
       if (isDisc) h += '<span style="font-size:11px;background:#FEE2E2;color:#DC2626;padding:2px 6px;border-radius:4px;margin-left:4px">판매중단</span>';
       h += '<div class="sku-id-sub">' + sidStr + '</div></td>';
@@ -3410,6 +3583,8 @@
     var showBulk = ids.length > 0;
     if (ba) ba.style.display = showBulk ? '' : 'none';
     if (bb) bb.style.display = showBulk ? '' : 'none';
+    updateBulkActionBar();
+    updateTodaySkuBox();
   }
 
   function loadSkuPage(forceRefresh) {
@@ -4613,6 +4788,7 @@
     var showBulk = ids.length > 0;
     if (ba) ba.style.display = showBulk ? '' : 'none';
     if (bb) bb.style.display = showBulk ? '' : 'none';
+    updateBulkActionBar();
   });
 
   document.getElementById('btn-queue-clear').addEventListener('click', function () {
@@ -5274,6 +5450,10 @@
   window.toggleTodayFilter = toggleTodayFilter;
   window.toggleScheduleDetail = toggleScheduleDetail;
   window.closeScheduleDetail = closeScheduleDetail;
+  window.bulkDeactivate = bulkDeactivate;
+  window.bulkActivate = bulkActivate;
+  window.clearSelection = clearSelection;
+  window.toggleTodaySkuList = toggleTodaySkuList;
   window.openAlertActionModal = openAlertActionModal;
   window.closeAlertActionModal = closeAlertActionModal;
   window.resolveAlert = resolveAlert;
