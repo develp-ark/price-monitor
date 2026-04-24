@@ -1022,33 +1022,25 @@
           <button type="button" onclick="clearSelection()" style="padding:4px 12px; background:#F3F4F6; color:#6B7280; border:1px solid #E5E8EB; border-radius:6px; font-size:12px; cursor:pointer;">선택 해제</button>
         </div>
         <div class="sku-toolbar-row sku-toolbar-row-top">
-          <div class="brand-tabs" id="sku-brand-tabs"></div>
-          <div class="filter-btns" id="sku-group-filter"></div>
-          <button type="button" onclick="toggleTodayFilter()" id="btn-today-filter" style="padding:4px 12px;background:#F3F4F6;color:#6B7280;border:1px solid #E5E8EB;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap">오늘 등록 <span id="today-count">0</span></button>
           <div class="sku-search-row">
             <input type="search" id="sku-search" placeholder="상품명 또는 SKU ID 검색" autocomplete="off" />
             <button type="button" id="sku-search-clear" title="검색어 지우기">×</button>
           </div>
         </div>
-        <div class="sku-toolbar-row sku-toolbar-row-bottom">
-          <div class="toolbar-actions sku-actions-left">
-            <button type="button" class="btn btn-primary btn-sm" id="btn-sku-add">+ SKU 추가</button>
-            <button type="button" class="btn btn-primary btn-sm" id="btn-manual-collect">수동 수집</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="btn-bulk-group-a" style="display:none;">A그룹으로</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="btn-bulk-group-b" style="display:none;">B그룹으로</button>
-          </div>
-          <div class="toolbar-actions sku-actions-right">
-            <span style="display:inline-flex;align-items:center;flex-wrap:wrap;gap:4px 0">
-            <button type="button" class="btn btn-ghost btn-sm" id="btn-csv-upload" data-csv-label="CSV ↑">CSV ↑</button>
-            <span style="font-size:11px;color:#9CA3AF;margin-left:8px" title="동일한 SKU ID가 이미 존재하면 브랜드, 상품명, URL, 등록가, 플래그, 메모가 업데이트됩니다">ℹ 기존 SKU는 자동 수정</span>
-            </span>
-            <input type="file" id="csv-file" accept=".csv,text/csv" />
-            <button type="button" class="btn btn-ghost btn-sm" id="btn-sku-csv-dl">CSV ↓</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="btn-auto-dist">자동분배</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="btn-sku-refresh">새로고침</button>
-          </div>
+        <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px; padding:12px 16px; background:#F9FAFB; border-radius:10px; border:1px solid #E5E8EB;">
+          <div id="sku-brand-tabs"></div>
+          <div id="sku-group-filter"></div>
         </div>
-        <p id="sku-csv-hint" class="hint" style="margin:0;padding:4px 12px 10px;font-size:11px;color:#6B7280;line-height:1.45">CSV 업로드 시 컬럼명은 <strong>SKU ID</strong>(필수), <strong>브랜드</strong>, <strong>SKU 명</strong>, <strong>url</strong>, <strong>등록가</strong>, <strong>플래그</strong>, <strong>메모</strong>를 사용합니다. url이 비어 있으면 SKU ID 기준 쿠팡 상품 URL이 자동으로 들어갑니다.</p>
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+          <button type="button" class="btn btn-primary btn-sm" id="btn-sku-add">+ SKU 추가</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-manual-collect">수동 수집</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-csv-upload" data-csv-label="CSV ↑" title="CSV 업로드 시 컬럼명은 SKU ID(필수), 브랜드, SKU 명, url, 등록가, 플래그, 메모를 사용합니다. url이 비어 있으면 SKU ID 기준 쿠팡 상품 URL이 자동 입력됩니다.">CSV ↑</button>
+          <input type="file" id="csv-file" accept=".csv,text/csv" />
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-sku-csv-dl">CSV ↓</button>
+          <span style="flex:1;"></span>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-auto-dist">자동분배</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-sku-refresh">새로고침</button>
+        </div>
       </div>
       <div class="card" style="padding:0; overflow:hidden;">
         <div id="sku-table-wrap" class="sku-theme-all" style="overflow:auto; max-height:70vh;">
@@ -1310,6 +1302,7 @@
     alertStatus: 'pending',
     skuBrand: '__all__',
     skuGroupFilter: '__all__',
+    skuActiveFilter: 'all',
     skuTodayOnly: false,
     skuPage: 1,
     skuSearch: '',
@@ -3202,6 +3195,8 @@
         var sn = String(r.sku_name || '').toLowerCase();
         if (sid.indexOf(q) === -1 && sn.indexOf(q) === -1) continue;
       }
+      if (state.skuActiveFilter === 'active' && r.is_active === false) continue;
+      if (state.skuActiveFilter === 'inactive' && r.is_active !== false) continue;
       if (state.skuTodayOnly) {
         if (!isCreatedAtTodayKstUserRule(r.created_at)) continue;
       }
@@ -3222,16 +3217,42 @@
     return filtered.slice(startIdx, startIdx + SKU_PAGE_SIZE);
   }
 
+  function skuFilterBtnStyle(isOn, tone) {
+    var s =
+      'padding:4px 10px;background:#fff;color:#6B7280;border:1px solid #E5E8EB;border-radius:6px;font-size:12px;cursor:pointer;';
+    if (!isOn) return s;
+    if (tone === 'inactive') {
+      return s + 'background:#F04452;color:#fff;border-color:#F04452;';
+    }
+    if (tone === 'today') {
+      return s + 'background:#10B981;color:#fff;border-color:#10B981;';
+    }
+    return s + 'background:#3182F6;color:#fff;border-color:#3182F6;';
+  }
+
   function renderSkuBrandTabs() {
-    var rows = state.skuDetailList || [];
-    var counts = countByBrand(rows);
     var brands = ['건우코리아', '아리코', '윰'];
     var tabs = document.getElementById('sku-brand-tabs');
-    var th = '<button type="button" data-sb="__all__" class="' + (state.skuBrand === '__all__' ? 'on' : '') + '">전체</button>';
+    if (!tabs) return;
+    var th = '<div style="display:flex; align-items:center; gap:8px;">';
+    th += '<span style="font-size:11px; color:#9CA3AF; font-weight:600; min-width:40px;">브랜드</span>';
+    th += '<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">';
+    th +=
+      '<button type="button" data-sb="__all__" style="' +
+      skuFilterBtnStyle(state.skuBrand === '__all__', 'default') +
+      '">전체</button>';
     for (var i = 0; i < brands.length; i++) {
       var br = brands[i];
-      th += '<button type="button" data-sb="' + escapeHtml(br) + '" class="' + (state.skuBrand === br ? 'on' : '') + '">' + escapeHtml(br) + '</button>';
+      th +=
+        '<button type="button" data-sb="' +
+        escapeHtml(br) +
+        '" style="' +
+        skuFilterBtnStyle(state.skuBrand === br, 'default') +
+        '">' +
+        escapeHtml(br) +
+        '</button>';
     }
+    th += '</div></div>';
     tabs.innerHTML = th;
   }
 
@@ -3239,37 +3260,38 @@
     var el = document.getElementById('sku-group-filter');
     if (!el) return;
     var g = state.skuGroupFilter || '__all__';
+    var af = state.skuActiveFilter || 'all';
     var h = '';
+    h += '<div style="display:flex; align-items:center; gap:8px;">';
+    h += '<span style="font-size:11px; color:#9CA3AF; font-weight:600; min-width:40px;">상태</span>';
+    h += '<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">';
+    var isStatusAll = g === '__all__' && af === 'all' && !state.skuTodayOnly;
     h +=
-      '<button type="button" data-sg-filter="__all__" class="' +
-      (g === '__all__' ? 'on' : '') +
+      '<button type="button" data-sku-status-reset="1" style="' +
+      skuFilterBtnStyle(isStatusAll, 'default') +
       '">전체</button>';
     h +=
-      '<button type="button" data-sg-filter="A" class="' +
-      (g === 'A' ? 'on' : '') +
+      '<button type="button" data-sg-filter="A" style="' +
+      skuFilterBtnStyle(g === 'A', 'default') +
       '">A그룹</button>';
     h +=
-      '<button type="button" data-sg-filter="B" class="' +
-      (g === 'B' ? 'on' : '') +
+      '<button type="button" data-sg-filter="B" style="' +
+      skuFilterBtnStyle(g === 'B', 'default') +
       '">B그룹</button>';
+    h +=
+      '<button type="button" data-sa-filter="active" style="' +
+      skuFilterBtnStyle(af === 'active', 'default') +
+      '">활성</button>';
+    h +=
+      '<button type="button" data-sa-filter="inactive" style="' +
+      skuFilterBtnStyle(af === 'inactive', 'inactive') +
+      '">비활성</button>';
+    h +=
+      '<button type="button" data-sku-today-toggle="1" style="' +
+      skuFilterBtnStyle(state.skuTodayOnly, 'today') +
+      '">오늘등록</button>';
+    h += '</div></div>';
     el.innerHTML = h;
-  }
-
-  function updateTodayFilterButton() {
-    var btn = document.getElementById('btn-today-filter');
-    var cnt = document.getElementById('today-count');
-    if (cnt) cnt.textContent = String(countSkuRegisteredTodayKst());
-    if (btn) {
-      if (state.skuTodayOnly) {
-        btn.style.background = '#10B981';
-        btn.style.color = '#fff';
-        btn.style.borderColor = '#10B981';
-      } else {
-        btn.style.background = '#F3F4F6';
-        btn.style.color = '#6B7280';
-        btn.style.borderColor = '#E5E8EB';
-      }
-    }
   }
 
   function getTodayRegisteredSkuRows() {
@@ -3424,9 +3446,15 @@
     renderSkuTablePage();
   }
 
+  function setSkuActiveFilter(mode) {
+    state.skuActiveFilter = mode;
+    state.skuPage = 1;
+    renderSkuTablePage();
+  }
+
   function renderSkuTablePage() {
+    renderSkuBrandTabs();
     renderSkuGroupFilter();
-    updateTodayFilterButton();
     var filtered = getFilteredSkuRows();
     var total = filtered.length;
     var totalPages = total === 0 ? 1 : Math.ceil(total / SKU_PAGE_SIZE);
@@ -3452,7 +3480,7 @@
       var isInactive = r.is_active === false;
       var trStyle = '';
       if (isInactive) {
-        trStyle = ' style="opacity:0.5;background:#FAFAFA"';
+        trStyle = ' style="opacity:0.5; background:#FAFAFA"';
       } else if (isDisc || isZeroPrice) {
         trStyle = ' style="background:#FFF5F5"';
       }
@@ -3466,7 +3494,7 @@
       h += '<td>' + skuBrandBadgeHtml(r.brand);
       if (isInactive) {
         h +=
-          ' <span style="font-size:10px;padding:2px 6px;background:#E5E7EB;color:#6B7280;border-radius:4px;font-weight:600">비활성</span>';
+          ' <span style="padding:1px 6px; background:#F3F4F6; color:#9CA3AF; border-radius:4px; font-size:10px; margin-left:4px;">비활성</span>';
       }
       h += '</td>';
       h += '<td><a class="link sku-name-link" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(r.sku_name || '') + '</a>';
@@ -3482,13 +3510,20 @@
       h += '<td>' + skuGroupBadgeHtml(r) + '</td>';
       h += '<td class="cell-last-collected">' + escapeHtml(fmtRecentShort(r.last_collected)) + '</td>';
       h += '<td><div class="sku-actions-inline">';
-      h +=
-        '<button type="button" class="btn-icon btn-collect" data-collect-sku="' +
-        sidStr +
-        '" data-sku-id="' +
-        sidStr +
-        '" title="즉시 수집">▶</button>';
-      if (needRecollect) {
+      if (!isInactive) {
+        h +=
+          '<button type="button" class="btn-icon btn-collect" data-collect-sku="' +
+          sidStr +
+          '" data-sku-id="' +
+          sidStr +
+          '" title="즉시 수집">▶</button>';
+      } else {
+        h +=
+          '<button type="button" class="btn-icon" data-activate-sku="' +
+          sidStr +
+          '" title="활성화" style="color:#10B981;border-color:#10B981">활성</button>';
+      }
+      if (!isInactive && needRecollect) {
         h += '<button type="button" class="btn-icon" data-recollect-sku="' + sidStr + '" title="재수집">↻</button>';
       }
       h += '<button type="button" class="btn-icon" data-edit-sku="' + sidStr + '" title="수정">✏️</button>';
@@ -3553,14 +3588,6 @@
       (state.skuPage >= totalPages ? ' disabled' : '') +
       '>다음 ▶</button>';
     pag.innerHTML = ph;
-
-    var tabBtns = document.querySelectorAll('#sku-brand-tabs [data-sb]');
-    for (var ti = 0; ti < tabBtns.length; ti++) {
-      var btn = tabBtns[ti];
-      var sb = btn.getAttribute('data-sb');
-      if (sb === state.skuBrand) btn.classList.add('on');
-      else btn.classList.remove('on');
-    }
 
     var allOn = slice.length > 0;
     for (var ac = 0; ac < slice.length; ac++) {
@@ -5244,6 +5271,26 @@
       renderSkuTablePage();
       return;
     }
+    var saEl = t.closest && t.closest('[data-sa-filter]');
+    var sa = saEl ? saEl.getAttribute('data-sa-filter') : null;
+    if (sa != null) {
+      setSkuActiveFilter(sa);
+      return;
+    }
+    var resetEl = t.closest && t.closest('[data-sku-status-reset]');
+    if (resetEl) {
+      state.skuGroupFilter = '__all__';
+      state.skuActiveFilter = 'all';
+      state.skuTodayOnly = false;
+      state.skuPage = 1;
+      renderSkuTablePage();
+      return;
+    }
+    var skuTodayEl = t.closest && t.closest('[data-sku-today-toggle]');
+    if (skuTodayEl) {
+      toggleTodayFilter();
+      return;
+    }
     var pgtEl = t.closest && t.closest('[data-pg-toggle]');
     if (pgtEl) {
       ev.preventDefault();
@@ -5394,6 +5441,20 @@
         rowR && rowR.sku_name ? rowR.sku_name : '',
         t
       );
+      return;
+    }
+    var actId = t.getAttribute('data-activate-sku');
+    if (actId != null) {
+      apiFetch('PATCH', '/sku-batch-toggle', { sku_ids: [actId], is_active: true })
+        .then(function () {
+          showManualToast('SKU 활성화 완료');
+          invalidateSkuCache();
+          return loadSkuPage(true);
+        })
+        .catch(function (e) {
+          console.error(e);
+          alert(e.message || String(e));
+        });
       return;
     }
     var es = t.getAttribute('data-edit-sku');
