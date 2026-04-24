@@ -1279,7 +1279,15 @@
     var d = new Date(isoStr);
     if (isNaN(d.getTime())) return '미수집';
     var kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
-    return pad2Num(kst.getUTCHours()) + ':' + pad2Num(kst.getUTCMinutes());
+    return (
+      pad2Num(kst.getUTCMonth() + 1) +
+      '-' +
+      pad2Num(kst.getUTCDate()) +
+      ' ' +
+      pad2Num(kst.getUTCHours()) +
+      ':' +
+      pad2Num(kst.getUTCMinutes())
+    );
   }
 
   var state = {
@@ -2147,10 +2155,14 @@
 
     for (var i = 0; i < items.length; i++) {
       var item = items[i] || {};
-      var isActive = i === Math.max(0, currentNum - 1) && (status.status === 'running' || status.status === 'stopping');
       var itemStatus = String(item.status || '').toLowerCase();
-      var isDone = !!item.collected_at || itemStatus === 'done' || itemStatus === 'success';
       var isFail = itemStatus === 'fail' || itemStatus === 'error';
+      var activeIdx = (status.status === 'running' || status.status === 'stopping') ? Math.max(0, currentNum - 1) : -1;
+      var isActive = i === activeIdx;
+      var doneByProgress = false;
+      if (status.status === 'done') doneByProgress = i < totalNum;
+      else if (currentNum > 0) doneByProgress = i < Math.max(0, currentNum - 1);
+      var isDone = !isFail && (doneByProgress || !!item.collected_at || itemStatus === 'done' || itemStatus === 'success');
       var isWaiting = !isDone && !isFail && !isActive;
       var rowStyle = 'border-bottom:1px solid #F3F4F6;';
       if (isActive) rowStyle += ' background:#EFF6FF;';
@@ -2195,11 +2207,7 @@
     }
     body.innerHTML = html;
 
-    if (currentNum > 0) {
-      var rows = body.querySelectorAll('tr');
-      var activeRow = rows[currentNum];
-      if (activeRow && activeRow.scrollIntoView) activeRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }
+    // keep user's current scroll position; do not force auto-scroll on each poll
   }
 
   function restoreCollectItemsFromStorage() {
