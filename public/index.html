@@ -5086,10 +5086,7 @@
       });
   });
 
-  document.getElementById('btn-csv-upload').addEventListener('click', function () {
-    document.getElementById('csv-file').click();
-  });
-  document.getElementById('csv-file').addEventListener('change', function (ev) {
+  function handleCsvUpload(ev) {
     var f = ev.target.files && ev.target.files[0];
     if (!f) return;
     var upBtn = document.getElementById('btn-csv-upload');
@@ -5133,7 +5130,12 @@
           upBtn.textContent = label;
         }
       });
+  }
+
+  document.getElementById('btn-csv-upload').addEventListener('click', function () {
+    document.getElementById('csv-file').click();
   });
+  document.getElementById('csv-file').addEventListener('change', handleCsvUpload);
 
   document.getElementById('btn-sku-csv-dl').addEventListener('click', btnSkuCsvDl);
 
@@ -5514,7 +5516,9 @@
   window.bulkDeactivate = bulkDeactivate;
   window.bulkActivate = bulkActivate;
   window.clearSelection = clearSelection;
+  window.updateBulkActionBar = updateBulkActionBar;
   window.toggleTodaySkuList = toggleTodaySkuList;
+  window.handleCsvUpload = handleCsvUpload;
   window.openAlertActionModal = openAlertActionModal;
   window.closeAlertActionModal = closeAlertActionModal;
   window.resolveAlert = resolveAlert;
@@ -5528,6 +5532,21 @@
     setCollectMenuOpen(nextOpen);
     if (nextOpen) refreshCollectMenuCounts();
   };
+
+  // === Global Scope Exposure ===
+  var fnNames = [
+    'toggleTodaySkuList', 'handleCsvUpload', 'uploadCsv', 'importCsv',
+    'bulkDeactivate', 'bulkActivate', 'clearSelection', 'updateBulkActionBar',
+    'openAlertActionModal', 'closeAlertActionModal', 'resolveAlert',
+    'saveAlertMemo', 'unresolveAlert', 'saveAdjustedPrice',
+    'startCollectMode', 'toggleCollectMenu', 'retryCollectFromAlert',
+    'showToast', 'toggleScheduleDetail', 'closeScheduleDetail',
+    'loadAlerts', 'loadPriceAlerts', 'loadTodaySection',
+    'loadScheduleSummary', 'loadCollectStatus', 'loadSkuPage'
+  ];
+  fnNames.forEach(function(name) {
+    try { if (typeof eval(name) === 'function') window[name] = eval(name); } catch(e) {}
+  });
 
   updateClock();
   state.clockTimer = setInterval(updateClock, 1000);
