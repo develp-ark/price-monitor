@@ -121,15 +121,25 @@ module.exports = async (req, res) => {
 
   const { data: prevRow, error: prevErr } = await client
     .from('price_history')
-    .select('price')
+    .select('price, collected_at')
     .eq('sku_id', sku_id)
+    .gt('price', 0)
     .order('collected_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (prevErr) return json(res, 500, { ok: false, error: prevErr.message });
 
-  const prev_price = prevRow?.price ?? null;
+  const prev_price = prevRow ? prevRow.price : null;
+  const prev_collected_at = prevRow ? prevRow.collected_at : null;
+
+  const { data: skuRow, error: skuRowErr } = await client
+    .from('sku_list')
+    .select('registered_price, adjusted_price, current_price')
+    .eq('sku_id', sku_id)
+    .maybeSingle();
+
+  if (skuRowErr) return json(res, 500, { ok: false, error: skuRowErr.message });
 
   const { error: insErr } = await client.from('price_history').insert({
     sku_id,
@@ -203,22 +213,14 @@ module.exports = async (req, res) => {
   }
 
   let changed = false;
-  let comparePrice = prev_price;
-
-  if (comparePrice == null) {
-    const { data: skuRow, error: skuErr } = await client
-      .from('sku_list')
-      .select('registered_price')
-      .eq('sku_id', sku_id)
-      .maybeSingle();
-    if (skuErr) return json(res, 500, { ok: false, error: skuErr.message });
-    comparePrice =
-      skuRow && skuRow.registered_price != null
-        ? Math.round(Number(skuRow.registered_price))
-        : null;
+  let comparePrice = null;
+  if (skuRow && skuRow.adjusted_price != null && Number(skuRow.adjusted_price) > 0) {
+    comparePrice = Math.round(Number(skuRow.adjusted_price));
+  } else if (prev_price != null && prev_price > 0) {
+    comparePrice = Math.round(Number(prev_price));
   }
 
-  if (comparePrice != null && comparePrice !== newPrice) {
+  if (comparePrice != null && comparePrice !== newPrice && newPrice > 0) {
     const change_pct =
       comparePrice === 0
         ? 0
@@ -229,6 +231,11 @@ module.exports = async (req, res) => {
       prev_price: comparePrice,
       new_price: newPrice,
       change_pct,
+      detected_at: new Date().toISOString(),
+      registered_price: skuRow ? skuRow.registered_price : null,
+      prev_collected_at: prev_collected_at,
+      new_collected_at: new Date().toISOString(),
+      resolved: false,
     });
 
     if (alErr) return json(res, 500, { ok: false, error: alErr.message });

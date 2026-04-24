@@ -1191,7 +1191,9 @@
       <span onclick="closeAlertActionModal()" style="position:absolute;top:16px;right:16px;font-size:20px;cursor:pointer;color:#6B7280">&times;</span>
       <h3 style="margin:0 0 16px;font-size:16px">가격 변동 처리</h3>
       <div id="alert-action-summary" style="margin-bottom:16px"></div>
-      <label style="font-size:13px;font-weight:600;color:#1A1A1A">조치 내용</label>
+      <label for="alert-action-adjusted-price" style="font-size:13px;font-weight:600;color:#1A1A1A;display:block;margin-top:12px">수정가 (기준가)</label>
+      <input type="text" id="alert-action-adjusted-price" inputmode="numeric" autocomplete="off" placeholder="숫자만 입력 (미입력 시 변경 없음)" style="width:100%;margin-top:4px;padding:8px 12px;border:1px solid #E5E8EB;border-radius:8px;font-size:13px;box-sizing:border-box" />
+      <label style="font-size:13px;font-weight:600;color:#1A1A1A;display:block;margin-top:12px">조치 내용</label>
       <textarea id="alert-action-memo" rows="3" placeholder="조치 내용을 입력하세요" style="width:100%;margin-top:4px;padding:8px 12px;border:1px solid #E5E8EB;border-radius:8px;font-size:13px;resize:vertical;box-sizing:border-box"></textarea>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
         <button id="btn-alert-unresolve" onclick="unresolveAlert()" style="display:none;background:#F04452;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer">미처리로 되돌리기</button>
@@ -1451,6 +1453,36 @@
     return '<span class="' + wrapCls + '">' + inner + '</span>';
   }
 
+  function alertHasAdjustedBaseline(r) {
+    var adj = Number(r && r.adjusted_price);
+    return !isNaN(adj) && adj > 0;
+  }
+
+  function effectiveDisplayChangePct(r) {
+    if (alertHasAdjustedBaseline(r)) {
+      var nw = Number(r.new_price);
+      var adj = Number(r.adjusted_price);
+      if (isNaN(nw) || isNaN(adj) || adj <= 0) {
+        var fb = Number(r.change_pct);
+        return isNaN(fb) ? null : fb;
+      }
+      return ((nw - adj) / adj) * 100;
+    }
+    var ch = Number(r.change_pct);
+    return isNaN(ch) ? null : ch;
+  }
+
+  function formatAlertPctRowHtml(r) {
+    if (alertHasAdjustedBaseline(r)) {
+      var pct = effectiveDisplayChangePct(r);
+      return (
+        formatAlertChangePctHtml(pct) +
+        '<div style="font-size:10px;color:#9CA3AF;line-height:1.2;margin-top:2px">(수정가 기준)</div>'
+      );
+    }
+    return formatAlertChangePctHtml(r.change_pct);
+  }
+
   function alertCmpLocale(a, b) {
     return String(a || '').localeCompare(String(b || ''), 'ko');
   }
@@ -1490,7 +1522,11 @@
     rows.sort(function (a, b) {
       var c = 0;
       if (key === 'pct_abs') {
-        c = Math.abs(num(a.change_pct)) - Math.abs(num(b.change_pct));
+        c =
+          Math.abs(Number(b.change_pct) || 0) -
+          Math.abs(Number(a.change_pct) || 0);
+        if (c !== 0) return asc ? -c : c;
+        return alertCmpLocale(a.sku_name, b.sku_name);
       } else if (key === 'sku_name') {
         c = alertCmpLocale(a.sku_name, b.sku_name);
       } else if (key === 'brand') {
@@ -1499,6 +1535,10 @@
         c = num(a.prev_price) - num(b.prev_price);
       } else if (key === 'new_price') {
         c = num(a.new_price) - num(b.new_price);
+      } else if (key === 'registered_price') {
+        c = num(a.registered_price) - num(b.registered_price);
+      } else if (key === 'adjusted_price') {
+        c = num(a.adjusted_price) - num(b.adjusted_price);
       } else if (key === 'change_pct') {
         c = num(a.change_pct) - num(b.change_pct);
       } else if (key === 'detected_at') {
@@ -1538,6 +1578,10 @@
       renderAlertSortArrow('brand') +
       '</th>';
     h +=
+      '<th class="num alert-sort-th" data-alert-sort="registered_price">등록가' +
+      renderAlertSortArrow('registered_price') +
+      '</th>';
+    h +=
       '<th class="num alert-sort-th" data-alert-sort="prev_price">이전가' +
       renderAlertSortArrow('prev_price') +
       '</th>';
@@ -1546,12 +1590,12 @@
       renderAlertSortArrow('new_price') +
       '</th>';
     h +=
-      '<th class="num alert-sort-th" data-alert-sort="pct_abs">변동률' +
-      renderAlertSortArrow('pct_abs') +
+      '<th class="num alert-sort-th" data-alert-sort="adjusted_price">수정가' +
+      renderAlertSortArrow('adjusted_price') +
       '</th>';
     h +=
-      '<th class="alert-sort-th" data-alert-sort="detected_at">감지일시' +
-      renderAlertSortArrow('detected_at') +
+      '<th class="num alert-sort-th" data-alert-sort="pct_abs">변동률' +
+      renderAlertSortArrow('pct_abs') +
       '</th>';
     h += '<th>상태</th>';
     h += '<th>액션</th>';
@@ -2298,9 +2342,13 @@
             sku_id: ar.sku_id,
             sku_name: ar.sku_name,
             brand: ar.brand,
+            registered_price: ar.registered_price,
             prev_price: ar.prev_price,
+            prev_collected_at: ar.prev_collected_at,
             new_price: ar.new_price,
+            new_collected_at: ar.new_collected_at,
             change_pct: ar.change_pct,
+            adjusted_price: ar.adjusted_price,
             detected_at: ar.detected_at,
             memo: rMemo || '',
             resolved: rResolved === true,
@@ -2465,7 +2513,24 @@
       h += '<tr' + (cls ? ' class="' + cls + '"' : '') + '>';
       h += '<td>' + productNameLinkHtml(r.sku_name, alertUrl) + '</td>';
       h += '<td>' + escapeHtml(br) + '</td>';
-      h += '<td class="num">' + escapeHtml(formatMoney(r.prev_price)) + '</td>';
+      var regMoney = formatMoney(r.registered_price);
+      h +=
+        '<td class="num">' +
+        (regMoney
+          ? '<span style="font-size:12px;color:#9CA3AF">' + escapeHtml(regMoney) + '원</span>'
+          : '<span style="color:#D1D5DB;display:block;text-align:center">—</span>') +
+        '</td>';
+      var prevMoney = formatMoney(r.prev_price);
+      h += '<td class="num">';
+      h +=
+        '<div style="font-size:13px;font-weight:600">' +
+        (prevMoney ? escapeHtml(prevMoney) + '원' : '<span style="color:#D1D5DB">—</span>') +
+        '</div>';
+      h +=
+        '<div style="font-size:10px;color:#9CA3AF;margin-top:2px">' +
+        escapeHtml(fmtCollectedAt(r.prev_collected_at)) +
+        '</div>';
+      h += '</td>';
       var newPriceNum = Number(r.new_price);
       var zeroPrice = r.new_price == null || (!isNaN(newPriceNum) && newPriceNum <= 0);
       var alertProductStatus = String(r.product_status || '').toLowerCase();
@@ -2475,14 +2540,31 @@
       } else if (zeroPrice) {
         h += '<td class="num"><span style="display:inline-block;background:#FEF3C7;color:#D97706;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;">판매중단 의심</span></td>';
       } else {
-        h += '<td class="num">' + escapeHtml(formatMoney(r.new_price)) + '</td>';
+        var curMoney = formatMoney(r.new_price);
+        h += '<td class="num">';
+        h += '<div style="font-size:13px;font-weight:600">' + escapeHtml(curMoney) + '원</div>';
+        h +=
+          '<div style="font-size:10px;color:#9CA3AF;margin-top:2px">' +
+          escapeHtml(fmtCollectedAt(r.new_collected_at)) +
+          '</div>';
+        h += '</td>';
+      }
+      if (alertHasAdjustedBaseline(r)) {
+        h +=
+          '<td class="num">' +
+          '<div style="font-size:13px;font-weight:600;color:#3182F6">' +
+          escapeHtml(formatMoney(r.adjusted_price)) +
+          '원</div>' +
+          '<div style="font-size:10px;color:#9CA3AF;margin-top:2px">기준가</div>' +
+          '</td>';
+      } else {
+        h += '<td class="num" style="text-align:center;color:#D1D5DB">—</td>';
       }
       if (zeroPrice) {
         h += '<td class="num"><span style="display:inline-block;background:#FEE2E2;color:#F04452;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;">확인필요</span></td>';
       } else {
-        h += '<td class="num">' + formatAlertChangePctHtml(r.change_pct) + '</td>';
+        h += '<td class="num">' + formatAlertPctRowHtml(r) + '</td>';
       }
-      h += '<td>' + escapeHtml(formatKstDateTimeShort(r.detected_at)) + '</td>';
       if (r && r.resolved === true) {
         h += '<td><span class="alert-status-badge done">완료</span>' + alertStatusMemoHtml(r.memo, true) + '</td>';
         h += '<td><button type="button" onclick="openAlertActionModal(\'' + escapeHtml(String(r.id != null && r.id !== '' ? r.id : ('idx_' + i))) + '\')" style="font-size:12px;padding:4px 12px;background:none;border:1px solid #E5E8EB;border-radius:6px;cursor:pointer;color:#3182F6">수정</button>';
@@ -2593,15 +2675,32 @@
       return;
     }
     currentAlertItem = item;
+    var dispPct = effectiveDisplayChangePct(item);
+    var pctNum = Number(dispPct);
+    var pctUp = !isNaN(pctNum) && pctNum > 0;
+    var pctLabel =
+      isNaN(pctNum) || pctNum === 0
+        ? '—'
+        : (pctUp ? '▲' : '▼') + Math.abs(pctNum).toFixed(2).replace(/\.?0+$/, '') + '%';
+    var pctColor =
+      isNaN(pctNum) || pctNum === 0 ? '#9CA3AF' : pctUp ? '#F04452' : '#10B981';
+    var pctSuffix = alertHasAdjustedBaseline(item)
+      ? ' <span style="font-size:10px;color:#9CA3AF;font-weight:400">(수정가 기준)</span>'
+      : '';
     var html = '<div style="padding:12px;background:#F9FAFB;border-radius:8px;font-size:13px">'
       + '<div style="font-weight:600;margin-bottom:4px">' + escapeHtml(item.sku_name || '') + '</div>'
       + '<div style="color:#6B7280;margin-bottom:8px">' + escapeHtml(item.brand || '') + '</div>'
       + '<span>이전가: ' + Number(item.prev_price || 0).toLocaleString() + '원</span>'
       + ' → <span style="font-weight:600">현재가: ' + Number(item.new_price || 0).toLocaleString() + '원</span>'
-      + ' <span style="color:' + ((item.change_pct || 0) > 0 ? '#F04452' : '#10B981') + ';font-weight:600">'
-      + ((item.change_pct || 0) > 0 ? '▲' : '▼') + Math.abs(item.change_pct || 0) + '%</span>'
+      + ' <span style="color:' + pctColor + ';font-weight:600">' + pctLabel + '</span>' + pctSuffix
       + '</div>';
     document.getElementById('alert-action-summary').innerHTML = html;
+    var adjInp = document.getElementById('alert-action-adjusted-price');
+    if (adjInp) {
+      var ap0 = item.adjusted_price;
+      adjInp.value =
+        ap0 != null && Number(ap0) > 0 ? String(Number(ap0)) : '';
+    }
     document.getElementById('alert-action-memo').value = item.memo || '';
     document.getElementById('btn-alert-unresolve').style.display = item.resolved ? 'inline-block' : 'none';
     var modal = document.getElementById('modal-alert-action');
@@ -2620,10 +2719,26 @@
       showToast('알림 ID가 없어 처리할 수 없습니다');
       return;
     }
+    var resolveBody = {
+      id: currentAlertItem.id,
+      memo: document.getElementById('alert-action-memo').value.trim(),
+      resolved: true
+    };
+    var adjEl = document.getElementById('alert-action-adjusted-price');
+    if (adjEl) {
+      var adjRaw = String(adjEl.value || '').replace(/,/g, '').trim();
+      if (adjRaw !== '') {
+        var adjNum = Number(adjRaw);
+        if (!isNaN(adjNum) && adjNum >= 0) {
+          resolveBody.adjusted_price = adjNum;
+          resolveBody.sku_id = currentAlertItem.sku_id;
+        }
+      }
+    }
     fetch('/api/price-alert', {
       method: 'PATCH',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({id: currentAlertItem.id, memo: document.getElementById('alert-action-memo').value.trim(), resolved: true})
+      body: JSON.stringify(resolveBody)
     }).then(function (r) { return r.json(); }).then(function (d) {
       if (d.ok) {
         showToast('완료 처리되었습니다');
@@ -2640,10 +2755,22 @@
       showToast('알림 ID가 없어 저장할 수 없습니다');
       return;
     }
+    var memoBody = { id: currentAlertItem.id, memo: document.getElementById('alert-action-memo').value.trim() };
+    var adjEl2 = document.getElementById('alert-action-adjusted-price');
+    if (adjEl2) {
+      var adjRaw2 = String(adjEl2.value || '').replace(/,/g, '').trim();
+      if (adjRaw2 !== '') {
+        var adjNum2 = Number(adjRaw2);
+        if (!isNaN(adjNum2) && adjNum2 >= 0) {
+          memoBody.adjusted_price = adjNum2;
+          memoBody.sku_id = currentAlertItem.sku_id;
+        }
+      }
+    }
     fetch('/api/price-alert', {
       method: 'PATCH',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({id: currentAlertItem.id, memo: document.getElementById('alert-action-memo').value.trim()})
+      body: JSON.stringify(memoBody)
     }).then(function (r) { return r.json(); }).then(function (d) {
       if (d.ok) {
         showToast('메모가 저장되었습니다');
