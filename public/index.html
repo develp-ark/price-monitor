@@ -4544,11 +4544,13 @@
     loadQueue();
   }
 
-  document.getElementById('tab-dash').addEventListener('click', function () {
+  var _elTabDash = document.getElementById('tab-dash');
+  if (_elTabDash) _elTabDash.addEventListener('click', function () {
     activateTab('dash');
   });
 
-  document.getElementById('tab-sku').addEventListener('click', function () {
+  var _elTabSku = document.getElementById('tab-sku');
+  if (_elTabSku) _elTabSku.addEventListener('click', function () {
     activateTab('sku');
   });
 
@@ -4660,17 +4662,20 @@
       });
   }
 
-  document.getElementById('btn-collect-start-main').addEventListener('click', function () {
+  var _elBtnCollectStartMain = document.getElementById('btn-collect-start-main');
+  if (_elBtnCollectStartMain) _elBtnCollectStartMain.addEventListener('click', function () {
     startCollectByMode(state.lastCollectModeKey || 'schedule_today');
   });
 
-  document.getElementById('btn-collect-mode-toggle').addEventListener('click', function (ev) {
+  var _elBtnCollectModeToggle = document.getElementById('btn-collect-mode-toggle');
+  if (_elBtnCollectModeToggle) _elBtnCollectModeToggle.addEventListener('click', function (ev) {
     ev.stopPropagation();
     setCollectMenuOpen(!state.collectMenuOpen);
     if (state.collectMenuOpen) refreshCollectModeCounts();
   });
 
-  document.getElementById('btn-stop-collect').addEventListener('click', function () {
+  var _elBtnStopCollect = document.getElementById('btn-stop-collect');
+  if (_elBtnStopCollect) _elBtnStopCollect.addEventListener('click', function () {
     if (!confirm('수집을 중지할까요?')) return;
     state.dashboardCollectPending = false;
     state.collectRunKind = null;
@@ -4732,7 +4737,8 @@
     }, 3000);
   });
 
-  document.getElementById('btn-bulk-group-a').addEventListener('click', function () {
+  var _btnBulkA = document.getElementById('btn-bulk-group-a');
+  if (_btnBulkA) _btnBulkA.addEventListener('click', function () {
     var ids = getSelectedSkuIds();
     if (!ids.length) {
       alert('선택한 SKU가 없습니다.');
@@ -4758,7 +4764,8 @@
     }
     runNext();
   });
-  document.getElementById('btn-bulk-group-b').addEventListener('click', function () {
+  var _btnBulkB = document.getElementById('btn-bulk-group-b');
+  if (_btnBulkB) _btnBulkB.addEventListener('click', function () {
     var ids = getSelectedSkuIds();
     if (!ids.length) {
       alert('선택한 SKU가 없습니다.');
@@ -4785,7 +4792,8 @@
     runNextB();
   });
 
-  document.getElementById('sku-check-all').addEventListener('change', function (ev) {
+  var _elSkuCheckAll = document.getElementById('sku-check-all');
+  if (_elSkuCheckAll) _elSkuCheckAll.addEventListener('change', function (ev) {
     var on = ev.target.checked;
     var slice = getCurrentSkuPageSlice();
     for (var i = 0; i < slice.length; i++) {
@@ -4794,7 +4802,8 @@
     renderSkuTablePage();
   });
 
-  document.getElementById('panel-sku').addEventListener('change', function (ev) {
+  var _elPanelSku = document.getElementById('panel-sku');
+  if (_elPanelSku) _elPanelSku.addEventListener('change', function (ev) {
     var t = ev.target;
     if (!t.classList || !t.classList.contains('sku-row-cb')) return;
     var id = t.getAttribute('data-sku-cb');
@@ -4818,7 +4827,8 @@
     updateBulkActionBar();
   });
 
-  document.getElementById('btn-queue-clear').addEventListener('click', function () {
+  var _elBtnQueueClear = document.getElementById('btn-queue-clear');
+  if (_elBtnQueueClear) _elBtnQueueClear.addEventListener('click', function () {
     if (!confirm('완료된 항목을 큐에서 비울까요?')) return;
     apiFetch('DELETE', '/collect-queue', { action: 'clear_done' })
       .then(function () {
@@ -4830,7 +4840,8 @@
       });
   });
 
-  document.getElementById('btn-manual-collect').addEventListener('click', function () {
+  var _elBtnManualCollect = document.getElementById('btn-manual-collect');
+  if (_elBtnManualCollect) _elBtnManualCollect.addEventListener('click', function () {
     openModal('modal-queue-add');
     document.getElementById('manual-sku-search').value = '';
     document.getElementById('manual-url-input').value = '';
@@ -4885,11 +4896,13 @@
     }, 3200);
   }
 
-  document.getElementById('manual-sku-search').addEventListener('input', function () {
+  var _elManualSkuSearch = document.getElementById('manual-sku-search');
+  if (_elManualSkuSearch) _elManualSkuSearch.addEventListener('input', function () {
     renderManualSkuSelect(this.value);
   });
 
-  document.getElementById('btn-manual-queue-add').addEventListener('click', function () {
+  var _elBtnManualQueueAdd = document.getElementById('btn-manual-queue-add');
+  if (_elBtnManualQueueAdd) _elBtnManualQueueAdd.addEventListener('click', function () {
     var sid = document.getElementById('manual-sku-select').value;
     var url = document.getElementById('manual-url-input').value.trim();
     var reqs = [];
@@ -4911,7 +4924,8 @@
       });
   });
 
-  document.getElementById('btn-toggle-queue').addEventListener('click', function () {
+  var _elBtnToggleQueue = document.getElementById('btn-toggle-queue');
+  if (_elBtnToggleQueue) _elBtnToggleQueue.addEventListener('click', function () {
     var body = document.getElementById('manual-queue-body');
     var icon = document.getElementById('manual-queue-toggle-icon');
     var isOpen = body.classList.contains('open');
@@ -4925,7 +4939,8 @@
     }
   });
 
-  document.getElementById('btn-queue-run-collect').addEventListener('click', function () {
+  var _elBtnQueueRunCollect = document.getElementById('btn-queue-run-collect');
+  if (_elBtnQueueRunCollect) _elBtnQueueRunCollect.addEventListener('click', function () {
     if (!extensionReady) {
       alert('Chrome 확장프로그램이 감지되지 않습니다.\n이 페이지에서 확장프로그램이 로드되었는지 확인하세요.');
       return;
@@ -4975,7 +4990,8 @@
     sendOne(0);
   });
 
-  document.getElementById('btn-sku-add').addEventListener('click', function () {
+  var _elBtnSkuAdd = document.getElementById('btn-sku-add');
+  if (_elBtnSkuAdd) _elBtnSkuAdd.addEventListener('click', function () {
     document.getElementById('f-sku-id').value = '';
     document.getElementById('f-sku-name').value = '';
     document.getElementById('f-brand-mode').value = '아리코';
@@ -4989,30 +5005,35 @@
     openModal('modal-sku-add');
   });
 
-  document.getElementById('f-brand-mode').addEventListener('change', function () {
+  var _elFBrandMode = document.getElementById('f-brand-mode');
+  if (_elFBrandMode) _elFBrandMode.addEventListener('change', function () {
     var v = document.getElementById('f-brand-mode').value;
     document.getElementById('f-brand-custom-wrap').style.display = v === '__custom__' ? '' : 'none';
   });
 
-  document.getElementById('e-brand-mode').addEventListener('change', function () {
+  var _elEBrandMode = document.getElementById('e-brand-mode');
+  if (_elEBrandMode) _elEBrandMode.addEventListener('change', function () {
     var v = document.getElementById('e-brand-mode').value;
     document.getElementById('e-brand-custom-wrap').style.display = v === '__custom__' ? '' : 'none';
   });
 
-  document.getElementById('sku-search').addEventListener('input', function () {
+  var _elSkuSearch = document.getElementById('sku-search');
+  if (_elSkuSearch) _elSkuSearch.addEventListener('input', function () {
     state.skuSearch = this.value;
     state.skuPage = 1;
     renderSkuTablePage();
   });
 
-  document.getElementById('sku-search-clear').addEventListener('click', function () {
+  var _elSkuSearchClear = document.getElementById('sku-search-clear');
+  if (_elSkuSearchClear) _elSkuSearchClear.addEventListener('click', function () {
     state.skuSearch = '';
     document.getElementById('sku-search').value = '';
     state.skuPage = 1;
     renderSkuTablePage();
   });
 
-  document.getElementById('btn-sku-save').addEventListener('click', function () {
+  var _elBtnSkuSave = document.getElementById('btn-sku-save');
+  if (_elBtnSkuSave) _elBtnSkuSave.addEventListener('click', function () {
     var skuId = document.getElementById('f-sku-id').value.trim();
     var skuName = document.getElementById('f-sku-name').value.trim();
     var mode = document.getElementById('f-brand-mode').value;
@@ -5048,7 +5069,8 @@
       });
   });
 
-  document.getElementById('btn-sku-edit-save').addEventListener('click', function () {
+  var _elBtnSkuEditSave = document.getElementById('btn-sku-edit-save');
+  if (_elBtnSkuEditSave) _elBtnSkuEditSave.addEventListener('click', function () {
     var skuId = document.getElementById('e-sku-id').value.trim();
     var skuName = document.getElementById('e-sku-name').value.trim();
     var mode = document.getElementById('e-brand-mode').value;
@@ -5132,12 +5154,15 @@
       });
   }
 
-  document.getElementById('btn-csv-upload').addEventListener('click', function () {
+  var _elBtnCsvUpload = document.getElementById('btn-csv-upload');
+  if (_elBtnCsvUpload) _elBtnCsvUpload.addEventListener('click', function () {
     document.getElementById('csv-file').click();
   });
-  document.getElementById('csv-file').addEventListener('change', handleCsvUpload);
+  var _elCsvFile = document.getElementById('csv-file');
+  if (_elCsvFile) _elCsvFile.addEventListener('change', handleCsvUpload);
 
-  document.getElementById('btn-sku-csv-dl').addEventListener('click', btnSkuCsvDl);
+  var _elBtnSkuCsvDl = document.getElementById('btn-sku-csv-dl');
+  if (_elBtnSkuCsvDl) _elBtnSkuCsvDl.addEventListener('click', btnSkuCsvDl);
 
   function runAutoDistributeAfterConfirm() {
     if (!confirm('SKU를 요일에 자동 분배할까요?')) return;
@@ -5155,25 +5180,30 @@
       });
   }
 
-  document.getElementById('btn-auto-dist').addEventListener('click', function () {
+  var _elBtnAutoDist = document.getElementById('btn-auto-dist');
+  if (_elBtnAutoDist) _elBtnAutoDist.addEventListener('click', function () {
     runAutoDistributeAfterConfirm();
   });
 
-  document.getElementById('btn-dash-auto-dist').addEventListener('click', function () {
+  var _elBtnDashAutoDist = document.getElementById('btn-dash-auto-dist');
+  if (_elBtnDashAutoDist) _elBtnDashAutoDist.addEventListener('click', function () {
     runAutoDistributeAfterConfirm();
   });
 
-  document.getElementById('btn-sku-refresh').addEventListener('click', function () {
+  var _elBtnSkuRefresh = document.getElementById('btn-sku-refresh');
+  if (_elBtnSkuRefresh) _elBtnSkuRefresh.addEventListener('click', function () {
     invalidateSkuCache();
     loadSkuPage(true);
   });
 
-  document.getElementById('btn-today-csv').addEventListener('click', function (ev) {
+  var _elBtnTodayCsv = document.getElementById('btn-today-csv');
+  if (_elBtnTodayCsv) _elBtnTodayCsv.addEventListener('click', function (ev) {
     ev.stopPropagation();
     setTodayCsvMenuOpen(!state.todayCsvMenuOpen);
   });
 
-  document.getElementById('schedule-popover').addEventListener('change', function (ev) {
+  var _elSchedulePopover = document.getElementById('schedule-popover');
+  if (_elSchedulePopover) _elSchedulePopover.addEventListener('change', function (ev) {
     var t = ev.target;
     if (t.type !== 'checkbox') return;
     var dayNum = parseInt(t.getAttribute('data-day'), 10);
