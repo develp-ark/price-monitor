@@ -1224,6 +1224,7 @@
       <div style="display:flex;gap:8px;margin-top:8px;align-items:stretch">
         <input type="text" id="alert-action-adjusted-price" inputmode="numeric" autocomplete="off" placeholder="금액 입력" style="flex:1;min-width:0;padding:8px 12px;border:1px solid #E5E8EB;border-radius:8px;font-size:13px;box-sizing:border-box" />
         <button type="button" id="btn-alert-apply-adjusted" onclick="applyAlertAdjustedPrice()" style="padding:8px 16px;background:#3182F6;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap">적용</button>
+        <button type="button" id="btn-alert-clear-adjusted" onclick="clearAdjustedPrice()" style="padding:8px 16px;background:#F04452;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap">삭제</button>
       </div>
       <p style="font-size:11px;color:#9CA3AF;margin:4px 0 0">수정가를 적용하면 다음 수집부터 이 가격 기준으로 변동률을 계산합니다</p>
       <div style="border-top:1px solid #E5E8EB;margin:16px 0"></div>
@@ -2956,6 +2957,44 @@
       })
       .catch(function (e) {
         showToast(e.message || '적용 실패');
+      });
+  }
+
+  function clearAdjustedPrice() {
+    if (!currentAlertItem || currentAlertItem.id == null || currentAlertItem.id === '') {
+      showToast('알림 ID가 없어 삭제할 수 없습니다');
+      return;
+    }
+    var clearBtn = document.getElementById('btn-alert-clear-adjusted');
+    var prevLabel = clearBtn ? clearBtn.textContent : '삭제';
+    fetch('/api/price-alert', {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        id: currentAlertItem.id,
+        sku_id: currentAlertItem.sku_id,
+        adjusted_price: null
+      })
+    })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (d) {
+        if (d.ok) {
+          var adjEl = document.getElementById('alert-action-adjusted-price');
+          if (adjEl) adjEl.value = '';
+          showToast('수정가 삭제 완료');
+          loadAlerts();
+          if (clearBtn) clearBtn.textContent = '✓ 삭제됨';
+          setTimeout(function () {
+            if (clearBtn) clearBtn.textContent = prevLabel;
+          }, 1800);
+        } else {
+          showToast('삭제 실패: ' + (d.error || ''));
+        }
+      })
+      .catch(function (e) {
+        showToast(e.message || '삭제 실패');
       });
   }
 
@@ -5626,6 +5665,7 @@
   window.resolveAlert = resolveAlert;
   window.saveAlertMemo = saveAlertMemo;
   window.applyAlertAdjustedPrice = applyAlertAdjustedPrice;
+  window.clearAdjustedPrice = clearAdjustedPrice;
   window.unresolveAlert = unresolveAlert;
   window.retryCollectFromAlert = retryCollectFromAlert;
   window.startCollectMode = startCollectByMode;

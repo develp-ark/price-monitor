@@ -34,8 +34,11 @@ module.exports = async (req, res) => {
       updateObj.resolved = body.resolved;
       updateObj.resolved_at = body.resolved ? new Date().toISOString() : null;
     }
-    if (body.adjusted_price !== undefined) {
-      updateObj.adjusted_price = body.adjusted_price;
+    if (Object.prototype.hasOwnProperty.call(body, 'adjusted_price')) {
+      var adjVal = body.adjusted_price;
+      var adjSave = (adjVal === null || adjVal === '' || adjVal === 0) ? null : adjVal;
+      updateObj.adjusted_price = adjSave;
+
       var skuForAdj = body.sku_id;
       if (!skuForAdj) {
         var alertLookup = await client
@@ -50,7 +53,7 @@ module.exports = async (req, res) => {
       if (skuForAdj) {
         var skuUp = await client
           .from('sku_list')
-          .update({ adjusted_price: body.adjusted_price })
+          .update({ adjusted_price: adjSave })
           .eq('sku_id', skuForAdj);
         if (skuUp.error) return json(res, 500, { ok: false, error: skuUp.error.message });
       }
