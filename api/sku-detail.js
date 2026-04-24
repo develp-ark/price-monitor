@@ -25,7 +25,7 @@ async function fetchAllRows(client) {
     const { data, error } = await client
       .from('sku_list')
       .select(
-        'sku_id, brand, sku_name, registered_price, current_price, change_pct, memo, last_collected, collect_cycle, flag, is_active, product_url, product_status, priority_group, created_at, adjusted_price'
+        'sku_id, brand, sku_name, registered_price, current_price, memo, last_collected, collect_cycle, flag, product_url, product_status, priority_group, created_at, adjusted_price'
       )
       .eq('is_active', true)
       .order('brand')
