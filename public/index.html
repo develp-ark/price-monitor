@@ -1002,6 +1002,8 @@
             <button type="button" class="btn btn-ghost btn-sm" id="btn-sku-refresh">새로고침</button>
           </div>
         </div>
+        <div id="sku-csv-upload-status" class="hint" style="display:none;margin:6px 0 0 0;padding:0 12px;font-size:12px;color:#3182F6;font-weight:600;"></div>
+        <p id="sku-csv-hint" class="hint" style="margin:0;padding:4px 12px 10px;font-size:11px;color:#6B7280;line-height:1.45">CSV 업로드 시 컬럼명은 <strong>SKU ID</strong>(필수), <strong>브랜드</strong>, <strong>SKU 명</strong>, <strong>url</strong>, <strong>등록가</strong>, <strong>플래그</strong>, <strong>메모</strong>를 사용합니다. url이 비어 있으면 SKU ID 기준 쿠팡 상품 URL이 자동으로 들어갑니다. 업로드 중에는 아래 진행 문구가 표시됩니다.</p>
       </div>
       <div class="card" style="padding:0; overflow:hidden;">
         <div id="sku-table-wrap" class="sku-theme-all" style="overflow:auto; max-height:70vh;">
@@ -1117,7 +1119,7 @@
       </div>
       <div class="form-row">
         <label for="e-url">쿠팡 URL</label>
-        <input type="url" id="e-url" readonly autocomplete="off" />
+        <input type="url" id="e-url" placeholder="https://www.coupang.com/..." autocomplete="off" />
       </div>
       <div class="form-row">
         <label for="e-sku-name">상품명 *</label>
@@ -1261,6 +1263,7 @@
     alertStatus: 'pending',
     skuBrand: '__all__',
     skuGroupFilter: '__all__',
+    skuTodayOnly: false,
     skuPage: 1,
     skuSearch: '',
     skuChecked: {},
@@ -1388,6 +1391,30 @@
       if (parts[i].type === 'day') d = parts[i].value;
     }
     return y + '-' + m + '-' + d;
+  }
+
+  function isoToKstYmd(isoStr) {
+    if (!isoStr) return '';
+    var d = new Date(isoStr);
+    if (isNaN(d.getTime())) return '';
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Seoul',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(d);
+  }
+
+  function countSkuRegisteredTodayKst() {
+    var rows = state.skuDetailList || [];
+    var today = kstYmd();
+    var n = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (state.skuBrand !== '__all__' && String(r.brand) !== state.skuBrand) continue;
+      if (isoToKstYmd(r.created_at) === today) n++;
+    }
+    return n;
   }
 
   function formatMdFromYmd(ymd) {
@@ -3123,6 +3150,9 @@
         var sn = String(r.sku_name || '').toLowerCase();
         if (sid.indexOf(q) === -1 && sn.indexOf(q) === -1) continue;
       }
+      if (state.skuTodayOnly) {
+        if (isoToKstYmd(r.created_at) !== kstYmd()) continue;
+      }
       out.push(r);
     }
     state.filteredSkuList = out.slice();
@@ -3170,6 +3200,13 @@
       '<button type="button" data-sg-filter="B" class="' +
       (g === 'B' ? 'on' : '') +
       '">B그룹</button>';
+    var todayCnt = countSkuRegisteredTodayKst();
+    h +=
+      '<button type="button" data-sku-today-toggle="1" class="' +
+      (state.skuTodayOnly ? 'on' : '') +
+      '">오늘 등록 <span class="badge alert-brand-count">' +
+      todayCnt +
+      '</span></button>';
     el.innerHTML = h;
   }
 
@@ -4599,6 +4636,7 @@
     if (isNaN(cycle) || cycle < 1) cycle = 7;
     var flag = document.getElementById('e-flag').value.trim();
     var memo = document.getElementById('e-memo').value.trim();
+    var urlVal = document.getElementById('e-url').value.trim();
     var payload = {
       sku_id: skuId,
       sku_name: skuName,
@@ -4607,7 +4645,8 @@
       registered_price: reg !== '' ? Number(reg) : null,
       flag: flag || null,
       memo: memo || null,
-      priority_group: document.getElementById('e-priority-group').value
+      priority_group: document.getElementById('e-priority-group').value,
+      product_url: urlVal || null
     };
     apiFetch('PATCH', '/sku-update', payload)
       .then(function () {
@@ -4627,6 +4666,13 @@
   document.getElementById('csv-file').addEventListener('change', function (ev) {
     var f = ev.target.files && ev.target.files[0];
     if (!f) return;
+    var statusEl = document.getElementById('sku-csv-upload-status');
+    var upBtn = document.getElementById('btn-csv-upload');
+    if (statusEl) {
+      statusEl.style.display = '';
+      statusEl.textContent = '업로드 진행 중…';
+    }
+    if (upBtn) upBtn.disabled = true;
     var fd = new FormData();
     fd.append('file', f);
     fetch(API_BASE + '/sku-upload', { method: 'POST', body: fd })
@@ -4636,14 +4682,41 @@
           return json;
         });
       })
-      .then(function () {
+      .then(function (json) {
         ev.target.value = '';
+        if (statusEl) {
+          statusEl.textContent =
+            '완료 — 신규 ' +
+            (json.inserted != null ? json.inserted : 0) +
+            '건 · 갱신 ' +
+            (json.updated != null ? json.updated : 0) +
+            '건 (총 ' +
+            (json.total != null ? json.total : 0) +
+            '행)';
+        }
         invalidateSkuCache();
-        return loadSkuPage(true);
+        return loadSkuPage(true).then(function () {
+          if (statusEl) {
+            setTimeout(function () {
+              statusEl.style.display = 'none';
+              statusEl.textContent = '';
+            }, 5000);
+          }
+        });
       })
       .catch(function (e) {
         console.error(e);
+        if (statusEl) {
+          statusEl.textContent = '업로드 실패: ' + (e.message || String(e));
+          setTimeout(function () {
+            statusEl.style.display = 'none';
+            statusEl.textContent = '';
+          }, 6000);
+        }
         alert(e.message || String(e));
+      })
+      .then(function () {
+        if (upBtn) upBtn.disabled = false;
       });
   });
 
@@ -4779,6 +4852,13 @@
     var sgFilter = sgfEl ? sgfEl.getAttribute('data-sg-filter') : null;
     if (sgFilter != null) {
       state.skuGroupFilter = sgFilter;
+      state.skuPage = 1;
+      renderSkuTablePage();
+      return;
+    }
+    var skuTodayEl = t.closest && t.closest('[data-sku-today-toggle]');
+    if (skuTodayEl) {
+      state.skuTodayOnly = !state.skuTodayOnly;
       state.skuPage = 1;
       renderSkuTablePage();
       return;

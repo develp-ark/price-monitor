@@ -55,6 +55,10 @@ module.exports = async (req, res) => {
         ? String(b.memo).trim()
         : null;
   }
+  if (b.product_url !== undefined) {
+    const u = String(b.product_url || '').trim();
+    updates.product_url = u || null;
+  }
   if (b.priority_group !== undefined) {
     if (b.priority_group === null || b.priority_group === '') {
       updates.priority_group = null;

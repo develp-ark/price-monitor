@@ -25,7 +25,7 @@ async function fetchAllRows(client) {
     const { data, error } = await client
       .from('sku_list')
       .select(
-        'sku_id, brand, sku_name, registered_price, current_price, memo, last_collected, collect_cycle, flag, is_active, product_url, priority_group, product_status'
+        'sku_id, brand, sku_name, registered_price, current_price, change_pct, memo, last_collected, collect_cycle, flag, is_active, product_url, product_status, priority_group, created_at, adjusted_price'
       )
       .eq('is_active', true)
       .order('brand')
@@ -168,6 +168,8 @@ module.exports = async (req, res) => {
           .toUpperCase();
         return u === 'A' || u === 'B' ? u : null;
       })(r.priority_group),
+      created_at: r.created_at != null ? String(r.created_at) : null,
+      adjusted_price: r.adjusted_price != null ? r.adjusted_price : null,
     };
   });
 
