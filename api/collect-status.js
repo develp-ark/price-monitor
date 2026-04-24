@@ -24,7 +24,7 @@ async function getLatestStatus(client) {
   const { data, error } = await client
     .from('collect_status')
     .select('*')
-    .order('updated_at', { ascending: false })
+    .order('id', { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -69,9 +69,10 @@ module.exports = async (req, res) => {
       return json(res, 404, { ok: false, error: 'No active session. start first.' });
     }
 
+    const maxTotal = latest.total || 0;
     const next = {
-      current: sanitizeInt(body.current, latest.current || 0),
-      success: sanitizeInt(body.success, latest.success || 0),
+      current: Math.min(sanitizeInt(body.current, latest.current || 0), maxTotal),
+      success: Math.min(sanitizeInt(body.success, latest.success || 0), maxTotal),
       fail: sanitizeInt(body.fail, latest.fail || 0),
       current_sku_name: body.current_sku_name ?? latest.current_sku_name ?? null,
       updated_at: new Date().toISOString(),
@@ -95,9 +96,14 @@ module.exports = async (req, res) => {
   if (!body) return;
 
   if (body.action === 'start') {
+    const now = new Date().toISOString();
+    const { error: closeErr } = await client
+      .from('collect_status')
+      .update({ status: 'done', finished_at: now, updated_at: now })
+      .in('status', ['running', 'stopping']);
+    if (closeErr) return json(res, 500, { ok: false, error: closeErr.message });
     const total = sanitizeInt(body.total, 0);
     const collect_mode = body.collect_mode != null ? String(body.collect_mode) : null;
-    const now = new Date().toISOString();
     const { data, error } = await client
       .from('collect_status')
       .insert({
