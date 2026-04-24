@@ -2462,20 +2462,6 @@
     return out;
   }
 
-  function alertStatusMemoHtml(memo, isDone) {
-    if (memo == null || String(memo).trim() === '') return '';
-    var bg = isDone ? '#F0FFF4' : '#F3F4F6';
-    return (
-      '<div style="margin-top:4px;padding:4px 8px;background:' +
-      bg +
-      ';border-radius:4px;font-size:11px;color:#6B7280;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' +
-      escapeHtml(String(memo)) +
-      '">' +
-      escapeHtml(String(memo)) +
-      '</div>'
-    );
-  }
-
   function renderAlertTable() {
     var rows = filterAlerts().slice();
     sortAlertRows(rows);
@@ -2572,22 +2558,61 @@
       } else {
         h += '<td class="num">' + formatAlertPctRowHtml(r) + '</td>';
       }
+      var alertIdJs = escapeJsSingleQuoted(
+        String(r.id != null && r.id !== '' ? r.id : 'idx_' + i)
+      );
       if (r && r.resolved === true) {
-        h += '<td><span class="alert-status-badge done">완료</span>' + alertStatusMemoHtml(r.memo, true) + '</td>';
-        h += '<td><button type="button" onclick="openAlertActionModal(\'' + escapeHtml(String(r.id != null && r.id !== '' ? r.id : ('idx_' + i))) + '\')" style="font-size:12px;padding:4px 12px;background:none;border:1px solid #E5E8EB;border-radius:6px;cursor:pointer;color:#3182F6">수정</button>';
+        h +=
+          '<td><span style="display:inline-block;padding:2px 8px;background:#D1FAE5;color:#059669;border-radius:4px;font-size:11px;font-weight:600">완료</span></td>';
+        h +=
+          '<td style="text-align:center;vertical-align:middle;padding:8px 4px">' +
+          '<button type="button" onclick="openAlertActionModal(\'' +
+          alertIdJs +
+          '\')" style="padding:4px 12px;background:#F3F4F6;color:#6B7280;border:1px solid #E5E8EB;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap">수정</button>';
         if (isDiscontinued) {
           h += ' <span style="font-size:11px;color:#9CA3AF;margin-left:6px">확정됨</span>';
         } else if (zeroPrice) {
-          h += ' <button onclick="retryCollectFromAlert(\'' + escapeJsSingleQuoted(String(r.sku_id)) + '\', \'' + escapeJsSingleQuoted(String(r.product_url || alertUrl || '')) + '\', \'' + escapeJsSingleQuoted(String(r.sku_name || '')) + '\', this)" style="font-size:11px;padding:3px 8px;background:#F04452;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:4px">재수집</button>';
+          h +=
+            ' <button type="button" onclick="retryCollectFromAlert(\'' +
+            escapeJsSingleQuoted(String(r.sku_id)) +
+            '\', \'' +
+            escapeJsSingleQuoted(String(r.product_url || alertUrl || '')) +
+            '\', \'' +
+            escapeJsSingleQuoted(String(r.sku_name || '')) +
+            '\', this)" style="font-size:11px;padding:3px 8px;background:#F04452;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:4px">재수집</button>';
         }
         h += '</td>';
       } else {
-        h += '<td><span class="alert-status-badge pending">미처리</span>' + alertStatusMemoHtml(r.memo, false) + '</td>';
-        h += '<td><button onclick="openAlertActionModal(\'' + escapeHtml(String(r.id != null && r.id !== '' ? r.id : ('idx_' + i))) + '\')" style="font-size:12px;padding:4px 12px;background:#3182F6;color:#fff;border:none;border-radius:6px;cursor:pointer">처리</button>';
+        var memoTrim = r.memo == null ? '' : String(r.memo).trim();
+        var hasMemo = memoTrim !== '';
+        if (hasMemo) {
+          h +=
+            '<td><span style="display:inline-block;padding:2px 8px;background:#FEF3C7;color:#D97706;border-radius:4px;font-size:11px;font-weight:600">미처리</span>' +
+            '<div style="margin-top:2px;font-size:10px;color:#6B7280;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' +
+            escapeHtml(memoTrim) +
+            '">' +
+            escapeHtml(memoTrim) +
+            '</div></td>';
+        } else {
+          h +=
+            '<td><span style="display:inline-block;padding:2px 8px;background:#FEE2E2;color:#DC2626;border-radius:4px;font-size:11px;font-weight:600">미처리</span></td>';
+        }
+        h +=
+          '<td style="text-align:center;vertical-align:middle;padding:8px 4px">' +
+          '<button type="button" onclick="openAlertActionModal(\'' +
+          alertIdJs +
+          '\')" style="padding:4px 12px;background:#3182F6;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">처리</button>';
         if (isDiscontinued) {
           h += ' <span style="font-size:11px;color:#9CA3AF;margin-left:6px">확정됨</span>';
         } else if (zeroPrice) {
-          h += ' <button onclick="retryCollectFromAlert(\'' + escapeJsSingleQuoted(String(r.sku_id)) + '\', \'' + escapeJsSingleQuoted(String(r.product_url || alertUrl || '')) + '\', \'' + escapeJsSingleQuoted(String(r.sku_name || '')) + '\', this)" style="font-size:11px;padding:3px 8px;background:#F04452;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:4px">재수집</button>';
+          h +=
+            ' <button type="button" onclick="retryCollectFromAlert(\'' +
+            escapeJsSingleQuoted(String(r.sku_id)) +
+            '\', \'' +
+            escapeJsSingleQuoted(String(r.product_url || alertUrl || '')) +
+            '\', \'' +
+            escapeJsSingleQuoted(String(r.sku_name || '')) +
+            '\', this)" style="font-size:11px;padding:3px 8px;background:#F04452;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:4px">재수집</button>';
         }
         h += '</td>';
       }
