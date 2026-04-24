@@ -1529,11 +1529,7 @@
     rows.sort(function (a, b) {
       var c = 0;
       if (key === 'pct_abs') {
-        c =
-          Math.abs(Number(b.change_pct) || 0) -
-          Math.abs(Number(a.change_pct) || 0);
-        if (c !== 0) return asc ? -c : c;
-        return alertCmpLocale(a.sku_name, b.sku_name);
+        c = num(a.change_pct) - num(b.change_pct);
       } else if (key === 'sku_name') {
         c = alertCmpLocale(a.sku_name, b.sku_name);
       } else if (key === 'brand') {
