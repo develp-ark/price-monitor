@@ -1,5 +1,6 @@
 const { getSupabase } = require('../lib/supabase');
 const { json, handleOptions } = require('../lib/cors');
+const { isCollectionDue, todayUtcYmd } = require('../lib/sku-due');
 
 function parseBody(req, res) {
   let body = req.body;
@@ -266,6 +267,7 @@ module.exports = async (req, res) => {
   if (body.action === 'collect_schedule') {
     var kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
     var kstDay = kstNow.getUTCDay();
+    var today = todayUtcYmd();
 
     // collect_schedule 테이블에서 오늘 요일의 sku_id 조회 (페이지네이션)
     var schedIds = [];
@@ -287,14 +289,24 @@ module.exports = async (req, res) => {
     var batchSize = 300;
     for (var b = 0; b < schedIds.length; b += batchSize) {
       var batch = schedIds.slice(b, b + batchSize);
-      var skuResult = await client.from('sku_list').select('sku_id, product_url, sku_name, brand, last_collected, registered_price, current_price, product_status').eq('is_active', true).in('sku_id', batch);
+      var skuResult = await client.from('sku_list').select('sku_id, product_url, sku_name, brand, last_collected, collect_cycle, registered_price, current_price, product_status').eq('is_active', true).in('sku_id', batch);
       if (skuResult.error) return json(res, 500, { ok: false, error: skuResult.error.message });
       items = items.concat((skuResult.data || []).map(function(r) {
-        return { sku_id: r.sku_id, product_url: r.product_url, sku_name: r.sku_name, brand: r.brand, last_collected: r.last_collected || null, registered_price: r.registered_price || null, current_price: r.current_price || null, product_status: r.product_status || null };
+        return { sku_id: r.sku_id, product_url: r.product_url, sku_name: r.sku_name, brand: r.brand, last_collected: r.last_collected || null, collect_cycle: r.collect_cycle, registered_price: r.registered_price || null, current_price: r.current_price || null, product_status: r.product_status || null };
       }));
     }
 
-    return json(res, 200, { ok: true, action: 'collect_schedule', day_of_week: kstDay, items: items, total: items.length });
+    var dueItems = items.filter(function (r) {
+      return isCollectionDue(r.last_collected, r.collect_cycle, today);
+    });
+    return json(res, 200, {
+      ok: true,
+      action: 'collect_schedule',
+      day_of_week: kstDay,
+      items: dueItems,
+      total: dueItems.length,
+      skipped: Math.max(0, items.length - dueItems.length)
+    });
   }
 
   if (body.action === 'collect_all') {
