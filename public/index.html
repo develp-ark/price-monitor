@@ -1187,18 +1187,25 @@
     </div>
   </div>
   <div class="modal-overlay" id="modal-alert-action" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center">
-    <div style="background:#fff;border-radius:16px;max-width:500px;width:90%;padding:24px;position:relative">
+    <div style="background:#fff;border-radius:16px;max-width:520px;width:90%;padding:24px;position:relative;box-sizing:border-box">
       <span onclick="closeAlertActionModal()" style="position:absolute;top:16px;right:16px;font-size:20px;cursor:pointer;color:#6B7280">&times;</span>
-      <h3 style="margin:0 0 16px;font-size:16px">가격 변동 처리</h3>
-      <div id="alert-action-summary" style="margin-bottom:16px"></div>
-      <label for="alert-action-adjusted-price" style="font-size:13px;font-weight:600;color:#1A1A1A;display:block;margin-top:12px">수정가 (기준가)</label>
-      <input type="text" id="alert-action-adjusted-price" inputmode="numeric" autocomplete="off" placeholder="숫자만 입력 (미입력 시 변경 없음)" style="width:100%;margin-top:4px;padding:8px 12px;border:1px solid #E5E8EB;border-radius:8px;font-size:13px;box-sizing:border-box" />
-      <label style="font-size:13px;font-weight:600;color:#1A1A1A;display:block;margin-top:12px">조치 내용</label>
-      <textarea id="alert-action-memo" rows="3" placeholder="조치 내용을 입력하세요" style="width:100%;margin-top:4px;padding:8px 12px;border:1px solid #E5E8EB;border-radius:8px;font-size:13px;resize:vertical;box-sizing:border-box"></textarea>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
-        <button id="btn-alert-unresolve" onclick="unresolveAlert()" style="display:none;background:#F04452;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer">미처리로 되돌리기</button>
-        <button onclick="saveAlertMemo()" style="background:#fff;border:1px solid #E5E8EB;border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer">메모만 저장</button>
-        <button onclick="resolveAlert()" style="background:#3182F6;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer">완료 처리</button>
+      <h3 style="margin:0 0 16px;font-size:16px;font-weight:600">가격 변동 처리</h3>
+      <div id="alert-action-summary"></div>
+      <div style="border-top:1px solid #E5E8EB;margin:16px 0"></div>
+      <label for="alert-action-adjusted-price" style="font-size:13px;font-weight:600;color:#1A1A1A;display:block">수정가 (기준가)</label>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:stretch">
+        <input type="text" id="alert-action-adjusted-price" inputmode="numeric" autocomplete="off" placeholder="금액 입력" style="flex:1;min-width:0;padding:8px 12px;border:1px solid #E5E8EB;border-radius:8px;font-size:13px;box-sizing:border-box" />
+        <button type="button" id="btn-alert-apply-adjusted" onclick="applyAlertAdjustedPrice()" style="padding:8px 16px;background:#3182F6;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap">적용</button>
+      </div>
+      <p style="font-size:11px;color:#9CA3AF;margin:4px 0 0">수정가를 적용하면 다음 수집부터 이 가격 기준으로 변동률을 계산합니다</p>
+      <div style="border-top:1px solid #E5E8EB;margin:16px 0"></div>
+      <label for="alert-action-memo" style="font-size:13px;font-weight:600;color:#1A1A1A;display:block">조치 내용</label>
+      <textarea id="alert-action-memo" placeholder="조치 내용을 입력하세요" style="width:100%;min-height:60px;margin-top:8px;padding:8px 12px;border:1px solid #E5E8EB;border-radius:8px;font-size:13px;resize:vertical;box-sizing:border-box"></textarea>
+      <button type="button" onclick="saveAlertMemo()" style="margin-top:10px;padding:8px 16px;background:#F3F4F6;color:#1A1A1A;border:1px solid #E5E8EB;border-radius:8px;font-size:13px;cursor:pointer">메모 저장</button>
+      <div style="border-top:1px solid #E5E8EB;margin:16px 0"></div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+        <button type="button" id="btn-alert-unresolve" onclick="unresolveAlert()" style="display:none;padding:10px 20px;background:#F3F4F6;color:#6B7280;border:1px solid #E5E8EB;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">미처리로 되돌리기</button>
+        <button type="button" onclick="resolveAlert()" style="padding:10px 20px;background:#3182F6;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">완료 처리</button>
       </div>
     </div>
   </div>
@@ -2683,17 +2690,60 @@
         ? '—'
         : (pctUp ? '▲' : '▼') + Math.abs(pctNum).toFixed(2).replace(/\.?0+$/, '') + '%';
     var pctColor =
-      isNaN(pctNum) || pctNum === 0 ? '#9CA3AF' : pctUp ? '#F04452' : '#10B981';
+      isNaN(pctNum) || pctNum === 0 ? '#9CA3AF' : pctUp ? '#F04452' : '#3182F6';
     var pctSuffix = alertHasAdjustedBaseline(item)
-      ? ' <span style="font-size:10px;color:#9CA3AF;font-weight:400">(수정가 기준)</span>'
+      ? '<span style="font-size:10px;color:#9CA3AF;font-weight:400;margin-left:4px">(수정가 기준)</span>'
       : '';
-    var html = '<div style="padding:12px;background:#F9FAFB;border-radius:8px;font-size:13px">'
-      + '<div style="font-weight:600;margin-bottom:4px">' + escapeHtml(item.sku_name || '') + '</div>'
-      + '<div style="color:#6B7280;margin-bottom:8px">' + escapeHtml(item.brand || '') + '</div>'
-      + '<span>이전가: ' + Number(item.prev_price || 0).toLocaleString() + '원</span>'
-      + ' → <span style="font-weight:600">현재가: ' + Number(item.new_price || 0).toLocaleString() + '원</span>'
-      + ' <span style="color:' + pctColor + ';font-weight:600">' + pctLabel + '</span>' + pctSuffix
-      + '</div>';
+    var regMoney = formatMoney(item.registered_price);
+    var prevMoney = formatMoney(item.prev_price);
+    var curMoney = formatMoney(item.new_price);
+    var regMain = regMoney ? escapeHtml(regMoney) + '원' : '<span style="color:#D1D5DB">—</span>';
+    var prevMain = prevMoney ? escapeHtml(prevMoney) + '원' : '<span style="color:#D1D5DB">—</span>';
+    var curMain = curMoney ? escapeHtml(curMoney) + '원' : '<span style="color:#D1D5DB">—</span>';
+    var prevSub = escapeHtml(fmtCollectedAt(item.prev_collected_at));
+    var curSub = escapeHtml(fmtCollectedAt(item.new_collected_at));
+    var html =
+      '<div style="font-size:15px;font-weight:700;line-height:1.35;margin-bottom:4px">' +
+      escapeHtml(item.sku_name || '') +
+      '</div>' +
+      '<div style="font-size:13px;color:#6B7280;margin-bottom:12px">' +
+      escapeHtml(item.brand || '') +
+      '</div>' +
+      '<div style="display:flex;gap:12px">' +
+      '<div style="flex:1;text-align:center;padding:8px;background:#F9FAFB;border-radius:8px">' +
+      '<div style="font-size:11px;color:#9CA3AF">등록가</div>' +
+      '<div style="font-size:15px;font-weight:700;margin-top:4px">' +
+      regMain +
+      '</div>' +
+      '<div style="font-size:10px;color:#9CA3AF;margin-top:2px">&nbsp;</div>' +
+      '</div>' +
+      '<div style="flex:1;text-align:center;padding:8px;background:#F9FAFB;border-radius:8px">' +
+      '<div style="font-size:11px;color:#9CA3AF">이전가</div>' +
+      '<div style="font-size:15px;font-weight:700;margin-top:4px">' +
+      prevMain +
+      '</div>' +
+      '<div style="font-size:10px;color:#9CA3AF;margin-top:2px">' +
+      prevSub +
+      '</div>' +
+      '</div>' +
+      '<div style="flex:1;text-align:center;padding:8px;background:#F9FAFB;border-radius:8px">' +
+      '<div style="font-size:11px;color:#9CA3AF">현재가</div>' +
+      '<div style="font-size:15px;font-weight:700;margin-top:4px">' +
+      curMain +
+      '</div>' +
+      '<div style="font-size:10px;color:#9CA3AF;margin-top:2px">' +
+      curSub +
+      '</div>' +
+      '</div>' +
+      '</div>' +
+      '<div style="margin-top:12px;font-size:13px;color:#1A1A1A">변동률: ' +
+      '<span style="color:' +
+      pctColor +
+      ';font-weight:700">' +
+      pctLabel +
+      '</span>' +
+      pctSuffix +
+      '</div>';
     document.getElementById('alert-action-summary').innerHTML = html;
     var adjInp = document.getElementById('alert-action-adjusted-price');
     if (adjInp) {
@@ -2701,6 +2751,8 @@
       adjInp.value =
         ap0 != null && Number(ap0) > 0 ? String(Number(ap0)) : '';
     }
+    var applyBtn = document.getElementById('btn-alert-apply-adjusted');
+    if (applyBtn) applyBtn.textContent = '적용';
     document.getElementById('alert-action-memo').value = item.memo || '';
     document.getElementById('btn-alert-unresolve').style.display = item.resolved ? 'inline-block' : 'none';
     var modal = document.getElementById('modal-alert-action');
@@ -2711,7 +2763,57 @@
 
   function closeAlertActionModal() {
     document.getElementById('modal-alert-action').style.display = 'none';
+    var applyBtn = document.getElementById('btn-alert-apply-adjusted');
+    if (applyBtn) applyBtn.textContent = '적용';
     currentAlertItem = null;
+  }
+
+  function applyAlertAdjustedPrice() {
+    if (!currentAlertItem || currentAlertItem.id == null || currentAlertItem.id === '') {
+      showToast('알림 ID가 없어 적용할 수 없습니다');
+      return;
+    }
+    var adjEl = document.getElementById('alert-action-adjusted-price');
+    var raw = String(adjEl && adjEl.value ? adjEl.value : '').replace(/,/g, '').trim();
+    if (raw === '') {
+      showToast('수정가를 입력해 주세요');
+      return;
+    }
+    var adjNum = Number(raw);
+    if (isNaN(adjNum) || adjNum < 0) {
+      showToast('유효한 금액을 입력해 주세요');
+      return;
+    }
+    var btn = document.getElementById('btn-alert-apply-adjusted');
+    var prevLabel = btn ? btn.textContent : '적용';
+    fetch('/api/price-alert', {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        id: currentAlertItem.id,
+        sku_id: currentAlertItem.sku_id,
+        adjusted_price: adjNum
+      })
+    })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (d) {
+        if (d.ok) {
+          showToast('수정가 적용 완료');
+          loadAlerts();
+          if (btn) btn.textContent = '✓ 적용됨';
+          setTimeout(function () {
+            if (btn) btn.textContent = prevLabel;
+            closeAlertActionModal();
+          }, 2000);
+        } else {
+          showToast('적용 실패: ' + (d.error || ''));
+        }
+      })
+      .catch(function (e) {
+        showToast(e.message || '적용 실패');
+      });
   }
 
   function resolveAlert() {
@@ -2724,17 +2826,6 @@
       memo: document.getElementById('alert-action-memo').value.trim(),
       resolved: true
     };
-    var adjEl = document.getElementById('alert-action-adjusted-price');
-    if (adjEl) {
-      var adjRaw = String(adjEl.value || '').replace(/,/g, '').trim();
-      if (adjRaw !== '') {
-        var adjNum = Number(adjRaw);
-        if (!isNaN(adjNum) && adjNum >= 0) {
-          resolveBody.adjusted_price = adjNum;
-          resolveBody.sku_id = currentAlertItem.sku_id;
-        }
-      }
-    }
     fetch('/api/price-alert', {
       method: 'PATCH',
       headers: {'Content-Type': 'application/json'},
@@ -2756,24 +2847,13 @@
       return;
     }
     var memoBody = { id: currentAlertItem.id, memo: document.getElementById('alert-action-memo').value.trim() };
-    var adjEl2 = document.getElementById('alert-action-adjusted-price');
-    if (adjEl2) {
-      var adjRaw2 = String(adjEl2.value || '').replace(/,/g, '').trim();
-      if (adjRaw2 !== '') {
-        var adjNum2 = Number(adjRaw2);
-        if (!isNaN(adjNum2) && adjNum2 >= 0) {
-          memoBody.adjusted_price = adjNum2;
-          memoBody.sku_id = currentAlertItem.sku_id;
-        }
-      }
-    }
     fetch('/api/price-alert', {
       method: 'PATCH',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(memoBody)
     }).then(function (r) { return r.json(); }).then(function (d) {
       if (d.ok) {
-        showToast('메모가 저장되었습니다');
+        showToast('메모 저장 완료');
         closeAlertActionModal();
         loadAlerts();
       } else {
@@ -4889,6 +4969,7 @@
   window.closeAlertActionModal = closeAlertActionModal;
   window.resolveAlert = resolveAlert;
   window.saveAlertMemo = saveAlertMemo;
+  window.applyAlertAdjustedPrice = applyAlertAdjustedPrice;
   window.unresolveAlert = unresolveAlert;
   window.retryCollectFromAlert = retryCollectFromAlert;
   window.startCollectMode = startCollectByMode;
