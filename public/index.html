@@ -784,6 +784,20 @@
       transition: opacity .3s;
     }
     .toast.show { opacity: 1; }
+    @keyframes csvUploadSpin {
+      to { transform: rotate(360deg); }
+    }
+    .csv-upload-spin {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border: 2px solid rgba(107, 114, 128, 0.35);
+      border-top-color: #6B7280;
+      border-radius: 50%;
+      animation: csvUploadSpin 0.65s linear infinite;
+      vertical-align: -2px;
+      margin-left: 6px;
+    }
     @media (max-width: 768px) {
       .wrap { padding: 12px; }
       .card { padding: 14px; }
@@ -805,9 +819,14 @@
       border-radius: 12px;
       padding: 16px;
       box-sizing: border-box;
+      cursor: pointer;
     }
     .dash-sch-card.is-today {
       border-top: 3px solid #3182F6;
+    }
+    .dash-sch-card.is-open-selection {
+      border-color: #3182F6;
+      box-shadow: 0 0 0 2px rgba(49, 130, 246, 0.2);
     }
     .dash-sch-card-head {
       display: flex;
@@ -882,6 +901,13 @@
           <span class="badge error">미배정 <span id="dash-sch-unassigned">0</span></span>
         </div>
         <div id="dash-schedule-week-cards" class="dash-sch-week-cards"></div>
+        <div id="schedule-detail-panel" style="display:none; margin-top:12px; background:#fff; border:1px solid #E5E8EB; border-radius:12px; padding:16px; max-height:400px; overflow-y:auto;">
+          <div id="schedule-detail-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <span id="schedule-detail-title" style="font-weight:700; font-size:14px;">—</span>
+            <button type="button" onclick="closeScheduleDetail()" style="background:none; border:none; font-size:18px; cursor:pointer; color:#9CA3AF;" title="닫기" aria-label="닫기">✕</button>
+          </div>
+          <div id="schedule-detail-table-wrap"></div>
+        </div>
         <div class="hint" id="dash-sch-groups" style="margin-top:10px;">A그룹 0개 (매일) / B그룹 0개 (주 1회)</div>
       </div>
 
@@ -982,6 +1008,7 @@
         <div class="sku-toolbar-row sku-toolbar-row-top">
           <div class="brand-tabs" id="sku-brand-tabs"></div>
           <div class="filter-btns" id="sku-group-filter"></div>
+          <button type="button" onclick="toggleTodayFilter()" id="btn-today-filter" style="padding:4px 12px;background:#F3F4F6;color:#6B7280;border:1px solid #E5E8EB;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap">오늘 등록 <span id="today-count">0</span></button>
           <div class="sku-search-row">
             <input type="search" id="sku-search" placeholder="상품명 또는 SKU ID 검색" autocomplete="off" />
             <button type="button" id="sku-search-clear" title="검색어 지우기">×</button>
@@ -995,15 +1022,17 @@
             <button type="button" class="btn btn-ghost btn-sm" id="btn-bulk-group-b" style="display:none;">B그룹으로</button>
           </div>
           <div class="toolbar-actions sku-actions-right">
-            <button type="button" class="btn btn-ghost btn-sm" id="btn-csv-upload">CSV ↑</button>
+            <span style="display:inline-flex;align-items:center;flex-wrap:wrap;gap:4px 0">
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-csv-upload" data-csv-label="CSV ↑">CSV ↑</button>
+            <span style="font-size:11px;color:#9CA3AF;margin-left:8px" title="동일한 SKU ID가 이미 존재하면 브랜드, 상품명, URL, 등록가, 플래그, 메모가 업데이트됩니다">ℹ 기존 SKU는 자동 수정</span>
+            </span>
             <input type="file" id="csv-file" accept=".csv,text/csv" />
             <button type="button" class="btn btn-ghost btn-sm" id="btn-sku-csv-dl">CSV ↓</button>
             <button type="button" class="btn btn-ghost btn-sm" id="btn-auto-dist">자동분배</button>
             <button type="button" class="btn btn-ghost btn-sm" id="btn-sku-refresh">새로고침</button>
           </div>
         </div>
-        <div id="sku-csv-upload-status" class="hint" style="display:none;margin:6px 0 0 0;padding:0 12px;font-size:12px;color:#3182F6;font-weight:600;"></div>
-        <p id="sku-csv-hint" class="hint" style="margin:0;padding:4px 12px 10px;font-size:11px;color:#6B7280;line-height:1.45">CSV 업로드 시 컬럼명은 <strong>SKU ID</strong>(필수), <strong>브랜드</strong>, <strong>SKU 명</strong>, <strong>url</strong>, <strong>등록가</strong>, <strong>플래그</strong>, <strong>메모</strong>를 사용합니다. url이 비어 있으면 SKU ID 기준 쿠팡 상품 URL이 자동으로 들어갑니다. 업로드 중에는 아래 진행 문구가 표시됩니다.</p>
+        <p id="sku-csv-hint" class="hint" style="margin:0;padding:4px 12px 10px;font-size:11px;color:#6B7280;line-height:1.45">CSV 업로드 시 컬럼명은 <strong>SKU ID</strong>(필수), <strong>브랜드</strong>, <strong>SKU 명</strong>, <strong>url</strong>, <strong>등록가</strong>, <strong>플래그</strong>, <strong>메모</strong>를 사용합니다. url이 비어 있으면 SKU ID 기준 쿠팡 상품 URL이 자동으로 들어갑니다.</p>
       </div>
       <div class="card" style="padding:0; overflow:hidden;">
         <div id="sku-table-wrap" class="sku-theme-all" style="overflow:auto; max-height:70vh;">
@@ -1115,11 +1144,13 @@
       <h3>SKU 정보 수정</h3>
       <div class="form-row">
         <label for="e-sku-id">SKU ID</label>
-        <input type="text" id="e-sku-id" readonly autocomplete="off" />
+        <input type="text" id="e-sku-id" readonly autocomplete="off" style="background:#F3F4F6;color:#9CA3AF;cursor:not-allowed" />
+        <p style="margin:4px 0 0;font-size:10px;color:#9CA3AF">SKU ID는 변경할 수 없습니다</p>
       </div>
       <div class="form-row">
         <label for="e-url">쿠팡 URL</label>
         <input type="url" id="e-url" placeholder="https://www.coupang.com/..." autocomplete="off" />
+        <p style="margin:4px 0 0;font-size:10px;color:#D97706">⚠ URL 변경 시 수집 대상 페이지가 바뀝니다</p>
       </div>
       <div class="form-row">
         <label for="e-sku-name">상품명 *</label>
@@ -1295,6 +1326,7 @@
       }
     })(),
     scheduleDayCounts: {},
+    dashScheduleDetailDay: null,
     queueCollectRunActive: false,
     queueCollectSuccess: 0,
     queueCollectFail: 0,
@@ -1393,26 +1425,29 @@
     return y + '-' + m + '-' + d;
   }
 
-  function isoToKstYmd(isoStr) {
-    if (!isoStr) return '';
-    var d = new Date(isoStr);
-    if (isNaN(d.getTime())) return '';
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Seoul',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).format(d);
+  function isCreatedAtTodayKstUserRule(createdAt) {
+    if (!createdAt) return false;
+    var raw = new Date(createdAt).getTime();
+    if (isNaN(raw)) return false;
+    var t = raw + 9 * 60 * 60 * 1000;
+    var d = new Date(t);
+    var y = d.getUTCFullYear();
+    var m = d.getUTCMonth() + 1;
+    var day = d.getUTCDate();
+    var pad = function (n) {
+      return n < 10 ? '0' + n : '' + n;
+    };
+    var ymd = y + '-' + pad(m) + '-' + pad(day);
+    return ymd === kstYmd();
   }
 
   function countSkuRegisteredTodayKst() {
     var rows = state.skuDetailList || [];
-    var today = kstYmd();
     var n = 0;
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
       if (state.skuBrand !== '__all__' && String(r.brand) !== state.skuBrand) continue;
-      if (isoToKstYmd(r.created_at) === today) n++;
+      if (isCreatedAtTodayKstUserRule(r.created_at)) n++;
     }
     return n;
   }
@@ -3151,7 +3186,7 @@
         if (sid.indexOf(q) === -1 && sn.indexOf(q) === -1) continue;
       }
       if (state.skuTodayOnly) {
-        if (isoToKstYmd(r.created_at) !== kstYmd()) continue;
+        if (!isCreatedAtTodayKstUserRule(r.created_at)) continue;
       }
       out.push(r);
     }
@@ -3200,18 +3235,35 @@
       '<button type="button" data-sg-filter="B" class="' +
       (g === 'B' ? 'on' : '') +
       '">B그룹</button>';
-    var todayCnt = countSkuRegisteredTodayKst();
-    h +=
-      '<button type="button" data-sku-today-toggle="1" class="' +
-      (state.skuTodayOnly ? 'on' : '') +
-      '">오늘 등록 <span class="badge alert-brand-count">' +
-      todayCnt +
-      '</span></button>';
     el.innerHTML = h;
+  }
+
+  function updateTodayFilterButton() {
+    var btn = document.getElementById('btn-today-filter');
+    var cnt = document.getElementById('today-count');
+    if (cnt) cnt.textContent = String(countSkuRegisteredTodayKst());
+    if (btn) {
+      if (state.skuTodayOnly) {
+        btn.style.background = '#10B981';
+        btn.style.color = '#fff';
+        btn.style.borderColor = '#10B981';
+      } else {
+        btn.style.background = '#F3F4F6';
+        btn.style.color = '#6B7280';
+        btn.style.borderColor = '#E5E8EB';
+      }
+    }
+  }
+
+  function toggleTodayFilter() {
+    state.skuTodayOnly = !state.skuTodayOnly;
+    state.skuPage = 1;
+    renderSkuTablePage();
   }
 
   function renderSkuTablePage() {
     renderSkuGroupFilter();
+    updateTodayFilterButton();
     var filtered = getFilteredSkuRows();
     var total = filtered.length;
     var totalPages = total === 0 ? 1 : Math.ceil(total / SKU_PAGE_SIZE);
@@ -3552,7 +3604,15 @@
       var y = bc.yoom || 0;
       var o = bc.other || 0;
       var sumB = k + a + y + o;
-      h += '<div class="dash-sch-card' + (di === todayDayNum ? ' is-today' : '') + '">';
+      h +=
+        '<div class="dash-sch-card' +
+        (di === todayDayNum ? ' is-today' : '') +
+        (state.dashScheduleDetailDay === di ? ' is-open-selection' : '') +
+        '" data-dash-sch-day="' +
+        di +
+        '" onclick="toggleScheduleDetail(' +
+        di +
+        ')">';
       h += '<div class="dash-sch-card-head"><span class="day-lab">' + escapeHtml(DAY_NAMES[di]) + '</span>';
       h += '<span class="day-cnt">' + escapeHtml(String(total)) + '</span></div>';
       h += '<div class="dash-sch-brand-bar">';
@@ -3656,6 +3716,9 @@
           }
           var todayNum = getDefaultKstWeekTabDay();
           renderDashScheduleWeekCards(dayCounts, brandByDay, todayNum);
+          if (state.dashScheduleDetailDay) {
+            refreshScheduleDetailPanel(state.dashScheduleDetailDay);
+          }
           return {
             aAssigned: aGroup,
             bAssigned: bGroup,
@@ -3674,6 +3737,150 @@
     var n = Number(v);
     if (isNaN(n)) return '';
     return n.toLocaleString('ko-KR');
+  }
+
+  function scheduleDetailBrandDotColor(brand) {
+    var b = String(brand || '');
+    if (b === '건우코리아') return '#EF4444';
+    if (b === '아리코') return '#3B82F6';
+    if (b === '윰') return '#10B981';
+    return '#94A3B8';
+  }
+
+  function sortBrandsForScheduleDetail(keys) {
+    var order = { 건우코리아: 0, 아리코: 1, 윰: 2 };
+    var arr = keys.slice();
+    arr.sort(function (a, b) {
+      var oa = Object.prototype.hasOwnProperty.call(order, a) ? order[a] : 99;
+      var ob = Object.prototype.hasOwnProperty.call(order, b) ? order[b] : 99;
+      if (oa !== ob) return oa - ob;
+      return a.localeCompare(b, 'ko');
+    });
+    return arr;
+  }
+
+  function renderScheduleDetailTableHtml(items) {
+    var byBrand = {};
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i] || {};
+      var bk =
+        it.brand != null && String(it.brand).trim() !== ''
+          ? String(it.brand).trim()
+          : '기타';
+      if (!byBrand[bk]) byBrand[bk] = [];
+      byBrand[bk].push(it);
+    }
+    var keys = Object.keys(byBrand);
+    keys = sortBrandsForScheduleDetail(keys);
+    for (var sb = 0; sb < keys.length; sb++) {
+      byBrand[keys[sb]].sort(function (a, b) {
+        return String(a.sku_name || '').localeCompare(String(b.sku_name || ''), 'ko');
+      });
+    }
+    var h = '';
+    h +=
+      '<table class="data" style="width:100%; font-size:12px; border-collapse:collapse;">';
+    h += '<thead><tr>';
+    h += '<th>브랜드</th><th>상품명</th><th class="num">등록가</th><th class="num">현재가</th><th>최근수집</th>';
+    h += '</tr></thead><tbody>';
+    for (var bi = 0; bi < keys.length; bi++) {
+      var br = keys[bi];
+      var rows = byBrand[br];
+      var dot = scheduleDetailBrandDotColor(br);
+      h += '<tr style="background:#F9FAFB;">';
+      h +=
+        '<td colspan="5" style="padding:8px 12px; font-size:12px; font-weight:600; color:#6B7280;">';
+      h +=
+        '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' +
+        dot +
+        ';margin-right:6px;vertical-align:middle"></span>';
+      h += escapeHtml(br) + ' (' + rows.length + '개)</td></tr>';
+      for (var ri = 0; ri < rows.length; ri++) {
+        var r = rows[ri];
+        var pu = String(r.product_url || '').trim();
+        var nameCell = pu
+          ? '<a class="link" href="' +
+            escapeHtml(pu) +
+            '" target="_blank" rel="noopener">' +
+            escapeHtml(r.sku_name || '') +
+            '</a>'
+          : escapeHtml(r.sku_name || '');
+        h += '<tr style="font-size:12px;">';
+        h += '<td style="padding:6px 12px; border-bottom:1px solid #F3F4F6;">' + escapeHtml(br) + '</td>';
+        h += '<td style="padding:6px 12px; border-bottom:1px solid #F3F4F6;">' + nameCell + '</td>';
+        h +=
+          '<td class="num" style="padding:6px 12px; border-bottom:1px solid #F3F4F6;">' +
+          escapeHtml(scheduleFmtMoney(r.registered_price)) +
+          '</td>';
+        h +=
+          '<td class="num" style="padding:6px 12px; border-bottom:1px solid #F3F4F6;">' +
+          escapeHtml(scheduleFmtMoney(r.current_price)) +
+          '</td>';
+        h +=
+          '<td style="padding:6px 12px; border-bottom:1px solid #F3F4F6;">' +
+          escapeHtml(formatCollectTime(r.last_collected)) +
+          '</td>';
+        h += '</tr>';
+      }
+    }
+    h += '</tbody></table>';
+    return h;
+  }
+
+  function refreshScheduleDetailPanel(day) {
+    return apiFetch('GET', '/collect-schedule?day=' + encodeURIComponent(String(day)), null)
+      .then(function (json) {
+        var items = (json && json.data) || [];
+        var titleEl = document.getElementById('schedule-detail-title');
+        var wrap = document.getElementById('schedule-detail-table-wrap');
+        var panel = document.getElementById('schedule-detail-panel');
+        if (titleEl) {
+          titleEl.textContent = DAY_NAMES[day] + '요일 SKU 목록 (' + items.length + '개)';
+        }
+        if (wrap) wrap.innerHTML = renderScheduleDetailTableHtml(items);
+        if (panel) panel.style.display = 'block';
+        return items;
+      })
+      .catch(function (e) {
+        console.error(e);
+        showManualToast('목록을 불러오지 못했습니다');
+      });
+  }
+
+  function closeScheduleDetail() {
+    var panel = document.getElementById('schedule-detail-panel');
+    if (panel) panel.style.display = 'none';
+    state.dashScheduleDetailDay = null;
+    var cards = document.querySelectorAll('#dash-schedule-week-cards .dash-sch-card');
+    for (var i = 0; i < cards.length; i++) {
+      cards[i].classList.remove('is-open-selection');
+    }
+  }
+
+  function toggleScheduleDetail(day) {
+    var n = Number(day);
+    if (isNaN(n) || n < 1 || n > 5) return;
+    var panel = document.getElementById('schedule-detail-panel');
+    var isOpen = panel && panel.style.display === 'block';
+    if (state.dashScheduleDetailDay === n && isOpen) {
+      closeScheduleDetail();
+      return;
+    }
+    state.dashScheduleDetailDay = n;
+    var cards = document.querySelectorAll('#dash-schedule-week-cards .dash-sch-card');
+    for (var c = 0; c < cards.length; c++) {
+      var el = cards[c];
+      el.classList.remove('is-open-selection');
+      if (Number(el.getAttribute('data-dash-sch-day')) === n) {
+        el.classList.add('is-open-selection');
+      }
+    }
+    var titleEl = document.getElementById('schedule-detail-title');
+    if (titleEl) titleEl.textContent = DAY_NAMES[n] + '요일 SKU 목록 (…)';
+    var wrap = document.getElementById('schedule-detail-table-wrap');
+    if (wrap) wrap.innerHTML = '';
+    if (panel) panel.style.display = 'block';
+    return refreshScheduleDetailPanel(n);
   }
 
   function scheduleBuildState(allSkus, scheduleData) {
@@ -4452,11 +4659,27 @@
   function showManualToast(msg) {
     var el = document.getElementById('manual-toast');
     if (!el) return;
+    el.style.background = '#111827';
+    el.style.color = '#fff';
     el.textContent = msg;
     el.classList.add('show');
     setTimeout(function () {
       el.classList.remove('show');
     }, 1800);
+  }
+
+  function showManualToastWithStyle(msg, bg, color) {
+    var el = document.getElementById('manual-toast');
+    if (!el) return;
+    el.style.background = bg;
+    el.style.color = color;
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(function () {
+      el.classList.remove('show');
+      el.style.background = '#111827';
+      el.style.color = '#fff';
+    }, 3200);
   }
 
   document.getElementById('manual-sku-search').addEventListener('input', function () {
@@ -4666,13 +4889,12 @@
   document.getElementById('csv-file').addEventListener('change', function (ev) {
     var f = ev.target.files && ev.target.files[0];
     if (!f) return;
-    var statusEl = document.getElementById('sku-csv-upload-status');
     var upBtn = document.getElementById('btn-csv-upload');
-    if (statusEl) {
-      statusEl.style.display = '';
-      statusEl.textContent = '업로드 진행 중…';
+    var label = (upBtn && upBtn.getAttribute('data-csv-label')) || 'CSV ↑';
+    if (upBtn) {
+      upBtn.disabled = true;
+      upBtn.innerHTML = '업로드 중...<span class="csv-upload-spin" aria-hidden="true"></span>';
     }
-    if (upBtn) upBtn.disabled = true;
     var fd = new FormData();
     fd.append('file', f);
     fetch(API_BASE + '/sku-upload', { method: 'POST', body: fd })
@@ -4684,39 +4906,29 @@
       })
       .then(function (json) {
         ev.target.value = '';
-        if (statusEl) {
-          statusEl.textContent =
-            '완료 — 신규 ' +
-            (json.inserted != null ? json.inserted : 0) +
-            '건 · 갱신 ' +
-            (json.updated != null ? json.updated : 0) +
-            '건 (총 ' +
-            (json.total != null ? json.total : 0) +
-            '행)';
+        var ins = json.inserted != null ? json.inserted : 0;
+        var upd = json.updated != null ? json.updated : 0;
+        var tot = json.total != null ? json.total : 0;
+        var line =
+          'CSV 업로드 완료 — 신규 ' + ins + '개 / 수정 ' + upd + '개 / 전체 ' + tot + '개';
+        if (ins > 0) {
+          showManualToastWithStyle(line, '#D1FAE5', '#059669');
+        } else {
+          showManualToastWithStyle(line, '#F3F4F6', '#6B7280');
         }
         invalidateSkuCache();
-        return loadSkuPage(true).then(function () {
-          if (statusEl) {
-            setTimeout(function () {
-              statusEl.style.display = 'none';
-              statusEl.textContent = '';
-            }, 5000);
-          }
-        });
+        return loadSkuPage(true);
       })
       .catch(function (e) {
         console.error(e);
-        if (statusEl) {
-          statusEl.textContent = '업로드 실패: ' + (e.message || String(e));
-          setTimeout(function () {
-            statusEl.style.display = 'none';
-            statusEl.textContent = '';
-          }, 6000);
-        }
-        alert(e.message || String(e));
+        var errLine = 'CSV 업로드 실패: ' + (e.message || String(e));
+        showManualToastWithStyle(errLine, '#FEE2E2', '#DC2626');
       })
       .then(function () {
-        if (upBtn) upBtn.disabled = false;
+        if (upBtn) {
+          upBtn.disabled = false;
+          upBtn.textContent = label;
+        }
       });
   });
 
@@ -4852,13 +5064,6 @@
     var sgFilter = sgfEl ? sgfEl.getAttribute('data-sg-filter') : null;
     if (sgFilter != null) {
       state.skuGroupFilter = sgFilter;
-      state.skuPage = 1;
-      renderSkuTablePage();
-      return;
-    }
-    var skuTodayEl = t.closest && t.closest('[data-sku-today-toggle]');
-    if (skuTodayEl) {
-      state.skuTodayOnly = !state.skuTodayOnly;
       state.skuPage = 1;
       renderSkuTablePage();
       return;
@@ -5066,6 +5271,9 @@
   window.loadTodaySection = loadTodaySection;
   window.loadScheduleSummary = loadScheduleSummary;
   window.showToast = showToast;
+  window.toggleTodayFilter = toggleTodayFilter;
+  window.toggleScheduleDetail = toggleScheduleDetail;
+  window.closeScheduleDetail = closeScheduleDetail;
   window.openAlertActionModal = openAlertActionModal;
   window.closeAlertActionModal = closeAlertActionModal;
   window.resolveAlert = resolveAlert;
