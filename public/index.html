@@ -792,6 +792,70 @@
       .toolbar-actions { width: 100%; }
       table.data { min-width: 760px; }
     }
+    .dash-sch-week-cards {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .dash-sch-card {
+      flex: 1;
+      min-width: 160px;
+      background: #fff;
+      border: 1px solid #E5E8EB;
+      border-radius: 12px;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    .dash-sch-card.is-today {
+      border-top: 3px solid #3182F6;
+    }
+    .dash-sch-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .dash-sch-card-head .day-lab {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1A1A1A;
+    }
+    .dash-sch-card-head .day-cnt {
+      font-size: 14px;
+      font-weight: 700;
+      color: #3182F6;
+    }
+    .dash-sch-brand-bar {
+      display: flex;
+      height: 8px;
+      border-radius: 4px;
+      overflow: hidden;
+      background: #F3F4F6;
+      margin-bottom: 10px;
+    }
+    .dash-sch-brand-bar > span {
+      display: block;
+      height: 100%;
+      min-width: 0;
+      flex: 0 0 auto;
+    }
+    .dash-sch-legend {
+      font-size: 11px;
+      color: #6B7280;
+      line-height: 1.5;
+    }
+    .dash-sch-legend-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 2px;
+    }
+    .dash-sch-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
   </style>
 </head>
 <body>
@@ -817,18 +881,7 @@
           <span class="badge done">배정 <span id="dash-sch-assigned">0</span></span>
           <span class="badge error">미배정 <span id="dash-sch-unassigned">0</span></span>
         </div>
-        <div style="overflow:auto;">
-          <table class="data">
-            <thead>
-              <tr>
-                <th style="width:80px">요일</th>
-                <th>SKU 수</th>
-                <th>브랜드별 내역</th>
-              </tr>
-            </thead>
-            <tbody id="dash-schedule-summary-tbody"></tbody>
-          </table>
-        </div>
+        <div id="dash-schedule-week-cards" class="dash-sch-week-cards"></div>
         <div class="hint" id="dash-sch-groups" style="margin-top:10px;">A그룹 0개 (매일) / B그룹 0개 (주 1회)</div>
       </div>
 
@@ -2354,6 +2407,20 @@
     return out;
   }
 
+  function alertStatusMemoHtml(memo, isDone) {
+    if (memo == null || String(memo).trim() === '') return '';
+    var bg = isDone ? '#F0FFF4' : '#F3F4F6';
+    return (
+      '<div style="margin-top:4px;padding:4px 8px;background:' +
+      bg +
+      ';border-radius:4px;font-size:11px;color:#6B7280;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' +
+      escapeHtml(String(memo)) +
+      '">' +
+      escapeHtml(String(memo)) +
+      '</div>'
+    );
+  }
+
   function renderAlertTable() {
     var rows = filterAlerts().slice();
     sortAlertRows(rows);
@@ -2417,11 +2484,7 @@
       }
       h += '<td>' + escapeHtml(formatKstDateTimeShort(r.detected_at)) + '</td>';
       if (r && r.resolved === true) {
-        h += '<td><span class="alert-status-badge done">완료</span>';
-        if (r.memo) {
-          h += '<div style="font-size:11px;color:#9CA3AF;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(String(r.memo)) + '">' + escapeHtml(String(r.memo)) + '</div>';
-        }
-        h += '</td>';
+        h += '<td><span class="alert-status-badge done">완료</span>' + alertStatusMemoHtml(r.memo, true) + '</td>';
         h += '<td><button type="button" onclick="openAlertActionModal(\'' + escapeHtml(String(r.id != null && r.id !== '' ? r.id : ('idx_' + i))) + '\')" style="font-size:12px;padding:4px 12px;background:none;border:1px solid #E5E8EB;border-radius:6px;cursor:pointer;color:#3182F6">수정</button>';
         if (isDiscontinued) {
           h += ' <span style="font-size:11px;color:#9CA3AF;margin-left:6px">확정됨</span>';
@@ -2430,7 +2493,7 @@
         }
         h += '</td>';
       } else {
-        h += '<td><span class="alert-status-badge pending">미처리</span></td>';
+        h += '<td><span class="alert-status-badge pending">미처리</span>' + alertStatusMemoHtml(r.memo, false) + '</td>';
         h += '<td><button onclick="openAlertActionModal(\'' + escapeHtml(String(r.id != null && r.id !== '' ? r.id : ('idx_' + i))) + '\')" style="font-size:12px;padding:4px 12px;background:#3182F6;color:#fff;border:none;border-radius:6px;cursor:pointer">처리</button>';
         if (isDiscontinued) {
           h += ' <span style="font-size:11px;color:#9CA3AF;margin-left:6px">확정됨</span>';
@@ -3212,6 +3275,55 @@
     refreshCollectModeCounts();
   }
 
+  function renderDashScheduleWeekCards(dayCounts, brandByDay, todayDayNum) {
+    var el = document.getElementById('dash-schedule-week-cards');
+    if (!el) return;
+    var h = '';
+    for (var di = 1; di <= 5; di++) {
+      var total = Number(dayCounts[di]) || 0;
+      var bc = brandByDay[di] || { kun: 0, ari: 0, yoom: 0, other: 0 };
+      var k = bc.kun || 0;
+      var a = bc.ari || 0;
+      var y = bc.yoom || 0;
+      var o = bc.other || 0;
+      var sumB = k + a + y + o;
+      h += '<div class="dash-sch-card' + (di === todayDayNum ? ' is-today' : '') + '">';
+      h += '<div class="dash-sch-card-head"><span class="day-lab">' + escapeHtml(DAY_NAMES[di]) + '</span>';
+      h += '<span class="day-cnt">' + escapeHtml(String(total)) + '</span></div>';
+      h += '<div class="dash-sch-brand-bar">';
+      if (sumB > 0) {
+        if (k > 0) h += '<span style="flex:' + k + ';background:#EF4444"></span>';
+        if (a > 0) h += '<span style="flex:' + a + ';background:#3B82F6"></span>';
+        if (y > 0) h += '<span style="flex:' + y + ';background:#10B981"></span>';
+        if (o > 0) h += '<span style="flex:' + o + ';background:#94A3B8"></span>';
+      } else if (total > 0) {
+        h += '<span style="flex:1;background:#E5E8EB"></span>';
+      }
+      h += '</div>';
+      h += '<div class="dash-sch-legend">';
+      h +=
+        '<div class="dash-sch-legend-row"><span class="dash-sch-dot" style="background:#EF4444"></span><span>건우코리아 ' +
+        k +
+        '개</span></div>';
+      h +=
+        '<div class="dash-sch-legend-row"><span class="dash-sch-dot" style="background:#3B82F6"></span><span>아리코 ' +
+        a +
+        '개</span></div>';
+      h +=
+        '<div class="dash-sch-legend-row"><span class="dash-sch-dot" style="background:#10B981"></span><span>윰 ' +
+        y +
+        '개</span></div>';
+      if (o > 0) {
+        h +=
+          '<div class="dash-sch-legend-row"><span class="dash-sch-dot" style="background:#94A3B8"></span><span>기타 ' +
+          o +
+          '개</span></div>';
+      }
+      h += '</div></div>';
+    }
+    el.innerHTML = h;
+  }
+
   function loadScheduleSummary() {
     return apiFetch('GET', '/collect-schedule', null)
       .then(function (json) {
@@ -3255,30 +3367,37 @@
             '개 (주 1회)';
         }
 
-        var tbody = document.getElementById('dash-schedule-summary-tbody');
-        if (!tbody) {
+        var fetches = [];
+        for (var di = 1; di <= 5; di++) {
+          fetches.push(apiFetch('GET', '/collect-schedule?day=' + encodeURIComponent(String(di)), null));
+        }
+        return Promise.all(fetches).then(function (dayJsons) {
+          var brandByDay = {};
+          for (var i = 0; i < 5; i++) {
+            var dNum = i + 1;
+            var items = (dayJsons[i] && dayJsons[i].data) || [];
+            var kun = 0;
+            var ari = 0;
+            var yoom = 0;
+            var other = 0;
+            for (var j = 0; j < items.length; j++) {
+              var br = String((items[j] && items[j].brand) || '').trim();
+              if (br === '건우코리아') kun++;
+              else if (br === '아리코') ari++;
+              else if (br === '윰') yoom++;
+              else if (br) other++;
+            }
+            brandByDay[dNum] = { kun: kun, ari: ari, yoom: yoom, other: other };
+          }
+          var todayNum = getDefaultKstWeekTabDay();
+          renderDashScheduleWeekCards(dayCounts, brandByDay, todayNum);
           return {
             aAssigned: aGroup,
             bAssigned: bGroup,
             a_group: aGroup,
             b_group: bGroup
           };
-        }
-        var hx = '';
-        for (var di = 1; di <= 5; di++) {
-          hx += '<tr>';
-          hx += '<td>' + escapeHtml(DAY_NAMES[di]) + '</td>';
-          hx += '<td class="num">' + escapeHtml(String(dayCounts[di] || 0)) + '</td>';
-          hx += '<td><span class="muted">—</span></td>';
-          hx += '</tr>';
-        }
-        tbody.innerHTML = hx;
-        return {
-          aAssigned: aGroup,
-          bAssigned: bGroup,
-          a_group: aGroup,
-          b_group: bGroup
-        };
+        });
       })
       .catch(function (e) {
         console.error(e);
