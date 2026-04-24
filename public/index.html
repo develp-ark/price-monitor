@@ -897,7 +897,7 @@
             <div id="collect-detail" class="hint" style="margin-top:8px;">—</div>
             <div class="progress-bar" id="collect-progress-wrap" style="display:none;"><div id="collect-progress-bar" style="width:0%;"></div></div>
             <div id="collect-running-text" class="hint" style="display:none;"></div>
-            <button type="button" id="btn-open-current-collect-modal" style="display:none;margin-top:8px;padding:0;border:none;background:none;color:#3182F6;font-size:12px;cursor:pointer;text-decoration:underline;">현재 수집 목록 보기</button>
+            <button type="button" id="btn-open-current-collect-modal" onclick="toggleCollectListPanel()" style="display:none;margin-top:8px;padding:0;border:none;background:none;color:#3182F6;font-size:12px;cursor:pointer;text-decoration:underline;">현재 수집 목록 보기</button>
           </div>
           <div class="actions">
             <div class="collect-split" id="collect-split-wrap">
@@ -907,6 +907,19 @@
             </div>
             <button type="button" class="btn btn-danger" id="btn-stop-collect" disabled>■ 중지</button>
           </div>
+        </div>
+        <div id="collect-list-panel" style="display:none; background:#fff; border:1px solid #E5E8EB; border-radius:12px; margin-top:8px; overflow:hidden;">
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid #F3F4F6;">
+            <div>
+              <span style="font-weight:700; font-size:14px;">현재 수집 목록</span>
+              <span id="collect-list-summary" style="font-size:12px; color:#6B7280; margin-left:8px;"></span>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <span id="collect-elapsed-time" style="font-size:12px; color:#9CA3AF;"></span>
+              <button type="button" onclick="toggleCollectListPanel()" style="background:none; border:none; font-size:18px; cursor:pointer; color:#9CA3AF;">✕</button>
+            </div>
+          </div>
+          <div id="collect-list-body" style="max-height:400px; overflow-y:auto; padding:0;"></div>
         </div>
       </div>
 
@@ -1222,26 +1235,6 @@
         <button type="button" id="btn-alert-unresolve" onclick="unresolveAlert()" style="display:none;padding:10px 20px;background:#F3F4F6;color:#6B7280;border:1px solid #E5E8EB;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">미처리로 되돌리기</button>
         <button type="button" onclick="resolveAlert()" style="padding:10px 20px;background:#3182F6;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">완료 처리</button>
       </div>
-    </div>
-  </div>
-  <div class="modal-overlay" id="modal-current-collect" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center">
-    <div style="background:#fff;border-radius:16px;max-width:760px;width:92%;padding:20px;position:relative;box-sizing:border-box;max-height:500px;overflow-y:auto;">
-      <span onclick="closeCurrentCollectModal()" style="position:absolute;top:12px;right:14px;font-size:20px;cursor:pointer;color:#6B7280">&times;</span>
-      <h3 style="margin:0 0 12px;font-size:16px">현재 수집 목록</h3>
-      <div id="current-collect-modal-meta" class="hint" style="margin-bottom:8px;">—</div>
-      <table class="data">
-        <thead>
-          <tr>
-            <th>상품명</th>
-            <th>브랜드</th>
-            <th class="num">등록가</th>
-            <th class="num">현재가</th>
-            <th class="num">변동률</th>
-            <th>상태</th>
-          </tr>
-        </thead>
-        <tbody id="current-collect-modal-tbody"></tbody>
-      </table>
     </div>
   </div>
   <div id="manual-toast" class="toast"></div>
@@ -1797,6 +1790,7 @@
         var st = d.status || 'idle';
         window._lastCollectStatus = d;
         window._lastCollectStatus.status = st;
+        window._collectStatus = d;
         var badge = document.getElementById('collect-badge');
         badge.className = 'badge ' + st;
         badge.textContent = st;
@@ -1861,6 +1855,8 @@
           runText.style.display = 'none';
           if (currentListBtn) currentListBtn.style.display = 'none';
           detail.style.display = '';
+          var panelOff = document.getElementById('collect-list-panel');
+          if (panelOff) panelOff.style.display = 'none';
         }
 
         if (st === 'done') {
@@ -1898,6 +1894,10 @@
         }
 
         startCollectPollingIfNeeded(st);
+        var panel = document.getElementById('collect-list-panel');
+        if (panel && panel.style.display !== 'none' && panel.style.display !== '') {
+          renderCollectList();
+        }
         return json;
       })
       .catch(function (e) {
@@ -2083,58 +2083,122 @@
     return rows;
   }
 
-  function renderCurrentCollectModalRows() {
+  function toggleCollectListPanel() {
+    var panel = document.getElementById('collect-list-panel');
+    if (!panel) return;
+    if (panel.style.display === 'none' || panel.style.display === '') {
+      panel.style.display = 'block';
+      renderCollectList();
+    } else {
+      panel.style.display = 'none';
+    }
+  }
+
+  function renderCollectList() {
+    var body = document.getElementById('collect-list-body');
+    var summary = document.getElementById('collect-list-summary');
+    var elapsed = document.getElementById('collect-elapsed-time');
+    if (!body) return;
+
     restoreCollectItemsFromStorage();
-    var rows = buildCurrentCollectRows();
-    var tbody = document.getElementById('current-collect-modal-tbody');
-    var meta = document.getElementById('current-collect-modal-meta');
-    if (!tbody || !meta) return;
-    var st = window._lastCollectStatus || {};
-    var total = Number(st.total) || rows.length;
-    var current = Number(st.current) || 0;
-    meta.textContent =
-      '진행 상태: ' +
-      (st.status || 'idle') +
-      ' · ' +
-      current +
-      '/' +
-      total +
-      ' · 성공 ' +
-      (Number(st.success) || 0) +
-      ' / 실패 ' +
-      (Number(st.fail) || 0);
-    if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="muted" style="padding:12px">목록이 없습니다.</td></tr>';
-      return;
-    }
-    var h = '';
-    for (var i = 0; i < rows.length; i++) {
-      var r = rows[i];
-      h += '<tr>';
-      h += '<td>' + productNameLinkHtml(r.sku_name, r.product_url) + '</td>';
-      h += '<td>' + escapeHtml(r.brand || '') + '</td>';
-      h += '<td class="num">' + escapeHtml(formatMoney(r.registered_price)) + '</td>';
-      h += '<td class="num">' + escapeHtml(formatMoney(r.current_price)) + '</td>';
-      h += '<td class="num">' + formatChangeCellHtml(r.change_pct) + '</td>';
-      h += '<td>' + formatCollectResultBadge(r.result_status) + '</td>';
-      h += '</tr>';
-    }
-    tbody.innerHTML = h;
-  }
+    var items = window._collectItems || window._currentCollectItems || [];
+    var status = window._collectStatus || window._lastCollectStatus || {};
+    var currentNum = Number(status.current) || 0;
+    var totalNum = Number(status.total) || items.length;
+    var successNum = Number(status.success) || 0;
+    var failNum = Number(status.fail) || 0;
 
-  function openCurrentCollectModal() {
-    var modal = document.getElementById('modal-current-collect');
-    if (!modal) return;
-    renderCurrentCollectModalRows();
-    modal.style.display = 'flex';
-    modal.style.alignItems = 'center';
-    modal.style.justifyContent = 'center';
-  }
+    if (summary) {
+      summary.textContent =
+        (status.status || 'idle') +
+        ' · ' +
+        currentNum +
+        '/' +
+        totalNum +
+        ' · 성공 ' +
+        successNum +
+        ' / 실패 ' +
+        failNum;
+    }
 
-  function closeCurrentCollectModal() {
-    var modal = document.getElementById('modal-current-collect');
-    if (!modal) return;
-    modal.style.display = 'none';
+    if (elapsed) {
+      if (window._collectStartTime) {
+        var diff = Math.floor((Date.now() - window._collectStartTime) / 1000);
+        if (diff < 0) diff = 0;
+        var mm = Math.floor(diff / 60);
+        var ss = diff % 60;
+        elapsed.textContent = '경과 ' + mm + '분 ' + (ss < 10 ? '0' : '') + ss + '초';
+      } else {
+        elapsed.textContent = '';
+      }
+    }
+
+    var html = '<table style="width:100%; border-collapse:collapse; font-size:12px;">';
+    html += '<thead><tr style="background:#F9FAFB; position:sticky; top:0; z-index:1;">';
+    html += '<th style="padding:8px 12px; text-align:center; color:#6B7280; font-weight:600; width:40px;">#</th>';
+    html += '<th style="padding:8px 12px; text-align:left; color:#6B7280; font-weight:600;">상품명</th>';
+    html += '<th style="padding:8px 12px; text-align:center; color:#6B7280; font-weight:600; width:70px;">브랜드</th>';
+    html += '<th style="padding:8px 12px; text-align:right; color:#6B7280; font-weight:600; width:70px;">등록가</th>';
+    html += '<th style="padding:8px 12px; text-align:right; color:#6B7280; font-weight:600; width:70px;">현재가</th>';
+    html += '<th style="padding:8px 12px; text-align:center; color:#6B7280; font-weight:600; width:80px;">수집시간</th>';
+    html += '<th style="padding:8px 12px; text-align:center; color:#6B7280; font-weight:600; width:58px;">상태</th>';
+    html += '</tr></thead><tbody>';
+
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i] || {};
+      var isActive = i === Math.max(0, currentNum - 1) && (status.status === 'running' || status.status === 'stopping');
+      var itemStatus = String(item.status || '').toLowerCase();
+      var isDone = !!item.collected_at || itemStatus === 'done' || itemStatus === 'success';
+      var isFail = itemStatus === 'fail' || itemStatus === 'error';
+      var isWaiting = !isDone && !isFail && !isActive;
+      var rowStyle = 'border-bottom:1px solid #F3F4F6;';
+      if (isActive) rowStyle += ' background:#EFF6FF;';
+      else if (isWaiting) rowStyle += ' background:#FAFAFA; color:#9CA3AF;';
+
+      html += '<tr style="' + rowStyle + '">';
+      html += '<td style="padding:6px 12px; text-align:center; font-size:11px; color:#9CA3AF;">' + (i + 1) + '</td>';
+      html += '<td style="padding:6px 12px; max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+      if (isActive) html += ' font-weight:700; color:#1D4ED8;';
+      html += '" title="' + escapeHtml(item.sku_name || '') + '">';
+      if (isActive) html += '<span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#3B82F6; margin-right:6px; animation:pulse 1s infinite;"></span>';
+      html += escapeHtml(item.sku_name || '') + '</td>';
+      html += '<td style="padding:6px 12px; text-align:center; color:#6B7280;">' + escapeHtml(item.brand || '') + '</td>';
+      html += '<td style="padding:6px 12px; text-align:right; color:#9CA3AF; font-size:11px;">' + (item.registered_price ? Number(item.registered_price).toLocaleString('ko-KR') : '—') + '</td>';
+      var curPrice = '—';
+      if ((isDone || isActive) && item.current_price) curPrice = Number(item.current_price).toLocaleString('ko-KR');
+      html += '<td style="padding:6px 12px; text-align:right; font-weight:600;">' + curPrice + '</td>';
+      var collectTime = '';
+      if (item.collected_at) {
+        var cd = new Date(item.collected_at);
+        if (!isNaN(cd.getTime())) {
+          var kst = new Date(cd.getTime() + 9 * 60 * 60 * 1000);
+          collectTime = pad2Num(kst.getUTCHours()) + ':' + pad2Num(kst.getUTCMinutes()) + ':' + pad2Num(kst.getUTCSeconds());
+        }
+      }
+      html += '<td style="padding:6px 12px; text-align:center; font-size:11px; color:#9CA3AF;">' + collectTime + '</td>';
+      var statusHtml = '';
+      if (isActive) statusHtml = '<span style="display:inline-block; padding:2px 8px; background:#DBEAFE; color:#1D4ED8; border-radius:10px; font-size:10px; font-weight:600;">수집중</span>';
+      else if (isDone) statusHtml = '<span style="color:#10B981; font-size:14px;">✓</span>';
+      else if (isFail) statusHtml = '<span style="color:#EF4444; font-size:14px;">✗</span>';
+      else statusHtml = '<span style="color:#D1D5DB; font-size:11px;">대기</span>';
+      html += '<td style="padding:6px 12px; text-align:center;">' + statusHtml + '</td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+
+    if (!document.getElementById('pulse-style')) {
+      var style = document.createElement('style');
+      style.id = 'pulse-style';
+      style.textContent = '@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}';
+      document.head.appendChild(style);
+    }
+    body.innerHTML = html;
+
+    if (currentNum > 0) {
+      var rows = body.querySelectorAll('tr');
+      var activeRow = rows[currentNum];
+      if (activeRow && activeRow.scrollIntoView) activeRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
   }
 
   function restoreCollectItemsFromStorage() {
@@ -3678,6 +3742,21 @@
 
   function handleCollectResult(data) {
     if (!data || data.sku_id == null) return;
+    var items = window._collectItems || window._currentCollectItems || [];
+    for (var ci = 0; ci < items.length; ci++) {
+      if (String(items[ci].sku_id) === String(data.sku_id)) {
+        if (data.success) {
+          items[ci].status = 'done';
+          items[ci].current_price = data.price != null ? data.price : items[ci].current_price;
+          items[ci].collected_at = new Date().toISOString();
+        } else {
+          items[ci].status = 'fail';
+        }
+        break;
+      }
+    }
+    window._collectItems = items;
+    window._currentCollectItems = items;
     if (state.queueCollectRunActive) {
       if (data.success) state.queueCollectSuccess++;
       else state.queueCollectFail++;
@@ -3851,7 +3930,6 @@
           dayCounts[d] = isNaN(n) ? 0 : n;
         }
         state.scheduleDayCounts = dayCounts;
-        renderTodayWeekTabs();
 
         var assignedCount =
           dayCounts[1] + dayCounts[2] + dayCounts[3] + dayCounts[4] + dayCounts[5];
@@ -4612,6 +4690,7 @@
     }
     var bar = document.getElementById('collect-progress-bar');
     if (bar) bar.style.width = '0%';
+    window._collectStartTime = Date.now();
     var stopBtn = document.getElementById('btn-stop-collect');
     if (stopBtn) stopBtn.disabled = false;
     setCollectStartButtonsState(true);
@@ -4661,6 +4740,7 @@
         window._currentCollectItems = window._collectItems;
         window._currentCollectMode = window._collectMode;
         window._currentCollectTotal = window._collectTotal;
+        window._collectStartTime = Date.now();
         try { localStorage.setItem('_collectItems', JSON.stringify(window._collectItems || [])); } catch (e) {}
         try { localStorage.setItem('_collectMode', label); } catch (e) {}
         state.lastCollectModeKey = mode.key;
@@ -4683,7 +4763,7 @@
 
   var _elBtnOpenCurrentCollectModal = document.getElementById('btn-open-current-collect-modal');
   if (_elBtnOpenCurrentCollectModal) _elBtnOpenCurrentCollectModal.addEventListener('click', function () {
-    openCurrentCollectModal();
+    toggleCollectListPanel();
   });
 
   var _elBtnCollectModeToggle = document.getElementById('btn-collect-mode-toggle');
@@ -5220,12 +5300,6 @@
     loadSkuPage(true);
   });
 
-  var _elBtnTodayCsv = document.getElementById('btn-today-csv');
-  if (_elBtnTodayCsv) _elBtnTodayCsv.addEventListener('click', function (ev) {
-    ev.stopPropagation();
-    setTodayCsvMenuOpen(!state.todayCsvMenuOpen);
-  });
-
   var _elSchedulePopover = document.getElementById('schedule-popover');
   if (_elSchedulePopover) _elSchedulePopover.addEventListener('change', function (ev) {
     var t = ev.target;
@@ -5261,10 +5335,6 @@
     if (state.collectMenuOpen && cwrap && !cwrap.contains(ev.target)) {
       setCollectMenuOpen(false);
     }
-    var twrap = document.getElementById('today-csv-wrap');
-    if (state.todayCsvMenuOpen && twrap && !twrap.contains(ev.target)) {
-      setTodayCsvMenuOpen(false);
-    }
   });
 
   document.addEventListener('click', function (ev) {
@@ -5285,35 +5355,10 @@
       }
       return;
     }
-    var ttEl = t.closest && t.closest('[data-today-tab]');
-    if (ttEl) {
-      var tdRaw = String(ttEl.getAttribute('data-today-tab') || '');
-      if (tdRaw === 'current') state.todayTabKey = 'current';
-      else {
-        var td = parseInt(tdRaw, 10);
-        if (!isNaN(td) && td >= 1 && td <= 5) state.todayTabKey = String(td);
-      }
-      renderTodayWeekTabs();
-      loadTodaySection();
-      return;
-    }
     var cmEl = t.closest && t.closest('[data-collect-mode]');
     if (cmEl) {
       var modeKey = cmEl.getAttribute('data-collect-mode');
       if (modeKey) startCollectByMode(modeKey);
-      return;
-    }
-    var csvEl = t.closest && t.closest('[data-today-csv-action]');
-    if (csvEl) {
-      var action = csvEl.getAttribute('data-today-csv-action');
-      setTodayCsvMenuOpen(false);
-      if (action === 'all') {
-        downloadAllSkuCsv(false);
-      } else if (action === 'collected') {
-        downloadAllSkuCsv(true);
-      } else {
-        downloadCurrentTabCsv();
-      }
       return;
     }
     if (t.getAttribute('data-close')) {
@@ -5568,8 +5613,8 @@
   window.toggleScheduleDetail = toggleScheduleDetail;
   window.closeScheduleDetail = closeScheduleDetail;
   window.downloadScheduleDetailCsv = downloadScheduleDetailCsv;
-  window.openCurrentCollectModal = openCurrentCollectModal;
-  window.closeCurrentCollectModal = closeCurrentCollectModal;
+  window.toggleCollectListPanel = toggleCollectListPanel;
+  window.renderCollectList = renderCollectList;
   window.bulkDeactivate = bulkDeactivate;
   window.bulkActivate = bulkActivate;
   window.clearSelection = clearSelection;
