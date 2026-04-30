@@ -1039,6 +1039,7 @@
                 <th>브랜드</th>
                 <th>상품명</th>
                 <th class="num">등록가</th>
+                <th class="num">공급가</th>
                 <th class="num">현재가</th>
                 <th class="num">변동률</th>
                 <th>그룹</th>
@@ -1114,7 +1115,17 @@
       </div>
       <div class="form-row">
         <label for="f-reg-price">등록가</label>
-        <input type="number" id="f-reg-price" min="0" step="1" />
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input type="number" id="f-reg-price" min="0" step="1" />
+          <span style="color:#6B7280;font-size:12px;">원</span>
+        </div>
+      </div>
+      <div class="form-row">
+        <label for="f-supply-price">공급가</label>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input type="number" id="f-supply-price" min="0" step="1" placeholder="공급가 입력" />
+          <span style="color:#6B7280;font-size:12px;">원</span>
+        </div>
       </div>
       <div class="form-row">
         <label for="f-cycle">수집주기(일)</label>
@@ -1166,7 +1177,17 @@
       </div>
       <div class="form-row">
         <label for="e-reg-price">등록가</label>
-        <input type="number" id="e-reg-price" min="0" step="1" />
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input type="number" id="e-reg-price" min="0" step="1" />
+          <span style="color:#6B7280;font-size:12px;">원</span>
+        </div>
+      </div>
+      <div class="form-row">
+        <label for="e-supply-price">공급가</label>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input type="number" id="e-supply-price" min="0" step="1" placeholder="공급가 입력" />
+          <span style="color:#6B7280;font-size:12px;">원</span>
+        </div>
       </div>
       <div class="form-row">
         <label for="e-cycle">수집주기(일)</label>
@@ -1659,6 +1680,8 @@
       '<th class="num alert-sort-th" data-alert-sort="new_price">현재가' +
       renderAlertSortArrow('new_price') +
       '</th>';
+    h += '<th class="num">공급가</th>';
+    h += '<th class="num">마진율</th>';
     h +=
       '<th class="num alert-sort-th" data-alert-sort="adjusted_price">수정가' +
       renderAlertSortArrow('adjusted_price') +
@@ -2372,11 +2395,13 @@
     }
   }
 
-  function skuChangePctForCsv(reg, cur) {
-    var r = Number(reg);
+  function skuChangePctForCsv(reg, cur, prev) {
+    var base = null;
+    if (prev != null && Number(prev) > 0) base = Number(prev);
+    else if (reg != null && Number(reg) > 0) base = Number(reg);
     var c = Number(cur);
-    if (isNaN(r) || r <= 0 || isNaN(c)) return '';
-    return Number((((c - r) / r) * 100).toFixed(2));
+    if (base == null || base <= 0 || isNaN(c)) return '';
+    return Number((((c - base) / base) * 100).toFixed(2));
   }
 
   function downloadAllSkuCsv(collectedOnly) {
@@ -2394,7 +2419,7 @@
           alert('다운로드할 데이터가 없습니다.');
           return;
         }
-        var header = ['SKU_ID', '브랜드', '상품명', '등록가', '현재가', '변동률', '최종수집일', '그룹', '상태'];
+        var header = ['SKU_ID', '브랜드', '상품명', '등록가', '이전가', '현재가', '변동률', '최종수집일', '그룹', '상태'];
         var rows = [];
         for (var j = 0; j < rowsRaw.length; j++) {
           var rr = rowsRaw[j];
@@ -2403,8 +2428,9 @@
             rr.brand,
             rr.sku_name,
             rr.registered_price,
+            rr.prev_price || '',
             rr.current_price,
-            skuChangePctForCsv(rr.registered_price, rr.current_price),
+            skuChangePctForCsv(rr.registered_price, rr.current_price, rr.prev_price),
             rr.last_collected,
             rr.priority_group || '',
             rr.product_status || ''
@@ -2478,6 +2504,7 @@
             sku_name: ar.sku_name,
             brand: ar.brand,
             registered_price: ar.registered_price,
+            supply_price: ar.supply_price,
             prev_price: ar.prev_price,
             prev_collected_at: ar.prev_collected_at,
             new_price: ar.new_price,
@@ -2670,6 +2697,19 @@
           '</div>';
         h += '</td>';
       }
+      var supplyMoney = r.supply_price ? formatMoney(r.supply_price) : '—';
+      h += '<td class="num" style="font-size:12px;color:#6B7280;">' + escapeHtml(supplyMoney) + '</td>';
+      var marginHtml = '—';
+      var marginStyle = 'font-size:12px;color:#6B7280;';
+      if (r.supply_price && r.new_price && Number(r.new_price) > 0 && Number(r.supply_price) > 0) {
+        var marginPct = ((Number(r.new_price) - Number(r.supply_price)) / Number(r.new_price) * 100).toFixed(1);
+        marginHtml = escapeHtml(marginPct) + '%';
+        if (Number(marginPct) > 40) {
+          marginStyle = 'font-size:12px;font-weight:700;color:#DC2626;';
+          marginHtml += ' <span style="font-size:10px;background:#FEE2E2;color:#DC2626;padding:1px 6px;border-radius:4px;margin-left:4px;">조치필요</span>';
+        }
+      }
+      h += '<td class="num" style="' + marginStyle + '">' + marginHtml + '</td>';
       if (alertHasAdjustedBaseline(r)) {
         h +=
           '<td class="num">' +
@@ -3101,9 +3141,12 @@
   }
 
   function skuRowChangePctHtml(r) {
-    if (r.registered_price && r.current_price && r.registered_price > 0) {
-      var diff = r.current_price - r.registered_price;
-      var pctNum = Number(((diff / r.registered_price) * 100).toFixed(2));
+    if (r.current_price && r.current_price > 0) {
+      var base = (r.prev_price && Number(r.prev_price) > 0) ? Number(r.prev_price) :
+        (r.registered_price && Number(r.registered_price) > 0) ? Number(r.registered_price) : 0;
+      if (base > 0) {
+        var diff = r.current_price - base;
+        var pctNum = Number(((diff / base) * 100).toFixed(2));
       if (!isNaN(pctNum) && pctNum !== 0) {
         var sign = pctNum > 0 ? '▲' : '▼';
         var color = pctNum > 0 ? '#EF4444' : '#3B82F6';
@@ -3118,6 +3161,7 @@
           escapeHtml(txt) +
           '</span>'
         );
+      }
       }
     }
     return '<span class="muted">—</span>';
@@ -3599,6 +3643,7 @@
       if (isDisc) h += '<span style="font-size:11px;background:#FEE2E2;color:#DC2626;padding:2px 6px;border-radius:4px;margin-left:4px">판매중단</span>';
       h += '<div class="sku-id-sub">' + sidStr + '</div></td>';
       h += '<td class="num">' + escapeHtml(formatMoney(r.registered_price)) + '</td>';
+      h += '<td class="num">' + escapeHtml(formatMoney(r.supply_price)) + '</td>';
       if (isZeroPrice) {
         h += '<td class="num cell-current-price"><span style="color:#F04452;font-weight:700">0원</span></td>';
       } else {
@@ -3780,6 +3825,7 @@
       document.getElementById('e-brand-custom').value = br;
     }
     document.getElementById('e-reg-price').value = row.registered_price != null ? String(row.registered_price) : '';
+    document.getElementById('e-supply-price').value = row.supply_price != null ? String(row.supply_price) : '';
     document.getElementById('e-cycle').value = row.collect_cycle != null ? String(row.collect_cycle) : '7';
     document.getElementById('e-flag').value = row.flag || '';
     document.getElementById('e-priority-group').value =
@@ -5141,6 +5187,7 @@
     document.getElementById('f-brand-custom-wrap').style.display = 'none';
     document.getElementById('f-url').value = '';
     document.getElementById('f-reg-price').value = '';
+    document.getElementById('f-supply-price').value = '';
     document.getElementById('f-cycle').value = '7';
     document.getElementById('f-flag').value = '';
     document.getElementById('f-memo').value = '';
@@ -5186,6 +5233,7 @@
       return;
     }
     var reg = document.getElementById('f-reg-price').value;
+    var supply = document.getElementById('f-supply-price').value;
     var cycle = parseInt(document.getElementById('f-cycle').value, 10) || 7;
     var flag = document.getElementById('f-flag').value.trim();
     var memo = document.getElementById('f-memo').value.trim();
@@ -5197,6 +5245,7 @@
       collect_cycle: cycle
     };
     if (reg !== '') payload.registered_price = Number(reg);
+    if (supply !== '') payload.supply_price = Number(supply);
     if (flag) payload.flag = flag;
     if (memo) payload.memo = memo;
     apiFetch('POST', '/sku-add', payload)
@@ -5222,6 +5271,7 @@
       return;
     }
     var reg = document.getElementById('e-reg-price').value;
+    var supply = document.getElementById('e-supply-price').value;
     var cycle = parseInt(document.getElementById('e-cycle').value, 10);
     if (isNaN(cycle) || cycle < 1) cycle = 7;
     var flag = document.getElementById('e-flag').value.trim();
@@ -5233,6 +5283,7 @@
       brand: brand,
       collect_cycle: cycle,
       registered_price: reg !== '' ? Number(reg) : null,
+      supply_price: supply !== '' ? Number(supply) : null,
       flag: flag || null,
       memo: memo || null,
       priority_group: document.getElementById('e-priority-group').value,

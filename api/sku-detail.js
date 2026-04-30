@@ -25,7 +25,7 @@ async function fetchAllRows(client) {
     const { data, error } = await client
       .from('sku_list')
       .select(
-        'sku_id, brand, sku_name, registered_price, current_price, prev_price, memo, last_collected, collect_cycle, flag, product_url, product_status, priority_group, created_at, adjusted_price, is_active'
+        'sku_id, brand, sku_name, registered_price, current_price, prev_price, supply_price, memo, last_collected, collect_cycle, flag, product_url, product_status, priority_group, created_at, adjusted_price, is_active'
       )
       .order('brand')
       .order('sku_id')
@@ -153,6 +153,7 @@ module.exports = async (req, res) => {
       registered_price: r.registered_price,
       current_price,
       prev_price: r.prev_price != null ? r.prev_price : null,
+      supply_price: r.supply_price != null ? r.supply_price : null,
       change_pct,
       memo: r.memo,
       last_collected: r.last_collected

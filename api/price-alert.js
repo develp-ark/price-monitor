@@ -105,7 +105,7 @@ module.exports = async (req, res) => {
   if (ids.length > 0) {
     const { data: skus, error: sErr } = await client
       .from('sku_list')
-      .select('sku_id, sku_name, brand, registered_price')
+      .select('sku_id, sku_name, brand, registered_price, supply_price')
       .in('sku_id', ids);
     if (sErr) return json(res, 500, { ok: false, error: sErr.message });
     for (const s of skus || []) skuMap[s.sku_id] = s;
@@ -119,6 +119,7 @@ module.exports = async (req, res) => {
       sku_name: meta.sku_name || '',
       brand: meta.brand || '',
       registered_price: r.registered_price ?? meta.registered_price ?? null,
+      supply_price: meta.supply_price ?? null,
       prev_price: r.prev_price,
       prev_collected_at: r.prev_collected_at ?? null,
       new_price: r.new_price,

@@ -8,6 +8,7 @@ const COL_SKU_ID = 'SKU ID';
 const COL_SKU_NAME = 'SKU 명';
 const COL_URL = 'url';
 const COL_REGISTERED = '등록가';
+const COL_SUPPLY = '공급가';
 const COL_FLAG = '플래그';
 const COL_MEMO = '메모';
 
@@ -92,6 +93,12 @@ function rowToPayload(rec) {
     const n = parseInt(regRaw, 10);
     if (!Number.isNaN(n)) registered_price = n;
   }
+  const supplyRaw = String(rec[COL_SUPPLY] ?? '').replace(/,/g, '').trim();
+  let supply_price = null;
+  if (supplyRaw !== '') {
+    const sn = parseInt(supplyRaw, 10);
+    if (!Number.isNaN(sn)) supply_price = sn;
+  }
 
   const flagRaw = String(rec[COL_FLAG] ?? '').trim();
   const flag = flagRaw === '' ? null : flagRaw;
@@ -99,7 +106,16 @@ function rowToPayload(rec) {
   const memoRaw = String(rec[COL_MEMO] ?? '').trim();
   const memo = memoRaw === '' ? null : memoRaw;
 
-  return { sku_id, brand, sku_name, product_url, registered_price, flag, memo };
+  return {
+    sku_id,
+    brand,
+    sku_name,
+    product_url,
+    registered_price,
+    supply_price,
+    flag,
+    memo,
+  };
 }
 
 function dedupeBySkuId(rows) {
@@ -187,6 +203,7 @@ module.exports = async (req, res) => {
             sku_name: p.sku_name,
             product_url: p.product_url,
             registered_price: p.registered_price,
+            supply_price: p.supply_price,
             flag: p.flag,
             memo: p.memo,
           })
