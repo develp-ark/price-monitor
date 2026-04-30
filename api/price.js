@@ -153,6 +153,7 @@ module.exports = async (req, res) => {
 
   var skuUpdatePayload = {
     current_price: newPrice,
+    prev_price: skuRow ? skuRow.current_price : null,
     last_collected: new Date().toISOString(),
   };
   if (!product_status && newPrice > 0) {
