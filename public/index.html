@@ -644,10 +644,6 @@
     #alert-table-wrap table.data thead th.alert-sort-th:hover {
       background: #f0f4ff;
     }
-    #alert-table-wrap table.data th,
-    #alert-table-wrap table.data td {
-      white-space: nowrap;
-    }
     #alert-table-wrap .alert-sort-arrow {
       font-size: 10px;
       font-weight: 600;
@@ -2690,13 +2686,13 @@
       var prevMoney = formatMoney(r.prev_price);
       h += '<td class="num">';
       h +=
-        '<span style="font-size:13px;font-weight:600">' +
+        '<div style="font-size:13px;font-weight:600">' +
         (prevMoney ? escapeHtml(prevMoney) + '원' : '<span style="color:#D1D5DB">—</span>') +
-        '</span>';
+        '</div>';
       h +=
-        '<span style="font-size:10px;color:#9CA3AF;margin-left:6px">' +
+        '<div style="font-size:10px;color:#9CA3AF;margin-top:2px">' +
         escapeHtml(fmtCollectedAt(r.prev_collected_at)) +
-        '</span>';
+        '</div>';
       h += '</td>';
       var newPriceNum = Number(r.new_price);
       var zeroPrice = r.new_price == null || (!isNaN(newPriceNum) && newPriceNum <= 0);
@@ -2709,11 +2705,11 @@
       } else {
         var curMoney = formatMoney(r.new_price);
         h += '<td class="num">';
-        h += '<span style="font-size:13px;font-weight:600">' + escapeHtml(curMoney) + '원</span>';
+        h += '<div style="font-size:13px;font-weight:600">' + escapeHtml(curMoney) + '원</div>';
         h +=
-          '<span style="font-size:10px;color:#9CA3AF;margin-left:6px">' +
+          '<div style="font-size:10px;color:#9CA3AF;margin-top:2px">' +
           escapeHtml(fmtCollectedAt(r.new_collected_at)) +
-          '</span>';
+          '</div>';
         h += '</td>';
       }
       var supplyMoney = r.supply_price ? formatMoney(r.supply_price) : '—';
@@ -2726,7 +2722,7 @@
         var threshold = getMarginThreshold(r.brand);
         if (Number(marginPct) > threshold) {
           marginStyle = 'font-size:12px;font-weight:700;color:#DC2626;';
-          marginHtml += ' <span style="font-size:10px;background:#FEE2E2;color:#DC2626;padding:1px 6px;border-radius:4px;margin-left:4px;white-space:nowrap;">초과(' + threshold + '%)</span>';
+          marginHtml += '<div style="font-size:10px;background:#FEE2E2;color:#DC2626;padding:1px 6px;border-radius:4px;margin-top:2px;display:inline-block;">초과(' + threshold + '%)</div>';
         }
       }
       h += '<td class="num" style="' + marginStyle + '">' + marginHtml + '</td>';
