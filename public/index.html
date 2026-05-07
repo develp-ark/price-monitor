@@ -1042,6 +1042,7 @@
                 <th class="num">공급가</th>
                 <th class="num">현재가</th>
                 <th class="num">변동률</th>
+                <th class="num">마진율</th>
                 <th>그룹</th>
                 <th>최근수집</th>
                 <th>액션</th>
@@ -3650,6 +3651,14 @@
         h += '<td class="num cell-current-price">' + escapeHtml(formatMoney(r.current_price)) + '</td>';
       }
       h += '<td class="num">' + skuRowChangePctHtml(r) + '</td>';
+      // 마진율
+      var marginTd = '—';
+      if (r.supply_price && r.current_price && Number(r.current_price) > 0 && Number(r.supply_price) > 0) {
+        var mPct = ((Number(r.current_price) - Number(r.supply_price)) / Number(r.current_price) * 100).toFixed(1);
+        var mColor = Number(mPct) > 40 ? '#DC2626' : '#6B7280';
+        marginTd = '<span style="color:' + mColor + '">' + escapeHtml(mPct) + '%</span>';
+      }
+      h += '<td class="num" style="font-size:12px;">' + marginTd + '</td>';
       h += '<td>' + skuGroupBadgeHtml(r) + '</td>';
       h += '<td class="cell-last-collected">' + escapeHtml(fmtRecentShort(r.last_collected)) + '</td>';
       h += '<td><div class="sku-actions-inline">';
