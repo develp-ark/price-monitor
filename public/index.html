@@ -644,6 +644,10 @@
     #alert-table-wrap table.data thead th.alert-sort-th:hover {
       background: #f0f4ff;
     }
+    #alert-table-wrap table.data th,
+    #alert-table-wrap table.data td {
+      white-space: nowrap;
+    }
     #alert-table-wrap .alert-sort-arrow {
       font-size: 10px;
       font-weight: 600;
@@ -2686,13 +2690,13 @@
       var prevMoney = formatMoney(r.prev_price);
       h += '<td class="num">';
       h +=
-        '<div style="font-size:13px;font-weight:600">' +
+        '<span style="font-size:13px;font-weight:600">' +
         (prevMoney ? escapeHtml(prevMoney) + '원' : '<span style="color:#D1D5DB">—</span>') +
-        '</div>';
+        '</span>';
       h +=
-        '<div style="font-size:10px;color:#9CA3AF;margin-top:2px">' +
+        '<span style="font-size:10px;color:#9CA3AF;margin-left:6px">' +
         escapeHtml(fmtCollectedAt(r.prev_collected_at)) +
-        '</div>';
+        '</span>';
       h += '</td>';
       var newPriceNum = Number(r.new_price);
       var zeroPrice = r.new_price == null || (!isNaN(newPriceNum) && newPriceNum <= 0);
@@ -2705,11 +2709,11 @@
       } else {
         var curMoney = formatMoney(r.new_price);
         h += '<td class="num">';
-        h += '<div style="font-size:13px;font-weight:600">' + escapeHtml(curMoney) + '원</div>';
+        h += '<span style="font-size:13px;font-weight:600">' + escapeHtml(curMoney) + '원</span>';
         h +=
-          '<div style="font-size:10px;color:#9CA3AF;margin-top:2px">' +
+          '<span style="font-size:10px;color:#9CA3AF;margin-left:6px">' +
           escapeHtml(fmtCollectedAt(r.new_collected_at)) +
-          '</div>';
+          '</span>';
         h += '</td>';
       }
       var supplyMoney = r.supply_price ? formatMoney(r.supply_price) : '—';
@@ -2722,17 +2726,17 @@
         var threshold = getMarginThreshold(r.brand);
         if (Number(marginPct) > threshold) {
           marginStyle = 'font-size:12px;font-weight:700;color:#DC2626;';
-          marginHtml += ' <span style="font-size:10px;background:#FEE2E2;color:#DC2626;padding:1px 6px;border-radius:4px;margin-left:4px;">초과(' + threshold + '%)</span>';
+          marginHtml += ' <span style="font-size:10px;background:#FEE2E2;color:#DC2626;padding:1px 6px;border-radius:4px;margin-left:4px;white-space:nowrap;">초과(' + threshold + '%)</span>';
         }
       }
       h += '<td class="num" style="' + marginStyle + '">' + marginHtml + '</td>';
       if (alertHasAdjustedBaseline(r)) {
         h +=
           '<td class="num">' +
-          '<div style="font-size:13px;font-weight:600;color:#3182F6">' +
+          '<span style="font-size:13px;font-weight:600;color:#3182F6">' +
           escapeHtml(formatMoney(r.adjusted_price)) +
-          '원</div>' +
-          '<div style="font-size:10px;color:#9CA3AF;margin-top:2px">기준가</div>' +
+          '원</span>' +
+          '<span style="font-size:10px;color:#9CA3AF;margin-left:6px">기준가</span>' +
           '</td>';
       } else {
         h += '<td class="num" style="text-align:center;color:#D1D5DB">—</td>';
@@ -2772,11 +2776,11 @@
         if (hasMemo) {
           h +=
             '<td><span style="display:inline-block;padding:2px 8px;background:#FEF3C7;color:#D97706;border-radius:4px;font-size:11px;font-weight:600">미처리</span>' +
-            '<div style="margin-top:2px;font-size:10px;color:#6B7280;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' +
+            '<span style="margin-left:6px;font-size:10px;color:#6B7280;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle" title="' +
             escapeHtml(memoTrim) +
             '">' +
             escapeHtml(memoTrim) +
-            '</div></td>';
+            '</span></td>';
         } else {
           h +=
             '<td><span style="display:inline-block;padding:2px 8px;background:#FEE2E2;color:#DC2626;border-radius:4px;font-size:11px;font-weight:600">미처리</span></td>';
