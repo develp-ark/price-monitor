@@ -1276,6 +1276,20 @@
     { key: 'arico', label: '아리코 수집', shortLabel: '아리코 수집', action: 'collect_brand', brand: '아리코', dot: '#3B82F6' },
     { key: 'yoom', label: '윰 수집', shortLabel: '윰 수집', action: 'collect_brand', brand: '윰', dot: '#10B981' }
   ];
+  var BRAND_MARGIN_THRESHOLD = {
+    '아리코': 40,
+    '윰': 50,
+    '건우코리아': 45
+  };
+  var DEFAULT_MARGIN_THRESHOLD = 40;
+
+  function getMarginThreshold(brand) {
+    if (!brand) return DEFAULT_MARGIN_THRESHOLD;
+    for (var key in BRAND_MARGIN_THRESHOLD) {
+      if (brand.indexOf(key) >= 0 || key.indexOf(brand) >= 0) return BRAND_MARGIN_THRESHOLD[key];
+    }
+    return DEFAULT_MARGIN_THRESHOLD;
+  }
 
   function getDefaultKstWeekTabDay() {
     var parts = new Intl.DateTimeFormat('en', {
@@ -2705,9 +2719,10 @@
       if (r.supply_price && r.new_price && Number(r.new_price) > 0 && Number(r.supply_price) > 0) {
         var marginPct = ((Number(r.new_price) - Number(r.supply_price)) / Number(r.new_price) * 100).toFixed(1);
         marginHtml = escapeHtml(marginPct) + '%';
-        if (Number(marginPct) > 40) {
+        var threshold = getMarginThreshold(r.brand);
+        if (Number(marginPct) > threshold) {
           marginStyle = 'font-size:12px;font-weight:700;color:#DC2626;';
-          marginHtml += ' <span style="font-size:10px;background:#FEE2E2;color:#DC2626;padding:1px 6px;border-radius:4px;margin-left:4px;">조치필요</span>';
+          marginHtml += ' <span style="font-size:10px;background:#FEE2E2;color:#DC2626;padding:1px 6px;border-radius:4px;margin-left:4px;">초과(' + threshold + '%)</span>';
         }
       }
       h += '<td class="num" style="' + marginStyle + '">' + marginHtml + '</td>';
@@ -3655,7 +3670,8 @@
       var marginTd = '—';
       if (r.supply_price && r.current_price && Number(r.current_price) > 0 && Number(r.supply_price) > 0) {
         var mPct = ((Number(r.current_price) - Number(r.supply_price)) / Number(r.current_price) * 100).toFixed(1);
-        var mColor = Number(mPct) > 40 ? '#DC2626' : '#6B7280';
+        var mThreshold = getMarginThreshold(r.brand);
+        var mColor = Number(mPct) > mThreshold ? '#DC2626' : '#6B7280';
         marginTd = '<span style="color:' + mColor + '">' + escapeHtml(mPct) + '%</span>';
       }
       h += '<td class="num" style="font-size:12px;">' + marginTd + '</td>';
