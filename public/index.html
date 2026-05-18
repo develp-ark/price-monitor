@@ -926,7 +926,7 @@
 
       <div class="card" id="card-dash-schedule">
         <div class="card-head">
-          <h2>스케줄 현황 (주간 분배)</h2>
+          <h2>스케줄 현황 (10세트 분배)</h2>
           <div style="display:flex;gap:8px;align-items:center;">
             <button type="button" class="btn btn-ghost" id="btn-all-sku-csv">전체 SKU CSV</button>
             <button type="button" class="btn btn-ghost" id="btn-dash-auto-dist">자동 분배</button>
@@ -1267,10 +1267,11 @@
 (function () {
   var API_BASE = '/api';
   var DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
+  var SCHEDULE_SET_COUNT = 10;
   var allAlertData = [];
   var currentAlertItem = null;
   var COLLECT_MODES = [
-    { key: 'schedule_today', label: '스케줄 수집 (오늘)', shortLabel: '스케줄 수집', action: 'collect_schedule' },
+    { key: 'schedule_today', label: '스케줄 수집 (다음 세트)', shortLabel: '스케줄 수집', action: 'collect_schedule' },
     { key: 'all', label: '전체 SKU 수집', shortLabel: '전체 SKU 수집', action: 'collect_all' },
     { key: 'kunwoo', label: '건우코리아 수집', shortLabel: '건우코리아 수집', action: 'collect_brand', brand: '건우코리아', dot: '#EF4444' },
     { key: 'arico', label: '아리코 수집', shortLabel: '아리코 수집', action: 'collect_brand', brand: '아리코', dot: '#3B82F6' },
@@ -1291,17 +1292,15 @@
     return DEFAULT_MARGIN_THRESHOLD;
   }
 
+  function scheduleSetLabel(n) {
+    var num = Number(n);
+    if (num >= 1 && num <= SCHEDULE_SET_COUNT) return num + '세트';
+    return '';
+  }
+
   function getDefaultKstWeekTabDay() {
-    var parts = new Intl.DateTimeFormat('en', {
-      timeZone: 'Asia/Seoul',
-      weekday: 'short'
-    }).formatToParts(new Date());
-    var w = '';
-    for (var wi = 0; wi < parts.length; wi++) {
-      if (parts[wi].type === 'weekday') w = parts[wi].value;
-    }
-    var mapEn = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5 };
-    if (mapEn[w]) return mapEn[w];
+    var n = Number(state.scheduleNextSet);
+    if (n >= 1 && n <= SCHEDULE_SET_COUNT) return n;
     return 1;
   }
 
@@ -1368,6 +1367,7 @@
       }
     })(),
     scheduleDayCounts: {},
+    scheduleNextSet: 1,
     dashScheduleDetailDay: null,
     todaySkuListExpanded: false,
     queueCollectRunActive: false,
@@ -1413,6 +1413,14 @@
 
     if (event.data.type === 'SCHEDULE_COLLECT_DONE') {
       loadCollectStatus();
+      if (event.data.success) {
+        apiFetch('POST', '/collect-schedule', { action: 'advance_schedule_set' })
+          .then(function () {
+            refreshCollectModeCounts();
+            loadScheduleSummary();
+          })
+          .catch(function () {});
+      }
     }
   });
 
@@ -2022,8 +2030,7 @@
 
   function todayTabDayLabel(d) {
     var n = Number(d);
-    if (n >= 1 && n <= 5 && DAY_NAMES[n]) return DAY_NAMES[n];
-    return '';
+    return scheduleSetLabel(n);
   }
 
   function setTodayEmptyMessage() {
@@ -2041,15 +2048,16 @@
     }
     var lab = todayTabDayLabel(state.todayTabKey);
     el.textContent = lab
-      ? lab + '요일에 배정된 SKU가 없습니다.'
-      : '해당 요일에 배정된 SKU가 없습니다.';
+      ? lab + '에 배정된 SKU가 없습니다.'
+      : '해당 세트에 배정된 SKU가 없습니다.';
   }
 
   function renderTodayWeekTabs() {
     var el = document.getElementById('today-week-tabs');
     if (!el) return;
     var cnt = state.scheduleDayCounts || {};
-    var labs = ['월', '화', '수', '목', '금'];
+    var labs = [];
+    for (var li = 1; li <= SCHEDULE_SET_COUNT; li++) labs.push(String(li));
     var st = (window._lastCollectStatus && window._lastCollectStatus.status) || 'idle';
     var htm = '';
     var currentOn = String(state.todayTabKey) === 'current' ? 'on' : '';
@@ -2060,7 +2068,7 @@
       currentTail = '<span style="margin-left:4px;color:#10B981;font-weight:700;">✓</span>';
     }
     htm += '<button type="button" data-today-tab="current" class="' + currentOn + '">현재 수집' + currentTail + '</button>';
-    for (var ti = 0; ti < 5; ti++) {
+    for (var ti = 0; ti < SCHEDULE_SET_COUNT; ti++) {
       var day = ti + 1;
       var num = cnt[day] != null ? cnt[day] : 0;
       var onCls = String(state.todayTabKey) === String(day) ? 'on' : '';
@@ -3188,7 +3196,7 @@
     if (!days || !days.length) return '<span class="muted">미배정</span>';
     var parts = [];
     for (var i = 0; i < days.length; i++) {
-      parts.push(DAY_NAMES[days[i]]);
+      parts.push(scheduleSetLabel(days[i]) || String(days[i]));
     }
     return escapeHtml(parts.join(','));
   }
@@ -3227,7 +3235,7 @@
     var pop = document.getElementById('schedule-popover');
     var days = state.skuScheduleMap[String(skuId)] || [];
     var inner = '';
-    for (var d = 0; d < 7; d++) {
+    for (var d = 1; d <= SCHEDULE_SET_COUNT; d++) {
       var chk = days.indexOf(d) >= 0 ? ' checked' : '';
       inner +=
         '<label><input type="checkbox" data-day="' +
@@ -3235,7 +3243,7 @@
         '"' +
         chk +
         ' /><span>' +
-        escapeHtml(DAY_NAMES[d]) +
+        escapeHtml(scheduleSetLabel(d)) +
         '</span></label>';
     }
     pop.innerHTML = inner;
@@ -3981,11 +3989,11 @@
     refreshCollectModeCounts();
   }
 
-  function renderDashScheduleWeekCards(dayCounts, brandByDay, todayDayNum) {
+  function renderDashScheduleWeekCards(dayCounts, brandByDay, currentSetNum) {
     var el = document.getElementById('dash-schedule-week-cards');
     if (!el) return;
     var h = '';
-    for (var di = 1; di <= 5; di++) {
+    for (var di = 1; di <= SCHEDULE_SET_COUNT; di++) {
       var total = Number(dayCounts[di]) || 0;
       var bc = brandByDay[di] || { kun: 0, ari: 0, yoom: 0, other: 0 };
       var k = bc.kun || 0;
@@ -3995,14 +4003,14 @@
       var sumB = k + a + y + o;
       h +=
         '<div class="dash-sch-card' +
-        (di === todayDayNum ? ' is-today' : '') +
+        (di === currentSetNum ? ' is-today' : '') +
         (state.dashScheduleDetailDay === di ? ' is-open-selection' : '') +
         '" data-dash-sch-day="' +
         di +
         '" onclick="toggleScheduleDetail(' +
         di +
         ')">';
-      h += '<div class="dash-sch-card-head"><span class="day-lab">' + escapeHtml(DAY_NAMES[di]) + '</span>';
+      h += '<div class="dash-sch-card-head"><span class="day-lab">' + escapeHtml(scheduleSetLabel(di)) + '</span>';
       h += '<span class="day-cnt">' + escapeHtml(String(total)) + '</span></div>';
       h += '<div class="dash-sch-brand-bar">';
       if (sumB > 0) {
@@ -4047,15 +4055,23 @@
         if (isNaN(aGroup)) aGroup = 0;
         if (isNaN(bGroup)) bGroup = 0;
 
-        var dayCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-        for (var d = 1; d <= 5; d++) {
-          var n = Number(summary[d]);
-          dayCounts[d] = isNaN(n) ? 0 : n;
+        var dayCounts = {};
+        for (var d = 1; d <= SCHEDULE_SET_COUNT; d++) {
+          dayCounts[d] = 0;
+        }
+        for (var dk in summary) {
+          if (!Object.prototype.hasOwnProperty.call(summary, dk)) continue;
+          var dn = Number(dk);
+          if (dn >= 1 && dn <= SCHEDULE_SET_COUNT) {
+            var nv = Number(summary[dk]);
+            dayCounts[dn] = isNaN(nv) ? 0 : nv;
+          }
         }
         state.scheduleDayCounts = dayCounts;
+        state.scheduleNextSet = Number(json && json.schedule_next_set) || 1;
 
-        var assignedCount =
-          dayCounts[1] + dayCounts[2] + dayCounts[3] + dayCounts[4] + dayCounts[5];
+        var assignedCount = 0;
+        for (var dc = 1; dc <= SCHEDULE_SET_COUNT; dc++) assignedCount += dayCounts[dc] || 0;
         var totalActive = aGroup + bGroup;
         var unassignedCount = totalActive - assignedCount;
         if (unassignedCount < 0) unassignedCount = 0;
@@ -4075,18 +4091,20 @@
           grpHint.textContent =
             'A그룹 ' +
             aGroup +
-            '개 (매일) / B그룹 ' +
+            '개 / B그룹 ' +
             bGroup +
-            '개 (주 1회)';
+            '개 — 10세트 순환 (다음 실행: ' +
+            state.scheduleNextSet +
+            '세트)';
         }
 
         var fetches = [];
-        for (var di = 1; di <= 5; di++) {
+        for (var di = 1; di <= SCHEDULE_SET_COUNT; di++) {
           fetches.push(apiFetch('GET', '/collect-schedule?day=' + encodeURIComponent(String(di)), null));
         }
         return Promise.all(fetches).then(function (dayJsons) {
           var brandByDay = {};
-          for (var i = 0; i < 5; i++) {
+          for (var i = 0; i < SCHEDULE_SET_COUNT; i++) {
             var dNum = i + 1;
             var items = (dayJsons[i] && dayJsons[i].data) || [];
             var kun = 0;
@@ -4102,8 +4120,8 @@
             }
             brandByDay[dNum] = { kun: kun, ari: ari, yoom: yoom, other: other };
           }
-          var todayNum = getDefaultKstWeekTabDay();
-          renderDashScheduleWeekCards(dayCounts, brandByDay, todayNum);
+          var currentSetNum = state.scheduleNextSet || 1;
+          renderDashScheduleWeekCards(dayCounts, brandByDay, currentSetNum);
           if (state.dashScheduleDetailDay) {
             refreshScheduleDetailPanel(state.dashScheduleDetailDay);
           }
@@ -4223,7 +4241,7 @@
         var wrap = document.getElementById('schedule-detail-table-wrap');
         var panel = document.getElementById('schedule-detail-panel');
         if (titleEl) {
-          titleEl.textContent = DAY_NAMES[day] + '요일 SKU 목록 (' + items.length + '개)';
+          titleEl.textContent = scheduleSetLabel(day) + ' SKU 목록 (' + items.length + '개)';
         }
         if (wrap) wrap.innerHTML = renderScheduleDetailTableHtml(items);
         if (panel) panel.style.display = 'block';
@@ -4264,7 +4282,7 @@
       }
     }
     var titleEl = document.getElementById('schedule-detail-title');
-    if (titleEl) titleEl.textContent = DAY_NAMES[n] + '요일 SKU 목록 (…)';
+    if (titleEl) titleEl.textContent = scheduleSetLabel(n) + ' SKU 목록 (…)';
     var wrap = document.getElementById('schedule-detail-table-wrap');
     if (wrap) wrap.innerHTML = '';
     if (panel) panel.style.display = 'block';
@@ -4274,7 +4292,7 @@
   function downloadScheduleDetailCsv() {
     var day = Number(state.dashScheduleDetailDay);
     if (isNaN(day) || day < 1 || day > 5) {
-      showManualToast('먼저 요일 카드를 선택해 주세요');
+      showManualToast('먼저 세트 카드를 선택해 주세요');
       return;
     }
     apiFetch('GET', '/collect-schedule?day=' + encodeURIComponent(String(day)), null)
@@ -4307,7 +4325,8 @@
   }
 
   function scheduleBuildState(allSkus, scheduleData) {
-    var dayMap = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+    var dayMap = {};
+    for (var dm = 1; dm <= SCHEDULE_SET_COUNT; dm++) dayMap[dm] = [];
     var assignedIds = {};
     var skuMap = {};
     var i;
@@ -4320,7 +4339,7 @@
       var d = Number(row.day_of_week);
       var sid = String(row.sku_id || '');
       if (!sid) continue;
-      if (d >= 1 && d <= 5) {
+      if (d >= 1 && d <= SCHEDULE_SET_COUNT) {
         if (dayMap[d].indexOf(sid) === -1) dayMap[d].push(sid);
         assignedIds[sid] = true;
       }
@@ -4469,8 +4488,10 @@
     var tbody = document.getElementById('schedule-summary-tbody');
     if (!tbody) return;
     tbody.innerHTML = '';
-    var dayNames = { 1: '월요일', 2: '화요일', 3: '수요일', 4: '목요일', 5: '금요일' };
-    var days = [1, 2, 3, 4, 5];
+    var dayNames = {};
+    for (var dn = 1; dn <= SCHEDULE_SET_COUNT; dn++) dayNames[dn] = scheduleSetLabel(dn);
+    var days = [];
+    for (var dsi = 1; dsi <= SCHEDULE_SET_COUNT; dsi++) days.push(dsi);
     for (var i = 0; i < days.length; i++) {
       var d = days[i];
       var skus = dayMap[d] || [];
@@ -4646,7 +4667,7 @@
     document.getElementById('btn-assign-selected').onclick = function () {
       var day = Number(document.getElementById('assign-day-select').value);
       if (!day) {
-        alert('요일을 선택하세요.');
+        alert('세트(1~10)를 선택하세요.');
         return;
       }
       var ids = [];
@@ -4848,13 +4869,24 @@
           return;
         }
         var mins = Math.max(1, Math.ceil((total * 15) / 60));
+        var setHint = '';
+        if (mode.action === 'collect_schedule' && d.schedule_set) {
+          setHint =
+            '\n[이번 실행: ' +
+            d.schedule_set +
+            '세트 / 총 ' +
+            (d.schedule_set_count || SCHEDULE_SET_COUNT) +
+            '세트 순환]';
+        }
         var msg =
           mode.shortLabel +
           ' — ' +
           total +
           '개 SKU를 수집합니다. 예상 소요시간: 약 ' +
           mins +
-          '분\n시작할까요?';
+          '분' +
+          setHint +
+          '\n시작할까요?';
         if (!confirm(msg)) return;
         var label = mode.shortLabel || mode.label || '수집';
         window._collectItems = d.items || [];
@@ -5387,7 +5419,7 @@
   if (_elBtnSkuCsvDl) _elBtnSkuCsvDl.addEventListener('click', btnSkuCsvDl);
 
   function runAutoDistributeAfterConfirm() {
-    if (!confirm('SKU를 요일에 자동 분배할까요?')) return;
+    if (!confirm('SKU를 10세트에 자동 분배할까요? (기존 배정은 초기화됩니다)')) return;
     apiFetch('POST', '/collect-schedule', { action: 'auto_distribute' })
       .then(function () {
         invalidateSkuCache();

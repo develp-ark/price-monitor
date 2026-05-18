@@ -15,11 +15,43 @@ function parseBody(req, res) {
   return body || {};
 }
 
-function parseDay(dayRaw) {
-  if (dayRaw === 'today') return new Date().getDay();
+/** day_of_week 컬럼 = 수집 세트 번호 1~10 (요일 아님) */
+const SCHEDULE_SET_COUNT = 10;
+
+function parseSetIndex(dayRaw) {
+  if (dayRaw === 'today') return null;
   const day = Number(dayRaw);
-  if (!Number.isInteger(day) || day < 0 || day > 6) return null;
+  if (!Number.isInteger(day) || day < 1 || day > SCHEDULE_SET_COUNT) return null;
   return day;
+}
+
+async function readNextSet(client) {
+  const { data, error } = await client
+    .from('collect_status')
+    .select('schedule_next_set')
+    .eq('id', 1)
+    .maybeSingle();
+  if (error) {
+    console.warn('[collect-schedule] readNextSet', error.message);
+    return 1;
+  }
+  const n = Number(data && data.schedule_next_set);
+  if (!Number.isInteger(n) || n < 1 || n > SCHEDULE_SET_COUNT) return 1;
+  return n;
+}
+
+async function advanceNextSet(client) {
+  const current = await readNextSet(client);
+  const next = current >= SCHEDULE_SET_COUNT ? 1 : current + 1;
+  const { error } = await client
+    .from('collect_status')
+    .update({ schedule_next_set: next, updated_at: new Date().toISOString() })
+    .eq('id', 1);
+  if (error) {
+    console.warn('[collect-schedule] advanceNextSet', error.message);
+    return current;
+  }
+  return next;
 }
 
 async function loadDayRows(client, day) {
@@ -143,9 +175,11 @@ module.exports = async (req, res) => {
     if (req.query.day === undefined) {
       try {
         const allRows = await fetchAllScheduleDaysPaged(client);
-        const summary = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+        const summary = {};
+        for (let si = 1; si <= SCHEDULE_SET_COUNT; si++) summary[si] = 0;
         allRows.forEach(function (r) {
-          summary[r.day_of_week]++;
+          const k = Number(r.day_of_week);
+          if (k >= 1 && k <= SCHEDULE_SET_COUNT) summary[k]++;
         });
         const groupRows = await fetchActivePriorityGroupRowsPaged(client);
         let aCount = 0;
@@ -154,11 +188,14 @@ module.exports = async (req, res) => {
           if (r.priority_group === 'A') aCount++;
           else bCount++;
         });
+        const scheduleNextSet = await readNextSet(client);
         return json(res, 200, {
           ok: true,
           summary,
           a_group: aCount,
           b_group: bCount,
+          schedule_next_set: scheduleNextSet,
+          schedule_set_count: SCHEDULE_SET_COUNT,
         });
       } catch (e) {
         return json(res, 500, {
@@ -178,13 +215,25 @@ module.exports = async (req, res) => {
       return json(res, 200, { ok: true, count: (data || []).length, data: data || [] });
     }
 
-    const day = parseDay(req.query.day);
-    if (day == null) {
-      return json(res, 400, { ok: false, error: 'day must be 0..6 or today' });
+    let setIndex = parseSetIndex(req.query.day);
+    if (req.query.day === 'today') {
+      setIndex = await readNextSet(client);
+    }
+    if (setIndex == null) {
+      return json(res, 400, {
+        ok: false,
+        error: 'day must be 1..' + SCHEDULE_SET_COUNT + ' or today',
+      });
     }
     try {
-      const data = await loadDayRows(client, day);
-      return json(res, 200, { ok: true, day_of_week: day, count: data.length, data });
+      const data = await loadDayRows(client, setIndex);
+      return json(res, 200, {
+        ok: true,
+        schedule_set: setIndex,
+        day_of_week: setIndex,
+        count: data.length,
+        data,
+      });
     } catch (e) {
       return json(res, 500, { ok: false, error: e.message || 'Failed to load schedule' });
     }
@@ -193,10 +242,10 @@ module.exports = async (req, res) => {
   if (req.method === 'DELETE') {
     const body = parseBody(req, res);
     if (!body) return;
-    const day = parseDay(body.day_of_week);
+    const day = parseSetIndex(body.day_of_week);
     const sku_id = String(body.sku_id || '').trim();
     if (day == null || !sku_id) {
-      return json(res, 400, { ok: false, error: 'day_of_week and sku_id are required' });
+      return json(res, 400, { ok: false, error: 'day_of_week (1..10) and sku_id are required' });
     }
 
     const { error } = await client
@@ -216,26 +265,34 @@ module.exports = async (req, res) => {
   const body = parseBody(req, res);
   if (!body) return;
 
+  if (body.action === 'advance_schedule_set') {
+    try {
+      const next = await advanceNextSet(client);
+      return json(res, 200, { ok: true, schedule_next_set: next });
+    } catch (e) {
+      return json(res, 500, { ok: false, error: e.message || 'Failed to advance set' });
+    }
+  }
+
   if (body.action === 'auto_distribute') {
     try {
       const bSkus = await fetchSkuListBGroup(client);
       const aSkus = await fetchSkuListAGroup(client);
-      const days = [1, 2, 3, 4, 5];
+      const sets = [];
+      for (let si = 1; si <= SCHEDULE_SET_COUNT; si++) sets.push(si);
 
       const { error: delErr } = await client
         .from('collect_schedule')
         .delete()
-        .in('day_of_week', days);
+        .in('day_of_week', sets);
       if (delErr) return json(res, 500, { ok: false, error: delErr.message });
 
       const inserts = [];
       bSkus.forEach(function (s, idx) {
-        inserts.push({ sku_id: s.sku_id, day_of_week: days[idx % 5] });
+        inserts.push({ sku_id: s.sku_id, day_of_week: sets[idx % sets.length] });
       });
-      aSkus.forEach(function (s) {
-        days.forEach(function (d) {
-          inserts.push({ sku_id: s.sku_id, day_of_week: d });
-        });
+      aSkus.forEach(function (s, idx) {
+        inserts.push({ sku_id: s.sku_id, day_of_week: sets[idx % sets.length] });
       });
 
       for (let b = 0; b < inserts.length; b += 500) {
@@ -244,16 +301,18 @@ module.exports = async (req, res) => {
         if (insErr) return json(res, 500, { ok: false, error: insErr.message });
       }
 
-      const summary = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+      const summary = {};
+      for (let sj = 1; sj <= SCHEDULE_SET_COUNT; sj++) summary[sj] = 0;
       inserts.forEach(function (r) {
         summary[r.day_of_week]++;
       });
 
       return json(res, 200, {
         ok: true,
-        message: 'Auto-distribute complete',
+        message: 'Auto-distribute complete (10 sets)',
         a_group: aSkus.length,
         b_group: bSkus.length,
+        schedule_set_count: SCHEDULE_SET_COUNT,
         summary,
       });
     } catch (e) {
@@ -265,23 +324,35 @@ module.exports = async (req, res) => {
   }
 
   if (body.action === 'collect_schedule') {
-    var kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
-    var kstDay = kstNow.getUTCDay();
     var today = todayUtcYmd();
+    var currentSet = await readNextSet(client);
 
-    // collect_schedule 테이블에서 오늘 요일의 sku_id 조회 (페이지네이션)
     var schedIds = [];
     var sFrom = 0;
     while (true) {
-      var sResult = await client.from('collect_schedule').select('sku_id').eq('day_of_week', kstDay).range(sFrom, sFrom + 999);
+      var sResult = await client
+        .from('collect_schedule')
+        .select('sku_id')
+        .eq('day_of_week', currentSet)
+        .range(sFrom, sFrom + 999);
       if (sResult.error) return json(res, 500, { ok: false, error: sResult.error.message });
-      schedIds = schedIds.concat((sResult.data || []).map(function(r) { return r.sku_id; }));
+      schedIds = schedIds.concat((sResult.data || []).map(function (r) {
+        return r.sku_id;
+      }));
       if (!sResult.data || sResult.data.length < 1000) break;
       sFrom += 1000;
     }
 
     if (!schedIds.length) {
-      return json(res, 200, { ok: true, action: 'collect_schedule', day_of_week: kstDay, items: [], total: 0 });
+      return json(res, 200, {
+        ok: true,
+        action: 'collect_schedule',
+        schedule_set: currentSet,
+        schedule_set_count: SCHEDULE_SET_COUNT,
+        day_of_week: currentSet,
+        items: [],
+        total: 0,
+      });
     }
 
     // sku_list에서 해당 SKU 정보 조회 (페이지네이션, is_active=true)
@@ -302,10 +373,12 @@ module.exports = async (req, res) => {
     return json(res, 200, {
       ok: true,
       action: 'collect_schedule',
-      day_of_week: kstDay,
+      schedule_set: currentSet,
+      schedule_set_count: SCHEDULE_SET_COUNT,
+      day_of_week: currentSet,
       items: dueItems,
       total: dueItems.length,
-      skipped: Math.max(0, items.length - dueItems.length)
+      skipped: Math.max(0, items.length - dueItems.length),
     });
   }
 
@@ -342,13 +415,13 @@ module.exports = async (req, res) => {
     return json(res, 200, { ok: true, action: 'collect_brand', brand: brandName, items: brandItems, total: brandItems.length });
   }
 
-  const day = parseDay(body.day_of_week);
+  const day = parseSetIndex(body.day_of_week);
   const sku_ids = Array.isArray(body.sku_ids)
     ? body.sku_ids.map((x) => String(x || '').trim()).filter(Boolean)
     : [];
 
   if (day == null || !sku_ids.length) {
-    return json(res, 400, { ok: false, error: 'day_of_week and sku_ids[] are required' });
+    return json(res, 400, { ok: false, error: 'day_of_week (1..10) and sku_ids[] are required' });
   }
 
   const { error: delErr } = await client
