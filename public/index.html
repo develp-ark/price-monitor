@@ -1299,6 +1299,7 @@
   }
 
   function getDefaultKstWeekTabDay() {
+    if (typeof state === 'undefined' || !state) return 1;
     var n = Number(state.scheduleNextSet);
     if (n >= 1 && n <= SCHEDULE_SET_COUNT) return n;
     return 1;
