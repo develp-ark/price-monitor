@@ -897,6 +897,27 @@
             <span id="collect-badge" class="badge idle">idle</span>
             <div id="collect-detail" class="hint" style="margin-top:8px;">—</div>
             <div class="progress-bar" id="collect-progress-wrap" style="display:none;"><div id="collect-progress-bar" style="width:0%;"></div></div>
+            <div id="collect-cooldown-banner" style="display:none; margin:8px 0; padding:12px 16px; background:#FFF7ED; border:1px solid #FDBA74; border-radius:8px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:18px;">⏸</span>
+                <div>
+                  <div id="cooldown-title" style="font-weight:700; color:#C2410C; font-size:13px;">쿠팡 차단 감지 — 쿨다운 중</div>
+                  <div style="font-size:12px; color:#9A3412;">
+                    <span id="cooldown-reason"></span> ·
+                    남은 시간: <span id="cooldown-remaining" style="font-weight:700;">--:--</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="collect-paused-banner" style="display:none; margin:8px 0; padding:12px 16px; background:#FEF2F2; border:1px solid #FECACA; border-radius:8px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:18px;">🛑</span>
+                <div>
+                  <div style="font-weight:700; color:#DC2626; font-size:13px;">쿠팡 반복 차단 — 수집 중단됨</div>
+                  <div id="paused-detail" style="font-size:12px; color:#991B1B;"></div>
+                </div>
+              </div>
+            </div>
             <div id="collect-running-text" class="hint" style="display:none;"></div>
             <button type="button" id="btn-open-current-collect-modal" onclick="toggleCollectListPanel()" style="display:none;margin-top:8px;padding:0;border:none;background:none;color:#3182F6;font-size:12px;cursor:pointer;text-decoration:underline;">현재 수집 목록 보기</button>
           </div>
@@ -1400,6 +1421,44 @@
     if (event.data.type === 'PRICE_COLLECT_RESULT') {
       handleCollectResult(event.data);
       handleRetryCollectResult(event.data);
+    }
+
+    if (event.data.type === 'COLLECT_COOLDOWN') {
+      var banner = document.getElementById('collect-cooldown-banner');
+      var reasonEl = document.getElementById('cooldown-reason');
+      var remainEl = document.getElementById('cooldown-remaining');
+      if (banner) {
+        banner.style.display = 'block';
+        var reasonText = event.data.reason === 'RET9999' ? 'RET9999 차단' : '시스템 오류';
+        if (reasonEl) reasonEl.textContent = reasonText;
+        var endTime = event.data.nextAttemptAt || (Date.now() + (event.data.ms || 60000));
+        if (window._cooldownTimer) clearInterval(window._cooldownTimer);
+        window._cooldownTimer = setInterval(function () {
+          var left = Math.max(0, endTime - Date.now());
+          var min = Math.floor(left / 60000);
+          var sec = Math.floor((left % 60000) / 1000);
+          if (remainEl) remainEl.textContent = min + ':' + (sec < 10 ? '0' : '') + sec;
+          if (left <= 0) {
+            clearInterval(window._cooldownTimer);
+            banner.style.display = 'none';
+          }
+        }, 1000);
+      }
+    }
+
+    if (event.data.type === 'COLLECT_PAUSED_BY_BLOCK') {
+      var coolBanner = document.getElementById('collect-cooldown-banner');
+      if (coolBanner) coolBanner.style.display = 'none';
+      if (window._cooldownTimer) clearInterval(window._cooldownTimer);
+      var pausedBanner = document.getElementById('collect-paused-banner');
+      var pausedDetail = document.getElementById('paused-detail');
+      if (pausedBanner) {
+        pausedBanner.style.display = 'block';
+        var blockCount = event.data.totalBlocks || event.data.blockCount || '5';
+        var msg = '누적 차단 ' + blockCount + '회 초과';
+        if (event.data.reason) msg += ' (' + event.data.reason + ')';
+        if (pausedDetail) pausedDetail.textContent = msg;
+      }
     }
 
     if (event.data.type === 'FORCE_STOP_RESULT') {
@@ -4798,6 +4857,11 @@
   });
 
   function beginDashboardCollect(list, mode) {
+    var cdBanner = document.getElementById('collect-cooldown-banner');
+    var pBanner = document.getElementById('collect-paused-banner');
+    if (cdBanner) cdBanner.style.display = 'none';
+    if (pBanner) pBanner.style.display = 'none';
+    if (window._cooldownTimer) clearInterval(window._cooldownTimer);
     lastTableRefresh = 0;
     state.dashboardCollectPending = true;
     state.collectRunKind = mode && mode.shortLabel ? mode.shortLabel : '수집';
