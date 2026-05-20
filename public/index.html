@@ -1473,14 +1473,13 @@
 
     if (event.data.type === 'SCHEDULE_COLLECT_DONE') {
       loadCollectStatus();
-      if (event.data.success) {
-        apiFetch('POST', '/collect-schedule', { action: 'advance_schedule_set' })
-          .then(function () {
-            refreshCollectModeCounts();
-            loadScheduleSummary();
-          })
-          .catch(function () {});
-      }
+      // 수집 실행 완료 시 항상 다음 세트로 진행 (실패가 많아도 같은 세트 반복 방지)
+      apiFetch('POST', '/collect-schedule', { action: 'advance_schedule_set' })
+        .then(function () {
+          refreshCollectModeCounts();
+          loadScheduleSummary();
+        })
+        .catch(function () {});
     }
   });
 
